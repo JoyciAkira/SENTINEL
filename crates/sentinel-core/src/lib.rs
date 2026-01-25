@@ -9,7 +9,7 @@
 //!
 //! 1. **Goal Manifold** (`goal_manifold`): Immutable, cryptographically verified goal representation ✅
 //! 2. **Alignment Field** (`alignment`): Continuous validation of goal alignment ✅
-//! 3. **Cognitive State** (future): Self-aware execution with meta-cognition
+//! 3. **Cognitive State** (`cognitive_state`): Self-aware execution with meta-cognition ✅
 //! 4. **Memory Manifold** (future): Hierarchical infinite-context memory
 //! 5. **Meta-Learning** (future): Cross-project learning and improvement
 //!
@@ -78,6 +78,7 @@
 )]
 
 pub mod alignment;
+pub mod cognitive_state;
 pub mod error;
 pub mod goal_manifold;
 pub mod types;
@@ -86,6 +87,7 @@ pub mod types;
 pub use alignment::{
     AlignmentField, AlignmentVector, MonteCarloSimulator, ProjectState, SimulationResult,
 };
+pub use cognitive_state::{Action, ActionDecision, CognitiveMode, CognitiveState};
 pub use error::{Result, SentinelError};
 pub use goal_manifold::{GoalManifold, Intent};
 pub use types::{Blake3Hash, GoalStatus, ProbabilityDistribution, Timestamp};
