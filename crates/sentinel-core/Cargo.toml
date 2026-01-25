@@ -1,0 +1,34 @@
+[package]
+name = "sentinel-core"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+description = "Core engine for Sentinel - Goal-aligned AI coding agent"
+
+[lib]
+crate-type = ["lib", "cdylib", "staticlib"]
+
+[dependencies]
+# Workspace dependencies
+serde.workspace = true
+serde_json.workspace = true
+uuid.workspace = true
+blake3.workspace = true
+chrono.workspace = true
+thiserror.workspace = true
+anyhow.workspace = true
+tokio.workspace = true
+
+# Graph data structures
+petgraph = "0.6"
+
+# Additional utilities
+hex = "0.4"
+rand = "0.8"
+
+[dev-dependencies]
+proptest.workspace = true
+tokio-test = "0.4"
