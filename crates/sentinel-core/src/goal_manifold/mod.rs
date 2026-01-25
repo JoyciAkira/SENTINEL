@@ -369,6 +369,11 @@ impl GoalManifold {
         self.goal_dag.get_ready_goals()
     }
 
+    /// Get all goals in the manifold
+    pub fn all_goals(&self) -> Vec<&Goal> {
+        self.goal_dag.goals().collect()
+    }
+
     /// Get the total number of goals
     pub fn goal_count(&self) -> usize {
         self.goal_dag.len()

@@ -7,8 +7,8 @@
 //!
 //! Sentinel is built on five layers:
 //!
-//! 1. **Goal Manifold** (`goal_manifold`): Immutable, cryptographically verified goal representation
-//! 2. **Alignment Field** (future): Continuous validation of goal alignment
+//! 1. **Goal Manifold** (`goal_manifold`): Immutable, cryptographically verified goal representation ✅
+//! 2. **Alignment Field** (`alignment`): Continuous validation of goal alignment ✅
 //! 3. **Cognitive State** (future): Self-aware execution with meta-cognition
 //! 4. **Memory Manifold** (future): Hierarchical infinite-context memory
 //! 5. **Meta-Learning** (future): Cross-project learning and improvement
@@ -77,11 +77,15 @@
     clippy::all
 )]
 
+pub mod alignment;
 pub mod error;
 pub mod goal_manifold;
 pub mod types;
 
 // Re-export commonly used types for convenience
+pub use alignment::{
+    AlignmentField, AlignmentVector, MonteCarloSimulator, ProjectState, SimulationResult,
+};
 pub use error::{Result, SentinelError};
 pub use goal_manifold::{GoalManifold, Intent};
 pub use types::{Blake3Hash, GoalStatus, ProbabilityDistribution, Timestamp};
