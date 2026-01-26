@@ -57,6 +57,9 @@ enum Commands {
         /// Valore di sensibilità (più basso = più flessibile)
         value: f64,
     },
+
+    /// Sincronizza la conoscenza esterna (Doc & Security Audit)
+    Sync,
 }
 
 #[tokio::main]
@@ -121,6 +124,31 @@ async fn main() -> anyhow::Result<()> {
             manifold.sensitivity = value.clamp(0.0, 1.0);
             save_manifold(&cli.manifold, &manifold)?;
             println!("Sensibilità impostata a: {:.2}", manifold.sensitivity);
+        }
+        Commands::Sync => {
+            println!("Sincronizzazione consapevolezza esterna...");
+            let mut watcher = sentinel_core::external::DependencyWatcher::new(std::path::PathBuf::from("."));
+            
+            // Scansione dipendenze
+            match watcher.scan_dependencies().await {
+                Ok(deps) => {
+                    println!("Trovate {} dipendenze nel progetto.", deps.len());
+                    for dep in deps {
+                        println!("- {} ({})", dep.name, dep.version);
+                    }
+                },
+                Err(e) => println!("Errore durante la scansione dipendenze: {}", e),
+            }
+
+            // Audit sicurezza
+            let alerts = watcher.run_security_audit();
+            if alerts.is_empty() {
+                println!("✅ Nessun rischio di sicurezza rilevato.");
+            } else {
+                for alert in alerts {
+                    println!("⚠️  {}", alert);
+                }
+            }
         }
     }
 

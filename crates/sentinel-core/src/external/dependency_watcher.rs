@@ -38,6 +38,29 @@ impl DependencyWatcher {
         self.doc_sources.push(url.into());
     }
 
+    /// Scarica e analizza la documentazione esterna
+    pub async fn sync_external_knowledge(&self) -> Result<String> {
+        let client = reqwest::Client::new();
+        let mut full_content = String::new();
+
+        for url in &self.doc_sources {
+            // Fetch content
+            let response = client.get(url).send().await?;
+            if response.status().is_success() {
+                let html = response.text().await?;
+                // Estrarre solo il testo utile (semplificato)
+                let fragment = scraper::Html::parse_fragment(&html);
+                let selector = scraper::Selector::parse("main, article, .content").unwrap();
+                
+                for element in fragment.select(&selector) {
+                    full_content.push_str(&element.text().collect::<Vec<_>>().join(" "));
+                }
+            }
+        }
+
+        Ok(full_content)
+    }
+
     /// Scansiona i file di progetto per trovare dipendenze (es. Cargo.toml)
     pub async fn scan_dependencies(&mut self) -> Result<Vec<ExternalDependency>> {
         let mut deps = Vec::new();
@@ -81,5 +104,19 @@ impl DependencyWatcher {
             .map(|d| d.risk_level)
             .sum::<f64>()
             .min(1.0)
+    }
+
+    /// Esegue un audit di sicurezza simulato (End-to-End foundation)
+    pub fn run_security_audit(&self) -> Vec<String> {
+        let mut alerts = Vec::new();
+        for dep in self.watched_dependencies.values() {
+            if dep.name == "tokio" && dep.version.starts_with("0.") {
+                alerts.push(format!("Vulnerabilità rilevata: {} v{} è obsoleta e insicura.", dep.name, dep.version));
+            }
+            if dep.risk_level > 0.5 {
+                alerts.push(format!("Rischio Allineamento: {} è marcata come libreria non approvata dal Goal Manifold.", dep.name));
+            }
+        }
+        alerts
     }
 }

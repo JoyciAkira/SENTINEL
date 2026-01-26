@@ -34,6 +34,8 @@ anyhow = "1.0"
 
 # Async runtime
 tokio = { version = "1.35", features = ["full"] }
+reqwest = { version = "0.11", features = ["json"] }
+scraper = "0.18"
 
 # Testing
 proptest = "1.4"

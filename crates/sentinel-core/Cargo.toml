@@ -22,6 +22,8 @@ chrono.workspace = true
 thiserror.workspace = true
 anyhow.workspace = true
 tokio.workspace = true
+reqwest = { workspace = true }
+scraper = { workspace = true }
 
 # Graph data structures
 petgraph = "0.6"

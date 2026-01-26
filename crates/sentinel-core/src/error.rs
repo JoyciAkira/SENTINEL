@@ -36,6 +36,10 @@ pub enum SentinelError {
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
 
+    /// Network errors
+    #[error("Network error: {0}")]
+    Network(#[from] reqwest::Error),
+
     /// Generic error with context
     #[error("{context}: {source}")]
     WithContext {
