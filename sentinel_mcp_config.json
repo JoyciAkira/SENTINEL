@@ -1,0 +1,12 @@
+{
+    "mcpServers": {
+        "sentinel": {
+            "command": "sentinel",
+            "args": ["mcp"],
+            "description": "Sentinel AI Alignment & Goal Monitoring",
+            "env": {
+                "PATH": "/usr/local/bin:/usr/bin:/bin"
+            }
+        }
+    }
+}

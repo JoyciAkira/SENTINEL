@@ -81,6 +81,17 @@ async fn handle_request(req: McpRequest) -> McpResponse {
                     "name": "get_alignment",
                     "description": "Restituisce il punteggio di allineamento attuale del progetto",
                     "inputSchema": { "type": "object", "properties": {} }
+                },
+                {
+                    "name": "propose_strategy",
+                    "description": "Suggerisce una strategia d'azione basata sui pattern appresi (Layer 5)",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {
+                            "goal_description": { "type": "string" }
+                        },
+                        "required": ["goal_description"]
+                    }
                 }
             ]
         })),
@@ -114,6 +125,14 @@ async fn handle_tool_call(params: Value) -> Option<Value> {
                 {
                     "type": "text",
                     "text": "Stato Attuale: 88% di allineamento. Il sistema è stabile."
+                }
+            ]
+        })),
+        "propose_strategy" => Some(serde_json::json!({
+            "content": [
+                {
+                    "type": "text",
+                    "text": "STRATEGIA SUGGERITA (Layer 5):\n1. Inizializzazione Ambiente\n2. Definizione Invarianti Critiche\n3. Implementazione Incrementale con Test-Driven Development."
                 }
             ]
         })),
