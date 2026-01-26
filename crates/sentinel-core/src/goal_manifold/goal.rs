@@ -6,7 +6,7 @@
 
 use crate::error::{GoalError, Result};
 use crate::goal_manifold::predicate::Predicate;
-use crate::types::{GoalStatus, ProbabilityDistribution, Timestamp};
+use crate::types::{GoalStatus, ProbabilityDistribution, Timestamp, GoalLock};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -18,6 +18,7 @@ use uuid::Uuid;
 /// - Dependencies on other goals
 /// - Complexity estimate (probability distribution)
 /// - Value contribution to root objective
+/// - Multi-agent locks (Social Manifold)
 ///
 /// # Invariants
 ///
@@ -75,6 +76,9 @@ pub struct Goal {
 
     /// Current execution status
     pub status: GoalStatus,
+
+    /// Current lock holder (Social Manifold - Layer 8)
+    pub current_lock: Option<GoalLock>,
 
     /// Optional parent goal (for hierarchical decomposition)
     pub parent_id: Option<Uuid>,
@@ -136,6 +140,7 @@ impl Goal {
             complexity_estimate: ProbabilityDistribution::point(5.0),
             value_to_root: 0.0,
             status: GoalStatus::Pending,
+            current_lock: None,
             parent_id: None,
             metadata: GoalMetadata::default(),
             created_at: now,

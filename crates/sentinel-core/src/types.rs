@@ -109,6 +109,22 @@ pub struct HumanOverride {
     pub timestamp: chrono::DateTime<chrono::Utc>,
 }
 
+/// Identità di un agente AI nel Social Manifold
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
+pub struct Agent {
+    pub id: uuid::Uuid,
+    pub name: String,
+    pub capabilities: Vec<String>,
+}
+
+/// Stato di un blocco su un Goal
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GoalLock {
+    pub agent_id: uuid::Uuid,
+    pub locked_at: Timestamp,
+    pub expires_at: Option<Timestamp>,
+}
+
 /// Probability distribution for metrics
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ProbabilityDistribution {
