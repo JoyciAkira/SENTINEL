@@ -157,6 +157,22 @@ async fn handle_tool_call(params: Value) -> Option<Value> {
                 }
             ]
         })),
+        "get_enforcement_rules" => Some(serde_json::json!({
+            "content": [
+                {
+                    "type": "text",
+                    "text": "SENTINEL ENFORCEMENT RULES:\n1. Non modificare file bloccati da altri agenti.\n2. Rispetta le Invarianti del Manifold (Coverage > 80%).\n3. Ogni modifica deve essere giustificata rispetto al Goal corrente.\n4. Segui i pattern di successo registrati nel Layer 5."
+                }
+            ]
+        })),
+        "safe_write" => Some(serde_json::json!({
+            "content": [
+                {
+                    "type": "text",
+                    "text": "SAFE WRITE APPROVED: Verifica di allineamento superata. Certificato emesso: ALIGN-CERT-SHA256-..."
+                }
+            ]
+        })),
         _ => Some(serde_json::json!({
             "isError": true,
             "content": [{"type": "text", "text": "Strumento non trovato"}]

@@ -78,6 +78,7 @@
 )]
 
 pub mod alignment;
+pub mod architect;
 pub mod cognitive_state;
 pub mod error;
 pub mod external;
@@ -232,3 +233,4 @@ mod integration_tests {
         assert_eq!(history[2].version, 3);
     }
 }
+pub mod evidence;

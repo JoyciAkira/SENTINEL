@@ -60,6 +60,12 @@ enum Commands {
 
     /// Sincronizza la conoscenza esterna (Doc & Security Audit)
     Sync,
+
+    /// Progetta l'architettura dei goal partendo da un intento
+    Design {
+        /// Descrizione dell'intento (es. "Voglio un'API sicura in Rust")
+        intent: String,
+    },
 }
 
 #[tokio::main]
@@ -161,6 +167,26 @@ async fn main() -> anyhow::Result<()> {
                     println!("⚠️  {}", alert);
                 }
             }
+        }
+        Commands::Design { intent } => {
+            println!("Sentinel Architect sta analizzando l'intento: \"{}\"...", intent);
+            let engine = sentinel_core::architect::ArchitectEngine::new();
+            let root_intent = sentinel_core::goal_manifold::Intent::new(intent, Vec::<String>::new());
+            
+            let proposal = engine.propose_architecture(root_intent)?;
+            
+            println!("\n--- PROPOSTA ARCHITETTONICA (Confidenza: {:.0}%) ---", proposal.confidence_score * 100.0);
+            println!("\nGOAL SUGGERITI:");
+            for (i, goal) in proposal.proposed_goals.iter().enumerate() {
+                println!("{}. {}", i + 1, goal.description);
+            }
+            
+            println!("\nINVARIANTI SUGGERITE:");
+            for inv in proposal.proposed_invariants {
+                println!("- [CRITICAL] {}", inv);
+            }
+            
+            println!("\nEsegui 'sentinel init' con questo intento per confermare l'architettura.");
         }
     }
 

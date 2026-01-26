@@ -377,6 +377,7 @@ impl GoalBuilder {
                 .unwrap_or_else(|| ProbabilityDistribution::point(5.0)),
             value_to_root: self.value_to_root,
             status: GoalStatus::Pending,
+            current_lock: None,
             parent_id: self.parent_id,
             metadata: GoalMetadata {
                 tags: self.tags,

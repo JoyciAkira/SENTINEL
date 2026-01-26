@@ -57,8 +57,8 @@ impl TuiApp {
         if self.manifold_path.exists() {
             if let Ok(content) = std::fs::read_to_string(&self.manifold_path) {
                 if let Ok(manifold) = serde_json::from_str::<sentinel_core::GoalManifold>(&content) {
-                    // Sincronizzazione Goal
-                    self.goals = manifold.goal_dag.nodes.values().map(|g| g.description.clone()).collect();
+                    // Sincronizzazione Goal tramite i metodi del DAG (goals() restituisce già un iteratore)
+                    self.goals = manifold.goal_dag.goals().map(|g| g.description.clone()).collect();
                     
                     // Rilevamento Conflitti Reali
                     self.conflicts.clear();
@@ -74,8 +74,7 @@ impl TuiApp {
             }
         }
     }
-
-
+}
 
 pub fn run_tui(manifold_path: PathBuf) -> anyhow::Result<()> {
     enable_raw_mode()?;
@@ -99,8 +98,8 @@ pub fn run_tui(manifold_path: PathBuf) -> anyhow::Result<()> {
             if let Event::Key(key) = event::read()? {
                 match key.code {
                     KeyCode::Char('q') => app.should_quit = true,
-                    KeyCode::Right => app.current_tab = (app.current_tab + 1) % 7,
-                    KeyCode::Left => app.current_tab = if app.current_tab == 0 { 6 } else { app.current_tab - 1 },
+                    KeyCode::Right => app.current_tab = (app.current_tab + 1) % 8,
+                    KeyCode::Left => app.current_tab = if app.current_tab == 0 { 7 } else { app.current_tab - 1 },
                     KeyCode::Down => app.next_goal(),
                     KeyCode::Up => app.previous_goal(),
                     _ => {}
@@ -125,23 +124,30 @@ pub fn run_tui(manifold_path: PathBuf) -> anyhow::Result<()> {
 }
 
 fn ui(f: &mut Frame, app: &TuiApp) {
-    let mut constraints = vec![
-        Constraint::Length(3), // Header
-        Constraint::Length(3), // Alignment Gauge
-        Constraint::Min(0),    // Main Content
-        Constraint::Length(3), // Footer
-    ];
-
-    // Se ci sono conflitti, aggiungiamo una riga di allarme in cima
-    if !app.conflicts.is_empty() {
-        constraints.insert(0, Constraint::Length(3));
-    }
-
-    let chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .margin(1)
-        .constraints(constraints.as_ref())
-        .split(f.size());
+    let chunks = if !app.conflicts.is_empty() {
+        Layout::default()
+            .direction(Direction::Vertical)
+            .margin(1)
+            .constraints([
+                Constraint::Length(3), // Alert
+                Constraint::Length(3), // Header
+                Constraint::Length(3), // Gauge
+                Constraint::Min(0),    // Main
+                Constraint::Length(3), // Footer
+            ].as_ref())
+            .split(f.size())
+    } else {
+        Layout::default()
+            .direction(Direction::Vertical)
+            .margin(1)
+            .constraints([
+                Constraint::Length(3), // Header
+                Constraint::Length(3), // Gauge
+                Constraint::Min(0),    // Main
+                Constraint::Length(3), // Footer
+            ].as_ref())
+            .split(f.size())
+    };
 
     let mut current_chunk = 0;
 
@@ -156,7 +162,7 @@ fn ui(f: &mut Frame, app: &TuiApp) {
     }
 
     // 1. Header: Title and Tabs
-    let titles = vec!["Overview", "Goal Tree", "Knowledge Base", "Infrastructure", "External", "Calibration", "Multi-Agent"];
+    let titles = vec!["Overview", "Goal Tree", "Knowledge Base", "Infrastructure", "External", "Calibration", "Multi-Agent", "Architect"];
     let tabs = Tabs::new(titles)
         .block(Block::default().borders(Borders::ALL).title("Layers"))
         .select(app.current_tab)
@@ -182,6 +188,7 @@ fn ui(f: &mut Frame, app: &TuiApp) {
     current_chunk += 1;
 
     // 3. Main Content
+    let main_chunk = chunks[current_chunk];
     match app.current_tab {
         0 => {
             let inner_text = "SYSTEM READY - Monitoring agent activity...\n\nSentinel is active and watching the Goal Manifold.\nAlignment gradients are stable.";
@@ -274,6 +281,13 @@ fn ui(f: &mut Frame, app: &TuiApp) {
                 .wrap(ratatui::widgets::Wrap { trim: true });
             f.render_widget(handover_block, social_chunks[1]);
         }
+        7 => {
+            let inner_text = "ARCHITECT ENGINE (Goal Decomposition):\n\n- Analyzing: 'Sviluppo Sentinel OS'\n- Status: Ready to decompose\n- Strategy: Hierarchical Multi-Layer Analysis\n\nPROPOSED STRUCTURE:\n1. Core Engine Integrity\n2. Alignment Field Visualization\n3. Meta-Learning Persistence\n4. Social Manifold Orchestration";
+            let main_block = Paragraph::new(inner_text)
+                .block(Block::default().borders(Borders::ALL).title("Autonomous Architect Proposal"))
+                .style(Style::default().fg(Color::White));
+            f.render_widget(main_block, main_chunk);
+        }
         _ => {}
     }
 
@@ -282,4 +296,28 @@ fn ui(f: &mut Frame, app: &TuiApp) {
         .block(Block::default().borders(Borders::ALL))
         .style(Style::default().fg(Color::Gray));
     f.render_widget(footer, chunks[3]);
+}
+
+impl TuiApp {
+    pub fn next_goal(&mut self) {
+        if self.goals.is_empty() { return; }
+        let i = match self.goal_list_state.selected() {
+            Some(i) => {
+                if i >= self.goals.len() - 1 { 0 } else { i + 1 }
+            }
+            None => 0,
+        };
+        self.goal_list_state.select(Some(i));
+    }
+
+    pub fn previous_goal(&mut self) {
+        if self.goals.is_empty() { return; }
+        let i = match self.goal_list_state.selected() {
+            Some(i) => {
+                if i == 0 { self.goals.len() - 1 } else { i - 1 }
+            }
+            None => 0,
+        };
+        self.goal_list_state.select(Some(i));
+    }
 }

@@ -118,7 +118,7 @@ pub struct Agent {
 }
 
 /// Stato di un blocco su un Goal
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct GoalLock {
     pub agent_id: uuid::Uuid,
     pub locked_at: Timestamp,
