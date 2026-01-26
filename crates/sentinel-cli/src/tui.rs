@@ -33,6 +33,7 @@ pub struct TuiApp {
     pub manifold_path: PathBuf,
     pub cognitive_density: f64,
     pub estimated_tokens: usize,
+    pub is_barrier_locked: bool,
 }
 
 impl TuiApp {
@@ -53,6 +54,7 @@ impl TuiApp {
             manifold_path,
             cognitive_density: 0.0,
             estimated_tokens: 0,
+            is_barrier_locked: false,
         }
     }
 
@@ -64,7 +66,11 @@ impl TuiApp {
                     // Sincronizzazione Goal tramite i metodi del DAG (goals() restituisce già un iteratore)
                     self.goals = manifold.goal_dag.goals().map(|g| g.description.clone()).collect();
                     
-                    // Calcolo Densità Cognitiva reale
+                    // Calcolo Barriera e Densità
+                    let decision = sentinel_core::guardrail::GuardrailEngine::evaluate(&manifold);
+                    self.is_barrier_locked = !decision.allowed;
+                    self.alignment_score = decision.score_at_check;
+                    
                     let report = sentinel_core::architect::distiller::CognitiveDistiller::distill(&manifold);
                     self.cognitive_density = (report.strategic_density + report.tactical_density + report.operational_density) / 3.0;
                     self.estimated_tokens = report.total_tokens_estimated;
@@ -200,10 +206,19 @@ fn ui(f: &mut Frame, app: &TuiApp) {
     let main_chunk = chunks[current_chunk];
     match app.current_tab {
         0 => {
-            let inner_text = "SYSTEM READY - Monitoring agent activity...\n\nSentinel is active and watching the Goal Manifold.\nAlignment gradients are stable.";
+            let barrier_status = if app.is_barrier_locked {
+                "[LOCKED] 🛑 RUNTIME BARRIER ACTIVE - Execution Interdicted"
+            } else {
+                "[UNLOCKED] ✅ RUNTIME BARRIER OPEN - Execution Authorized"
+            };
+            
+            let inner_text = format!(
+                "COGNITIVE OS STATUS: READY\n\n{}\n\nSentinel is active and watching the Goal Manifold.\nAlignment gradients are stable.",
+                barrier_status
+            );
             let main_block = Paragraph::new(inner_text)
                 .block(Block::default().borders(Borders::ALL).title("Cognitive Status"))
-                .style(Style::default().fg(Color::White));
+                .style(Style::default().fg(if app.is_barrier_locked { Color::Red } else { Color::Green }));
             f.render_widget(main_block, main_chunk);
         }
         1 => {

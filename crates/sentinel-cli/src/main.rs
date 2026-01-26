@@ -69,6 +69,13 @@ enum Commands {
         /// Descrizione dell'intento (es. "Voglio un'API sicura in Rust")
         intent: String,
     },
+
+    /// Esegue un comando solo se l'allineamento è garantito da Sentinel
+    Run {
+        /// Il comando da eseguire (es. "cargo build")
+        #[arg(last = true)]
+        command: Vec<String>,
+    },
 }
 
 #[tokio::main]
@@ -227,6 +234,32 @@ async fn main() -> anyhow::Result<()> {
             }
             
             println!("\nEsegui 'sentinel init' con questo intento per confermare l'architettura.");
+        }
+        Commands::Run { command } => {
+            if command.is_empty() {
+                println!("Errore: Nessun comando specificato. Esempio: sentinel run -- cargo build");
+                return Ok(());
+            }
+
+            let manifold = load_manifold(&cli.manifold)?;
+            let decision = sentinel_core::guardrail::GuardrailEngine::evaluate(&manifold);
+
+            if decision.allowed {
+                println!("✅ SENTINEL GUARDIAN: Allineamento verificato ({:.1}%). Esecuzione in corso...\n", decision.score_at_check * 100.0);
+                
+                let mut child = std::process::Command::new(&command[0])
+                    .args(&command[1..])
+                    .spawn()
+                    .map_err(|e| anyhow::anyhow!("Fallita l'esecuzione del comando: {}", e))?;
+
+                let status = child.wait()?;
+                if !status.success() {
+                    std::process::exit(status.code().unwrap_or(1));
+                }
+            } else {
+                println!("❌ SENTINEL GUARDIAN BLOCK: {}", decision.reason.unwrap());
+                std::process::exit(1);
+            }
         }
     }
 
