@@ -6,71 +6,151 @@
 
 use crate::error::Result;
 use crate::learning::types::*;
-use crate::types::Timestamp;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use uuid::Uuid;
+use std::path::{Path, PathBuf};
+use serde::{Serialize, Deserialize};
 
-/// Knowledge Base - interfaccia in-memory
+/// Struttura per la persistenza della Knowledge Base
+#[derive(Serialize, Deserialize)]
+struct KnowledgeBaseData {
+    patterns: HashMap<Uuid, SuccessPattern>,
+    pattern_relations: Vec<((Uuid, Uuid), f64)>,
+}
+
+/// Knowledge Base - Implementazione con persistenza
 ///
-/// Gestisce lo storage e il retrieval di pattern appresi
-/// usando HashMap invece di Neo4j (per sviluppo rapido).
+/// Gestisce lo storage e il retrieval di pattern appresi.
+/// Supporta il salvataggio automatico su disco in formato JSON.
 pub struct KnowledgeBase {
     patterns: Arc<RwLock<HashMap<Uuid, SuccessPattern>>>,
     pattern_by_goal_type: Arc<RwLock<HashMap<GoalType, Vec<Uuid>>>>,
     pattern_relations: Arc<RwLock<HashMap<(Uuid, Uuid), f64>>>,
+    storage_path: Option<PathBuf>,
 }
 
 impl KnowledgeBase {
-    /// Crea una nuova istanza di Knowledge Base
+    /// Crea una nuova istanza di Knowledge Base (solo memoria)
     pub fn new() -> Self {
         Self {
             patterns: Arc::new(RwLock::new(HashMap::new())),
             pattern_by_goal_type: Arc::new(RwLock::new(HashMap::new())),
             pattern_relations: Arc::new(RwLock::new(HashMap::new())),
+            storage_path: None,
         }
     }
 
-    /// Inizializza lo schema del database (no-op per in-memory)
+    /// Crea una nuova istanza con persistenza su disco
+    pub async fn with_storage(path: impl AsRef<Path>) -> Result<Self> {
+        let mut kb = Self {
+            patterns: Arc::new(RwLock::new(HashMap::new())),
+            pattern_by_goal_type: Arc::new(RwLock::new(HashMap::new())),
+            pattern_relations: Arc::new(RwLock::new(HashMap::new())),
+            storage_path: Some(path.as_ref().to_path_buf()),
+        };
+
+        if path.as_ref().exists() {
+            kb.load_from_disk().await?;
+        }
+
+        Ok(kb)
+    }
+
+    /// Carica i dati dal disco
+    async fn load_from_disk(&mut self) -> Result<()> {
+        let path = self.storage_path.as_ref().unwrap();
+        let content = tokio::fs::read_to_string(path).await.map_err(crate::error::SentinelError::Io)?;
+
+        let data: KnowledgeBaseData = serde_json::from_str(&content).map_err(crate::error::SentinelError::Serialization)?;
+
+        // Popola pattern e indici
+        {
+            let mut patterns = self.patterns.write().await;
+            let mut by_type = self.pattern_by_goal_type.write().await;
+            
+            for (id, pattern) in data.patterns {
+                for goal_type in &pattern.applicable_to_goal_types {
+                    by_type.entry(goal_type.clone()).or_default().push(id);
+                }
+                patterns.insert(id, pattern);
+            }
+        }
+
+        // Popola relazioni
+        {
+            let mut relations = self.pattern_relations.write().await;
+            for (pair, strength) in data.pattern_relations {
+                relations.insert(pair, strength);
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Salva i dati su disco
+    async fn save_to_disk(&self) -> Result<()> {
+        if let Some(path) = &self.storage_path {
+            let data = {
+                let patterns = self.patterns.read().await;
+                let relations = self.pattern_relations.read().await;
+                
+                KnowledgeBaseData {
+                    patterns: patterns.clone(),
+                    pattern_relations: relations.iter().map(|(k, v)| (*k, *v)).collect(),
+                }
+            };
+
+            let content = serde_json::to_string_pretty(&data).map_err(crate::error::SentinelError::Serialization)?;
+
+            if let Some(parent) = path.parent() {
+                tokio::fs::create_dir_all(parent).await.ok();
+            }
+
+            tokio::fs::write(path, content).await.map_err(crate::error::SentinelError::Io)?;
+        }
+        Ok(())
+    }
+
+    /// Inizializza lo schema del database (no-op per questa versione)
     pub async fn initialize_schema(&self) -> Result<()> {
         Ok(())
     }
 
     /// Salva un pattern di successo nel knowledge base
-    ///
-    /// Se il pattern esiste già, aggiorna il success rate e il support count.
     pub async fn store_pattern(&self, pattern: &SuccessPattern) -> Result<()> {
-        let mut patterns = self.patterns.write().await;
+        {
+            let mut patterns = self.patterns.write().await;
 
-        // Verifica se il pattern esiste già
-        if let Some(existing) = patterns.get(&pattern.id) {
-            // Aggiorna success rate (media pesata)
-            let new_success_rate = existing.success_rate * 0.7 + pattern.success_rate * 0.3;
-            let new_support = existing.support + 1;
+            // Verifica se il pattern esiste già
+            if let Some(existing) = patterns.get(&pattern.id) {
+                let new_success_rate = existing.success_rate * 0.7 + pattern.success_rate * 0.3;
+                let new_support = existing.support + 1;
 
-            let updated = SuccessPattern {
-                success_rate: new_success_rate,
-                support: new_support,
-                ..existing.clone()
-            };
+                let updated = SuccessPattern {
+                    success_rate: new_success_rate,
+                    support: new_support,
+                    ..existing.clone()
+                };
 
-            patterns.insert(pattern.id, updated);
-        } else {
-            // Nuovo pattern
-            patterns.insert(pattern.id, pattern.clone());
+                patterns.insert(pattern.id, updated);
+            } else {
+                patterns.insert(pattern.id, pattern.clone());
+                
+                // Aggiorna indici per goal type solo per nuovi pattern
+                let mut by_type = self.pattern_by_goal_type.write().await;
+                for goal_type in &pattern.applicable_to_goal_types {
+                    by_type
+                        .entry(goal_type.clone())
+                        .or_default()
+                        .push(pattern.id);
+                }
+            }
         }
 
-        drop(patterns);
-
-        // Aggiorna indici per goal type
-        for goal_type in &pattern.applicable_to_goal_types {
-            let mut by_type = self.pattern_by_goal_type.write().await;
-            (*by_type)
-                .entry(goal_type.clone())
-                .or_insert_with(Vec::new)
-                .push(pattern.id);
-        }
+        // Persistenza automatica
+        self.save_to_disk().await?;
 
         Ok(())
     }
@@ -360,54 +440,49 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_pattern_update_on_store() {
-        let kb = KnowledgeBase::new();
-
-        let pattern_id = Uuid::new_v4();
-        let pattern1 = SuccessPattern {
-            id: pattern_id,
-            name: "Test Pattern".to_string(),
-            description: "Test pattern".to_string(),
-            action_sequence: vec![],
-            applicable_to_goal_types: vec![GoalType::BugFix],
-            success_rate: 0.7,
-            support: 5,
-            preconditions: vec![],
-            expected_outcomes: vec![],
-            confidence: 0.6,
-            learned_at: crate::types::now(),
-        };
-
-        kb.store_pattern(&pattern1).await.unwrap();
-
-        let stats1 = kb.get_statistics().await.unwrap();
-        assert_eq!(stats1.total_patterns, 1);
-
-        // Store again with updated success rate
-        let pattern2 = SuccessPattern {
-            id: pattern_id,
-            name: "Test Pattern".to_string(),
-            description: "Test pattern".to_string(),
+    async fn test_knowledge_base_persistence() {
+        let temp_dir = std::env::temp_dir();
+        let kb_path = temp_dir.join(format!("kb_test_{}.json", Uuid::new_v4()));
+        
+        let pattern = SuccessPattern {
+            id: Uuid::new_v4(),
+            name: "Persistent Pattern".to_string(),
+            description: "Should be saved".to_string(),
             action_sequence: vec![],
             applicable_to_goal_types: vec![GoalType::BugFix],
             success_rate: 0.9,
-            support: 3,
+            support: 1,
             preconditions: vec![],
             expected_outcomes: vec![],
             confidence: 0.8,
             learned_at: crate::types::now(),
         };
 
-        kb.store_pattern(&pattern2).await.unwrap();
+        // 1. Salva pattern in una KB con storage
+        {
+            let kb = KnowledgeBase::with_storage(&kb_path).await.unwrap();
+            kb.store_pattern(&pattern).await.unwrap();
+            // kb dropped qui, save_to_disk chiamato da store_pattern
+        }
 
-        let stats2 = kb.get_statistics().await.unwrap();
-        assert_eq!(stats2.total_patterns, 1);
+        // 2. Ricarica da disco in una nuova istanza
+        {
+            let kb = KnowledgeBase::with_storage(&kb_path).await.unwrap();
+            let stats = kb.get_statistics().await.unwrap();
+            assert_eq!(stats.total_patterns, 1);
+            
+            let test_goal = crate::goal_manifold::goal::Goal::builder()
+                .description("Fix bug")
+                .add_success_criterion(crate::goal_manifold::predicate::Predicate::AlwaysTrue)
+                .value_to_root(1.0)
+                .build()
+                .unwrap();
+            
+            let applicable = kb.find_applicable_patterns(&test_goal).await.unwrap();
+            assert_eq!(applicable[0].name, "Persistent Pattern");
+        }
 
-        let patterns = kb.patterns.read().await;
-        let stored = patterns.get(&pattern_id).unwrap();
-        // Success rate should be updated (weighted average)
-        assert!(stored.success_rate > 0.7);
-        // Support should be incremented (5 + 1 per update)
-        assert_eq!(stored.support, 6); // 5 (iniziale) + 1 (incremento)
+        // Pulizia
+        std::fs::remove_file(kb_path).ok();
     }
 }

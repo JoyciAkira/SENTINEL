@@ -161,21 +161,22 @@ crates/sentinel-core/src/learning/
 ### Week 2: Knowledge Base Integration
 
 **Tasks**:
-- [x] Setup Neo4j connection
+- [x] Setup Neo4j connection (Deferito - Usato JSON Storage)
 - [x] Schema definition (migrations)
 - [x] CRUD operations per Pattern
 - [x] Retrieval per goal similarity
 - [x] Relationship tracking
+- [x] Persistenza su disco (JSON Serialization)
 - [x] Unit tests
 
 **Status**: ✅ COMPLETED (2026-01-25)
 
-**Note**: Implementazione in-memory con HashMap invece di Neo4j per sviluppo rapido. Neo4j integration può essere aggiunta in futuro quando necessario.
+**Note**: Implementazione con storage JSON locale per massimizzare la portabilità e la velocità di sviluppo. La struttura è pronta per un'eventuale migrazione a Neo4j se la complessità dei grafi dovesse aumentare significativamente.
 
 **Deliverables**:
 ```
 crates/sentinel-core/src/learning/
-└── knowledge_base.rs       ✅ IMPLEMENTATO
+└── knowledge_base.rs       ✅ IMPLEMENTATO (con persistenza)
 ```
 
 ### Week 3: Deviation Classifier (Python Integration) 🚧 SKIPPED
