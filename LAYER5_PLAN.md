@@ -221,16 +221,18 @@ crates/sentinel-core/src/learning/
 ### Week 5: Integration & Testing
 
 **Tasks**:
-- [ ] End-to-end integration test
+- [x] End-to-end integration test (Feedback Loop)
+- [x] Learning Orchestrator (`LearningEngine`)
+- [x] Hook di completamento goal nel `CognitiveState`
+- [x] Suggerimento automatico strategie su nuovi goal
 - [ ] Performance benchmarking
-- [ ] Synthetic project generation for testing
-- [ ] A/B testing (with/without meta-learning)
 - [ ] Documentation
 
+**Status**: 🚧 IN PROGRESS (Core loop working)
+
 **Deliverables**:
-- Test suite completo
-- Performance report
-- API documentation
+- Test suite end-to-end passata
+- `LearningEngine` integrato nel `CognitiveState`
 
 ## Key Technical Decisions
 

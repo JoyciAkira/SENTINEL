@@ -41,7 +41,7 @@ impl Default for MiningConfig {
 #[derive(Clone, Debug)]
 pub struct PatternMiningEngine {
     /// Mining configuration
-    config: MiningConfig,
+    pub config: MiningConfig,
 
     /// Cached patterns
     success_patterns: HashMap<Uuid, SuccessPattern>,
@@ -202,10 +202,12 @@ impl PatternMiningEngine {
         }
 
         // Filter and return
-        pattern_counts
+        let result: Vec<_> = pattern_counts
             .into_iter()
             .filter(|(_, count)| *count >= self.config.min_support)
-            .collect()
+            .collect();
+        
+        result
     }
 
     /// Create a success pattern from a sequence
