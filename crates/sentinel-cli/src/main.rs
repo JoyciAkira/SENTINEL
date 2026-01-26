@@ -1,5 +1,4 @@
 use clap::{Parser, Subcommand};
-use sentinel_core::Result;
 use std::path::PathBuf;
 
 /// Sentinel CLI - Monitoraggio e Allineamento per Agenti AI
@@ -13,6 +12,9 @@ struct Cli {
     #[arg(short, long, value_name = "FILE", default_value = "sentinel.json")]
     manifold: PathBuf,
 }
+
+mod tui;
+mod mcp;
 
 #[derive(Subcommand)]
 enum Commands {
@@ -30,9 +32,10 @@ enum Commands {
 
     /// Analizza i pattern appresi dai progetti precedenti
     Learnings,
-}
 
-mod tui;
+    /// Avvia il server MCP (Model Context Protocol)
+    Mcp,
+}
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -50,6 +53,9 @@ async fn main() -> anyhow::Result<()> {
         }
         Commands::Learnings => {
             println!("Esplorazione Knowledge Base...");
+        }
+        Commands::Mcp => {
+            mcp::run_server().await?;
         }
     }
 

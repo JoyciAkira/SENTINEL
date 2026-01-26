@@ -50,9 +50,11 @@ Interfaccia a riga di comando per integrazione manuale e script CI/CD.
 **Status**: ✅ COMPLETED (2026-01-25)
 
 ### Week 2: MCP Integration (Cline Support)
-- [ ] Implementazione del server MCP.
-- [ ] Esposizione dei tool di validazione azioni.
+- [x] Implementazione del server MCP (Base JSON-RPC over stdin/stdout).
+- [x] Esposizione dei tool di validazione azioni (`validate_action`, `get_alignment`).
 - [ ] Test di integrazione end-to-end con Cline.
+
+**Status**: 🚧 IN PROGRESS (Foundation ready)
 
 ### Week 3: LSP & Editor Support
 - [ ] Sviluppo del server LSP per diagnostica di allineamento.

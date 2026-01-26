@@ -4,8 +4,8 @@ use crossterm::{
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use ratatui::{
-    backend::{Backend, CrosstermBackend},
-    layout::{Constraint, Direction, Layout, Rect},
+    backend::CrosstermBackend,
+    layout::{Constraint, Direction, Layout},
     style::{Color, Modifier, Style},
     widgets::{Block, Borders, Gauge, Paragraph, Tabs},
     Terminal, Frame,
