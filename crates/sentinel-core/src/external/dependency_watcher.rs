@@ -21,6 +21,7 @@ pub struct ExternalDependency {
 pub struct DependencyWatcher {
     project_root: PathBuf,
     watched_dependencies: HashMap<String, ExternalDependency>,
+    doc_sources: Vec<String>,
 }
 
 impl DependencyWatcher {
@@ -28,7 +29,13 @@ impl DependencyWatcher {
         Self {
             project_root,
             watched_dependencies: HashMap::new(),
+            doc_sources: Vec::new(),
         }
+    }
+
+    /// Aggiunge una sorgente di documentazione da monitorare
+    pub fn add_doc_source(&mut self, url: impl Into<String>) {
+        self.doc_sources.push(url.into());
     }
 
     /// Scansiona i file di progetto per trovare dipendenze (es. Cargo.toml)
@@ -38,14 +45,25 @@ impl DependencyWatcher {
 
         if cargo_path.exists() {
             let content = tokio::fs::read_to_string(cargo_path).await?;
-            // Logica di parsing semplificata per ora
-            if content.contains("tokio") {
-                deps.push(ExternalDependency {
-                    name: "tokio".to_string(),
-                    version: "1.35".to_string(),
-                    source: "crates.io".to_string(),
-                    risk_level: 0.05,
-                });
+            let value: toml::Value = toml::from_str(&content).map_err(|e| {
+                crate::error::SentinelError::CustomPredicateFailed(format!("TOML Error: {}", e))
+            })?;
+
+            if let Some(dependencies) = value.get("dependencies").and_then(|d| d.as_table()) {
+                for (name, version) in dependencies {
+                    let version_str = match version {
+                        toml::Value::String(s) => s.clone(),
+                        toml::Value::Table(t) => t.get("version").and_then(|v| v.as_str()).unwrap_or("unknown").to_string(),
+                        _ => "unknown".to_string(),
+                    };
+
+                    deps.push(ExternalDependency {
+                        name: name.clone(),
+                        version: version_str,
+                        source: "crates.io".to_string(),
+                        risk_level: if name == "unsafe-lib" { 0.8 } else { 0.01 },
+                    });
+                }
             }
         }
 

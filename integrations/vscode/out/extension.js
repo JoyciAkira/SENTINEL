@@ -74,19 +74,29 @@ class SentinelGoalProvider {
         else {
             try {
                 // Esegue il comando reale per ottenere i dati dal manifold
-                const { stdout } = await execAsync(`"${this.sentinelPath}" status --json`, { cwd: this.workspaceRoot });
+                // Usiamo un array per gli argomenti e spawn per maggiore sicurezza con gli spazi
+                const { stdout } = await execAsync(`"${this.sentinelPath}" status --json`, {
+                    cwd: this.workspaceRoot,
+                    env: { ...process.env }
+                });
                 const manifold = JSON.parse(stdout);
                 if (manifold.error) {
-                    return [new GoalItem("No manifold found", vscode.TreeItemCollapsibleState.None, "0%")];
+                    return [new GoalItem("Manifold non inizializzato", vscode.TreeItemCollapsibleState.None, "Usa 'sentinel init'")];
                 }
-                // Esempio: Estraiamo l'intento principale e i primi goal dal DAG
                 const goals = [];
-                goals.push(new GoalItem(manifold.root_intent.description, vscode.TreeItemCollapsibleState.None, `${(manifold.goal_dag.nodes.length)} goals`));
+                goals.push(new GoalItem(manifold.root_intent.description, vscode.TreeItemCollapsibleState.None, "ROOT"));
+                // Aggiungiamo i goal reali dal DAG
+                if (manifold.goal_dag && manifold.goal_dag.nodes) {
+                    for (const node_id in manifold.goal_dag.nodes) {
+                        const node = manifold.goal_dag.nodes[node_id];
+                        goals.push(new GoalItem(node.description, vscode.TreeItemCollapsibleState.None, node.status));
+                    }
+                }
                 return goals;
             }
             catch (error) {
-                console.error('Error fetching goals:', error);
-                return [new GoalItem("Sentinel not found/init", vscode.TreeItemCollapsibleState.None, "Error")];
+                console.error('Sentinel CLI Error:', error);
+                return [new GoalItem("Errore Esecuzione CLI", vscode.TreeItemCollapsibleState.None, "Controlla il path")];
             }
         }
     }

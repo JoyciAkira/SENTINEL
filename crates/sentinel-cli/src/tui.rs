@@ -19,6 +19,7 @@ pub struct TuiApp {
     pub should_quit: bool,
     pub goal_list_state: ListState,
     pub goals: Vec<String>,
+    pub dependency_count: usize,
 }
 
 impl TuiApp {
@@ -33,11 +34,11 @@ impl TuiApp {
             should_quit: false,
             goal_list_state,
             goals: vec![
-                "Layer 6: TUI Refinement".to_string(),
-                "Layer 6: VS Code Extension".to_string(),
+                "Layer 6: Integration".to_string(),
                 "Layer 7: External Awareness".to_string(),
                 "Layer 8: Multi-Agent Sync".to_string(),
             ],
+            dependency_count: 0,
         }
     }
 
@@ -204,7 +205,10 @@ fn ui(f: &mut Frame, app: &TuiApp) {
             f.render_widget(main_block, chunks[2]);
         }
         4 => {
-            let inner_text = "EXTERNAL AWARENESS:\n\n- Dependency: tokio (v1.35) [SECURE]\n- Dependency: serde (v1.0) [SECURE]\n- Risk Level: 0.05 (Negligible)\n\nNo external alignment threats detected.";
+            let inner_text = format!(
+                "EXTERNAL AWARENESS:\n\n- Detected Dependencies: {}\n- Watched Sources: 2\n- Risk Level: 0.05 (Negligible)\n\nSTATUS: No external alignment threats detected.",
+                app.dependency_count
+            );
             let main_block = Paragraph::new(inner_text)
                 .block(Block::default().borders(Borders::ALL).title("External Dependencies & Risks"))
                 .style(Style::default().fg(Color::White));
