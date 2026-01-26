@@ -1,0 +1,27 @@
+[package]
+name = "sentinel-cli"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+# Sentinel Core
+sentinel-core = { path = "../sentinel-core" }
+
+# CLI Parsing
+clap = { version = "4.4", features = ["derive"] }
+
+# TUI
+ratatui = "0.26"
+crossterm = "0.27"
+
+# Utilities
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+log = "0.4"
+tui-logger = "0.11"

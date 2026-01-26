@@ -42,9 +42,12 @@ Interfaccia a riga di comando per integrazione manuale e script CI/CD.
 ## Roadmap di Implementazione
 
 ### Week 1: CLI & TUI Foundation
-- [ ] Setup del crate `sentinel-cli`.
-- [ ] Implementazione dei comandi base per interagire con il GoalManifold.
-- [ ] Prima bozza della TUI con visualizzazione della "Alignment Bar".
+- [x] Setup del crate `sentinel-cli`.
+- [x] Implementazione dei comandi base per interagire con il GoalManifold.
+- [x] Prima bozza della TUI con visualizzazione della "Alignment Bar".
+- [x] Integrazione end-to-end del loop di apprendimento nel CognitiveState.
+
+**Status**: ✅ COMPLETED (2026-01-25)
 
 ### Week 2: MCP Integration (Cline Support)
 - [ ] Implementazione del server MCP.
