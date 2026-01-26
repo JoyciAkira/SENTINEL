@@ -103,7 +103,12 @@ Sentinel addresses each root cause with a fundamental architectural innovation:
 
 ## Core Architecture
 
-### Layer 1: Goal Manifold (Immutable Truth)
+### Layer 1: Goal Manifold (Foundation)
+- **Intent**: High-level natural language description.
+- **Infrastructure Map**: Registry of official endpoints (IPs, URLs) monitored for project health.
+- **Goal DAG**: Graph of dependent sub-goals.
+- **Blake3 Integrity**: Cryptographic seal on the entire manifold.
+
 
 The Goal Manifold is the **cryptographically secured** representation of project objectives.
 

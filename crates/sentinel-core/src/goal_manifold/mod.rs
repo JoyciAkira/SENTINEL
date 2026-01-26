@@ -112,6 +112,9 @@ pub struct Intent {
 
     /// Frameworks (if specified)
     pub frameworks: Vec<String>,
+
+    /// Official infrastructure endpoints (e.g., "frontend" -> "192.168.1.50")
+    pub infrastructure_map: std::collections::HashMap<String, String>,
 }
 
 impl Intent {
@@ -124,7 +127,14 @@ impl Intent {
             target_platform: None,
             languages: Vec::new(),
             frameworks: Vec::new(),
+            infrastructure_map: std::collections::HashMap::new(),
         }
+    }
+
+    /// Add an infrastructure endpoint
+    pub fn with_endpoint(mut self, name: impl Into<String>, url: impl Into<String>) -> Self {
+        self.infrastructure_map.insert(name.into(), url.into());
+        self
     }
 
     /// Add an expected outcome

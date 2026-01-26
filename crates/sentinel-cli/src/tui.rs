@@ -58,8 +58,8 @@ pub fn run_tui() -> anyhow::Result<()> {
             if let Event::Key(key) = event::read()? {
                 match key.code {
                     KeyCode::Char('q') => app.should_quit = true,
-                    KeyCode::Right => app.current_tab = (app.current_tab + 1) % 3,
-                    KeyCode::Left => app.current_tab = app.current_tab.saturating_sub(1),
+                    KeyCode::Right => app.current_tab = (app.current_tab + 1) % 4,
+                    KeyCode::Left => app.current_tab = if app.current_tab == 0 { 3 } else { app.current_tab - 1 },
                     _ => {}
                 }
             }
@@ -100,7 +100,7 @@ fn ui(f: &mut Frame, app: &TuiApp) {
         .split(f.size());
 
     // 1. Header: Title and Tabs
-    let titles = vec!["Overview", "Goal Tree", "Knowledge Base"];
+    let titles = vec!["Overview", "Goal Tree", "Knowledge Base", "Infrastructure"];
     let tabs = Tabs::new(titles)
         .block(Block::default().borders(Borders::ALL).title("Layers"))
         .select(app.current_tab)
@@ -128,6 +128,7 @@ fn ui(f: &mut Frame, app: &TuiApp) {
         0 => "SYSTEM READY - Monitoring agent activity...",
         1 => "GOAL MANIFOLD GRAPH - [Loading DAG...]",
         2 => "LEARNED PATTERNS - [Querying Knowledge Base...]",
+        3 => "INFRASTRUCTURE MAP:\n\n- Frontend IP: [Monitoring...]\n- API Gateway: [Monitoring...]\n- Database: [Monitoring...]",
         _ => "",
     };
 

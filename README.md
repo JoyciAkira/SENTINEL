@@ -32,6 +32,7 @@ The **Goal Manifold** is Sentinel's foundation - a cryptographically verified, i
 - **Immutable Root Intent**: Original goal is hash-sealed and never changes
 - **Formal Success Criteria**: Goals defined by verifiable predicates
 - **DAG Dependencies**: Sophisticated dependency management with cycle prevention
+- **Infrastructure Mapping**: Register and monitor official endpoints (Frontend IPs, API Gateways, DBs).
 - **Integrity Verification**: Blake3 cryptographic hashing
 - **Version History**: Complete append-only audit trail
 

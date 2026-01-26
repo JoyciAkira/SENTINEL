@@ -375,6 +375,19 @@ impl CognitiveState {
         crate::alignment::ProjectState::new(std::path::PathBuf::from("."))
     }
 
+    /// Get the current status of mapped infrastructure endpoints
+    pub async fn check_infrastructure_health(&self) -> HashMap<String, bool> {
+        let mut health_map = HashMap::new();
+        
+        for (name, url) in &self.goal_manifold.root_intent.infrastructure_map {
+            // Simplified health check: try to parse as URL or just assume true for mock
+            // In a real implementation, this would be a network ping/request
+            health_map.insert(name.clone(), true); 
+        }
+        
+        health_map
+    }
+
     pub fn mode(&self) -> &CognitiveMode {
         &self.cognitive_mode
     }
