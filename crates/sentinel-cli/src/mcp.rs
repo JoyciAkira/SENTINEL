@@ -105,6 +105,14 @@ async fn handle_request(req: McpRequest) -> McpResponse {
                         },
                         "required": ["goal_id", "content"]
                     }
+                },
+                {
+                    "name": "get_cognitive_map",
+                    "description": "Recupera la visione onnisciente del progetto (Strategic, Tactical, Operational goals)",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {}
+                    }
                 }
             ]
         })),
@@ -173,6 +181,32 @@ async fn handle_tool_call(params: Value) -> Option<Value> {
                 }
             ]
         })),
+        "get_cognitive_map" => {
+            // Proviamo a caricare il manifold reale per distillare la mappa
+            let manifold_path = std::path::PathBuf::from("sentinel.json");
+            let map_text = if manifold_path.exists() {
+                if let Ok(content) = std::fs::read_to_string(manifold_path) {
+                    if let Ok(manifold) = serde_json::from_str::<sentinel_core::GoalManifold>(&content) {
+                        sentinel_core::architect::distiller::CognitiveDistiller::distill(&manifold)
+                    } else {
+                        "ERROR: Manifold file is corrupted.".to_string()
+                    }
+                } else {
+                    "ERROR: Could not read sentinel.json.".to_string()
+                }
+            } else {
+                "SENTINEL INFO: No active manifold found. Use 'sentinel init' to start.".to_string()
+            };
+
+            Some(serde_json::json!({
+                "content": [
+                    {
+                        "type": "text",
+                        "text": map_text
+                    }
+                ]
+            }))
+        },
         _ => Some(serde_json::json!({
             "isError": true,
             "content": [{"type": "text", "text": "Strumento non trovato"}]

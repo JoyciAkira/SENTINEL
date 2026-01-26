@@ -1,6 +1,6 @@
 {
   "root_intent": {
-    "description": "Sviluppo Sentinel OS - Layer 8 Online",
+    "description": "Sviluppo OS Sentinel: Verso l'Onniscienza Cognitiva",
     "constraints": [],
     "expected_outcomes": [],
     "target_platform": null,
@@ -10,12 +10,14 @@
   },
   "sensitivity": 0.5,
   "overrides": [],
+  "handover_log": [],
+  "file_locks": {},
   "goal_dag": {
     "goals": {}
   },
   "invariants": [],
-  "created_at": "2026-01-26T16:56:07.792806Z",
-  "updated_at": "2026-01-26T16:56:07.792806Z",
+  "created_at": "2026-01-26T18:20:06.872254Z",
+  "updated_at": "2026-01-26T18:20:06.872254Z",
   "integrity_hash": [
     0,
     0,
