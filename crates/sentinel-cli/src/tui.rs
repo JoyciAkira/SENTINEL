@@ -31,6 +31,8 @@ pub struct TuiApp {
     pub agents: Vec<AgentStatus>,
     pub conflicts: Vec<String>,
     pub manifold_path: PathBuf,
+    pub cognitive_density: f64,
+    pub estimated_tokens: usize,
 }
 
 impl TuiApp {
@@ -49,6 +51,8 @@ impl TuiApp {
             agents: Vec::new(),
             conflicts: Vec::new(),
             manifold_path,
+            cognitive_density: 0.0,
+            estimated_tokens: 0,
         }
     }
 
@@ -60,6 +64,11 @@ impl TuiApp {
                     // Sincronizzazione Goal tramite i metodi del DAG (goals() restituisce già un iteratore)
                     self.goals = manifold.goal_dag.goals().map(|g| g.description.clone()).collect();
                     
+                    // Calcolo Densità Cognitiva reale
+                    let report = sentinel_core::architect::distiller::CognitiveDistiller::distill(&manifold);
+                    self.cognitive_density = (report.strategic_density + report.tactical_density + report.operational_density) / 3.0;
+                    self.estimated_tokens = report.total_tokens_estimated;
+
                     // Rilevamento Conflitti Reali
                     self.conflicts.clear();
                     let mut files_seen = std::collections::HashMap::new();
@@ -282,11 +291,23 @@ fn ui(f: &mut Frame, app: &TuiApp) {
             f.render_widget(handover_block, social_chunks[1]);
         }
         7 => {
-            let inner_text = "ARCHITECT ENGINE (Goal Decomposition):\n\n- Analyzing: 'Sviluppo Sentinel OS'\n- Status: Ready to decompose\n- Strategy: Hierarchical Multi-Layer Analysis\n\nPROPOSED STRUCTURE:\n1. Core Engine Integrity\n2. Alignment Field Visualization\n3. Meta-Learning Persistence\n4. Social Manifold Orchestration";
+            let arch_chunks = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([Constraint::Length(3), Constraint::Min(0)].as_ref())
+                .split(main_chunk);
+
+            let omniscience_gauge = Gauge::default()
+                .block(Block::default().borders(Borders::ALL).title("Agent Omniscience Level (Context Injection)"))
+                .gauge_style(Style::default().fg(Color::Magenta).bg(Color::Black))
+                .percent((app.cognitive_density * 100.0) as u16)
+                .label(format!("Density: {:.1}% | Est. Tokens: {}", app.cognitive_density * 100.0, app.estimated_tokens));
+            f.render_widget(omniscience_gauge, arch_chunks[0]);
+
+            let inner_text = "ARCHITECT ENGINE (Goal Decomposition):\n\n- Analyzing: 'Sviluppo Sentinel OS'\n- Status: Active\n- Strategy: Hierarchical Multi-Layer Analysis\n\nPROPOSED STRUCTURE:\n1. Core Engine Integrity\n2. Alignment Field Visualization\n3. Meta-Learning Persistence\n4. Social Manifold Orchestration";
             let main_block = Paragraph::new(inner_text)
                 .block(Block::default().borders(Borders::ALL).title("Autonomous Architect Proposal"))
                 .style(Style::default().fg(Color::White));
-            f.render_widget(main_block, main_chunk);
+            f.render_widget(main_block, arch_chunks[1]);
         }
         _ => {}
     }

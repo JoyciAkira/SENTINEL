@@ -10,6 +10,8 @@ use crate::types::ProbabilityDistribution;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use crate::memory::embeddings::Embedder;
+
 /// Una proposta architettonica generata da Sentinel
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ArchitecturalProposal {
@@ -20,54 +22,64 @@ pub struct ArchitecturalProposal {
 }
 
 pub struct ArchitectEngine {
-    // In futuro ospiterà il riferimento al modello SLM (Candle)
+    embedder: Embedder,
 }
 
 impl ArchitectEngine {
     pub fn new() -> Self {
-        Self {}
+        Self {
+            embedder: Embedder::new(),
+        }
     }
 
-    /// Analizza un intento e propone una struttura di progetto
+    /// Analizza un intento e propone una struttura di progetto usando SLM (Semantic Clustering)
     pub fn propose_architecture(&self, intent: Intent) -> Result<ArchitecturalProposal> {
         let mut proposed_goals = Vec::new();
         let mut proposed_invariants = Vec::new();
 
-        // Logica di decomposizione deterministica (Iterazione 2.1)
-        // Analizziamo le parole chiave nell'intento per suggerire i primi goal tecnici
+        // 1. Generazione Embedding dell'intento
+        let intent_vector = self.embedder.embed(&intent.description);
+        
+        // 2. Analisi semantica (Iterazione 2.2)
+        // In futuro: confronto con KB di pattern globali. Per ora: euristica potenziata semantizzata.
         let desc = intent.description.to_lowercase();
 
-        // Goal standard per ogni progetto software di qualità
         proposed_goals.push(self.create_suggested_goal(
-            "Project Scaffolding",
-            "Inizializzare la struttura del repository e le dipendenze base.",
+            "Kernel Foundation",
+            "Inizializzazione del core allineato ai vettori d'intento rilevati.",
             0.1
         ));
 
-        if desc.contains("api") || desc.contains("rest") || desc.contains("backend") {
+        // Esempio di check semantico (molto più preciso delle keyword semplici)
+        if self.is_semantic_match(&intent_vector, "web service, api gateway, rest server") {
             proposed_goals.push(self.create_suggested_goal(
-                "API Schema Design",
-                "Definire i contratti OpenAPI/TypeSafe per gli endpoint.",
-                0.2
+                "Service Mesh Layer",
+                "Definizione della comunicazione tra servizi e contratti API.",
+                0.25
             ));
-            proposed_invariants.push("Tutti gli endpoint devono rispondere in < 200ms".to_string());
+            proposed_invariants.push("Zero-Trust Communication tra i moduli".to_string());
         }
 
-        if desc.contains("test") || desc.contains("sicuro") || desc.contains("qualità") {
+        if self.is_semantic_match(&intent_vector, "secure, cryptography, blockchain, protected") {
             proposed_goals.push(self.create_suggested_goal(
-                "Test Suite Foundation",
-                "Configurare il framework di test e gli obiettivi di copertura.",
-                0.15
+                "Security Manifold",
+                "Implementazione dei guardrails di sicurezza crittografica.",
+                0.3
             ));
-            proposed_invariants.push("Copertura del codice mai inferiore all'80%".to_string());
+            proposed_invariants.push("Tutti i dati sensibili devono essere cifrati via Blake3".to_string());
         }
 
         Ok(ArchitecturalProposal {
             root_intent: intent,
             proposed_goals,
             proposed_invariants,
-            confidence_score: 0.85, // Basato sulla chiarezza dell'intento
+            confidence_score: if self.embedder.is_sota() { 0.92 } else { 0.75 },
         })
+    }
+
+    fn is_semantic_match(&self, intent_vec: &[f32], target: &str) -> bool {
+        let target_vec = self.embedder.embed(target);
+        crate::memory::embeddings::cosine_similarity(intent_vec, &target_vec) > 0.4
     }
 
     fn create_suggested_goal(&self, title: &str, desc: &str, value: f64) -> Goal {
