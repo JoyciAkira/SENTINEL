@@ -15,6 +15,7 @@ struct Cli {
 
 mod tui;
 mod mcp;
+mod lsp;
 
 #[derive(Subcommand)]
 enum Commands {
@@ -35,6 +36,9 @@ enum Commands {
 
     /// Avvia il server MCP (Model Context Protocol)
     Mcp,
+
+    /// Avvia il server LSP (Language Server Protocol) per integrazione IDE
+    Lsp,
 }
 
 #[tokio::main]
@@ -56,6 +60,9 @@ async fn main() -> anyhow::Result<()> {
         }
         Commands::Mcp => {
             mcp::run_server().await?;
+        }
+        Commands::Lsp => {
+            lsp::run_server().await?;
         }
     }
 

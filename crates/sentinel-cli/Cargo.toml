@@ -16,6 +16,10 @@ clap = { version = "4.4", features = ["derive"] }
 ratatui = "0.26"
 crossterm = "0.27"
 
+# LSP
+tower-lsp = "0.20"
+lsp-types = "0.94"
+
 # Utilities
 tokio = { workspace = true }
 tokio-util = { version = "0.7", features = ["codec"] }

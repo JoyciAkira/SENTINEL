@@ -57,9 +57,11 @@ Interfaccia a riga di comando per integrazione manuale e script CI/CD.
 **Status**: 🚧 IN PROGRESS (Foundation ready)
 
 ### Week 3: LSP & Editor Support
-- [ ] Sviluppo del server LSP per diagnostica di allineamento.
-- [ ] Creazione estensione VS Code "Sentinel-Vision".
-- [ ] Visualizzazione del manifold come grafico interattivo.
+- [x] Sviluppo del server LSP per diagnostica di allineamento (Base: `did_open`, `did_change`).
+- [ ] Creazione estensione VS Code "Sentinel-Vision" (In pianificazione).
+- [ ] Visualizzazione del manifold come grafico interattivo (LSP Code Lenses).
+
+**Status**: 🚧 IN PROGRESS (LSP Backend ready)
 
 ### Week 4: Dashboard & Analytics
 - [ ] Dashboard web per analisi storica dei progetti.
