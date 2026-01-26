@@ -59,7 +59,7 @@ use uuid::Uuid;
 ///
 /// manifold.add_goal(goal).unwrap();
 /// ```
-use crate::types::{HumanOverride, AlignmentReport, HandoverNote};
+use crate::types::{HumanOverride, HandoverNote};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GoalManifold {

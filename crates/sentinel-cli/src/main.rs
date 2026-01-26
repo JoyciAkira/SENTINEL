@@ -76,6 +76,12 @@ enum Commands {
         #[arg(last = true)]
         command: Vec<String>,
     },
+
+    /// Avvia la sincronizzazione con la rete Sentinel globale (Layer 9)
+    Federate {
+        /// Indirizzo del relay o del peer (opzionale)
+        relay: Option<String>,
+    },
 }
 
 #[tokio::main]
@@ -260,6 +266,25 @@ async fn main() -> anyhow::Result<()> {
                 println!("❌ SENTINEL GUARDIAN BLOCK: {}", decision.reason.unwrap());
                 std::process::exit(1);
             }
+        }
+        Commands::Federate { relay } => {
+            println!("🌐 SENTINEL FEDERATION - Layer 9 Distributed Intelligence\n");
+            
+            let mut network = sentinel_core::federation::network::NetworkManager::new()
+                .map_err(|e| anyhow::anyhow!("Fallita inizializzazione rete: {}", e))?;
+            
+            println!("- PeerID Locale: {}", network.peer_id);
+            println!("- Protocollo: libp2p v0.53 (TCP/Noise/Yamux)");
+
+            if let Some(r) = relay {
+                println!("- Tentativo di dial al relay: {} ...", r);
+            }
+
+            println!("- Avvio Swarm Engine. In ascolto per altri nodi Sentinel...\n");
+            println!("(Premi CTRL+C per terminare la sessione di federazione)\n");
+            
+            // Esecuzione loop di rete reale
+            network.run_node().await.map_err(|e| anyhow::anyhow!("Errore di rete: {}", e))?;
         }
     }
 

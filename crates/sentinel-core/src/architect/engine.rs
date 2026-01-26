@@ -3,13 +3,12 @@
 //! Questo motore trasforma l'Intento (Natural Language) in una struttura
 //! formale di Goal e Invarianti. È il "primo respiro" di ogni progetto Sentinel.
 
-use crate::error::Result;
+use serde::{Deserialize, Serialize};
 use crate::goal_manifold::goal::Goal;
 use crate::goal_manifold::Intent;
+use crate::error::Result;
 use crate::types::ProbabilityDistribution;
-use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-
 use crate::memory::embeddings::Embedder;
 
 /// Una proposta architettonica generata da Sentinel

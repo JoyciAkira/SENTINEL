@@ -235,3 +235,4 @@ mod integration_tests {
 }
 pub mod evidence;
 pub mod guardrail;
+pub mod federation;

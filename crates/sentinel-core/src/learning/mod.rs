@@ -14,6 +14,7 @@ use crate::error::Result;
 use crate::goal_manifold::goal::Goal;
 use std::sync::Arc;
 use uuid::Uuid;
+use crate::learning::types::GoalType;
 
 // Re-exports
 pub use classifier::DeviationClassifier;
@@ -32,13 +33,13 @@ pub struct LearningEngine {
 impl LearningEngine {
     /// Crea un nuovo LearningEngine
     pub fn new(knowledge_base: Arc<KnowledgeBase>) -> Self {
-        let mut miner = PatternMiningEngine::new();
-        miner.config.min_support = 1; 
+        let miner = PatternMiningEngine::new();
+        let synthesizer = StrategySynthesizer::new(knowledge_base.clone());
         
         Self {
             miner,
-            knowledge_base: knowledge_base.clone(),
-            synthesizer: StrategySynthesizer::new(knowledge_base),
+            knowledge_base,
+            synthesizer,
         }
     }
 
