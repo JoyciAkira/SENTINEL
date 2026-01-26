@@ -29,6 +29,9 @@ petgraph = "0.6"
 hex = "0.4"
 rand = "0.8"
 
+# Knowledge Base (Neo4j) - Commented out for in-memory version
+# neo4rs = "0.7"
+
 # World-class embeddings (100% local, no API costs)
 # Using Candle (pure Rust) for embeddings to avoid C++ dependency hell
 candle-core = "0.8.2"

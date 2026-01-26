@@ -305,6 +305,7 @@ pub enum Comparison {
     LessThanOrEqual,
     #[serde(rename = ">")]
     GreaterThan,
+    /// Greater than or equal
     #[serde(rename = ">=")]
     GreaterThanOrEqual,
 }

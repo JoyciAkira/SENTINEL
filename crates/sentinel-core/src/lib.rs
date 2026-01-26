@@ -93,8 +93,8 @@ pub use cognitive_state::{Action, ActionDecision, CognitiveMode, CognitiveState}
 pub use error::{Result, SentinelError};
 pub use goal_manifold::{GoalManifold, Intent};
 pub use learning::{
-    CompletedProject, DeviationPattern, LearningReport, PatternMiningEngine, Strategy,
-    SuccessPattern,
+    CompletedProject, DeviationPattern, KnowledgeBase, LearningReport, PatternMiningEngine,
+    Strategy, SuccessPattern,
 };
 pub use memory::{MemoryItem, MemoryManifold, MemoryType};
 pub use types::{Blake3Hash, GoalStatus, ProbabilityDistribution, Timestamp};
