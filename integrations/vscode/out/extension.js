@@ -53,7 +53,13 @@ function activate(context) {
     // 2. Setup Goal TreeView
     const goalProvider = new SentinelGoalProvider(sentinelPath, workspaceRoot);
     vscode.window.registerTreeDataProvider('sentinel-goals', goalProvider);
-    vscode.commands.registerCommand('sentinel.refreshGoals', () => goalProvider.refresh());
+    // 3. Setup Network TreeView
+    const networkProvider = new SentinelNetworkProvider(sentinelPath, workspaceRoot);
+    vscode.window.registerTreeDataProvider('sentinel-network', networkProvider);
+    vscode.commands.registerCommand('sentinel.refreshGoals', () => {
+        goalProvider.refresh();
+        networkProvider.refresh();
+    });
     console.log('Sentinel extension activated. Path:', sentinelPath);
 }
 exports.activate = activate;
@@ -174,11 +180,58 @@ class SentinelGoalProvider {
                     externalRoot.children.push(new GoalItem("No threats detected", vscode.TreeItemCollapsibleState.None, "SECURE"));
                 }
                 rootItems.push(externalRoot);
+                // 5. Distributed Intelligence (Phase 3)
+                const networkRoot = new GoalItem("Sentinel Network", vscode.TreeItemCollapsibleState.Collapsed, "P2P");
+                networkRoot.iconPath = new vscode.ThemeIcon('hubot');
+                networkRoot.children = [];
+                // Questi dati verranno popolati dal comando status --json aggiornato con i dati del Layer 9/10
+                const peerCount = manifold.peer_count || 0;
+                networkRoot.children.push(new GoalItem(`Connected Peers: ${peerCount}`, vscode.TreeItemCollapsibleState.None, peerCount > 0 ? "ONLINE" : "SEARCHING"));
+                if (manifold.consensus_active) {
+                    const item = new GoalItem("Consensus Vote in Progress", vscode.TreeItemCollapsibleState.None, "VOTING");
+                    item.iconPath = new vscode.ThemeIcon('check-all');
+                    networkRoot.children.push(item);
+                }
+                else {
+                    networkRoot.children.push(new GoalItem("Global Consensus Stable", vscode.TreeItemCollapsibleState.None, "SYNCED"));
+                }
+                rootItems.push(networkRoot);
                 return rootItems;
             }
             catch (error) {
                 return [new GoalItem("Errore Sentinel", vscode.TreeItemCollapsibleState.None, error.message)];
             }
+        }
+    }
+}
+class SentinelNetworkProvider {
+    constructor(sentinelPath, workspaceRoot) {
+        this.sentinelPath = sentinelPath;
+        this.workspaceRoot = workspaceRoot;
+        this._onDidChangeTreeData = new vscode.EventEmitter();
+        this.onDidChangeTreeData = this._onDidChangeTreeData.event;
+    }
+    refresh() {
+        this._onDidChangeTreeData.fire();
+    }
+    getTreeItem(element) {
+        return element;
+    }
+    async getChildren(element) {
+        if (element)
+            return [];
+        try {
+            const report = await runSentinelJson(this.sentinelPath, ["status", "--json"], this.workspaceRoot);
+            const manifold = report.manifold;
+            const peerCount = manifold.peer_count || 0;
+            const peerItem = new GoalItem(`Connected Peers: ${peerCount}`, vscode.TreeItemCollapsibleState.None, peerCount > 0 ? "ONLINE" : "SEARCHING");
+            peerItem.iconPath = new vscode.ThemeIcon('broadcast');
+            const consensusItem = new GoalItem(manifold.consensus_active ? "Consensus: VOTING" : "Global Consensus Stable", vscode.TreeItemCollapsibleState.None, manifold.consensus_active ? "ACTIVE" : "SYNCED");
+            consensusItem.iconPath = new vscode.ThemeIcon(manifold.consensus_active ? 'check-all' : 'shield');
+            return [peerItem, consensusItem];
+        }
+        catch (e) {
+            return [new GoalItem("Network Offline", vscode.TreeItemCollapsibleState.None, "OFFLINE")];
         }
     }
 }

@@ -173,14 +173,36 @@ async fn handle_tool_call(params: Value) -> Option<Value> {
                 }
             ]
         })),
-        "safe_write" => Some(serde_json::json!({
-            "content": [
-                {
-                    "type": "text",
-                    "text": "SAFE WRITE APPROVED: Verifica di allineamento superata. Certificato emesso: ALIGN-CERT-SHA256-..."
-                }
-            ]
-        })),
+        "safe_write" => {
+            let content = params.get("arguments")
+                .and_then(|a| a.get("content"))
+                .and_then(|c| c.as_str())
+                .unwrap_or("");
+
+            // 1. Scansione di Sicurezza Reale (Layer 7)
+            let report = sentinel_core::security::SecurityScanner::scan(content);
+
+            if !report.is_safe {
+                Some(serde_json::json!({
+                    "isError": true,
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": format!("SENTINEL BLOCK: Rilevate minacce di sicurezza (Risk: {:.2}).\nDettagli: {}", report.risk_score, report.threats.join(", "))
+                        }
+                    ]
+                }))
+            } else {
+                Some(serde_json::json!({
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": format!("SAFE WRITE APPROVED: Codice pulito. Allineamento verificato (Risk: {:.2}).", report.risk_score)
+                        }
+                    ]
+                }))
+            }
+        },
         "get_cognitive_map" => {
             // Proviamo a caricare il manifold reale per distillare la mappa
             let manifold_path = std::path::PathBuf::from("sentinel.json");
