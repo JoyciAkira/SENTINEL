@@ -80,6 +80,7 @@
 pub mod alignment;
 pub mod cognitive_state;
 pub mod error;
+pub mod external;
 pub mod goal_manifold;
 pub mod learning;
 pub mod memory;

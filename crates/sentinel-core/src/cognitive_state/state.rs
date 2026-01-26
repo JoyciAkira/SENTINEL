@@ -15,6 +15,7 @@ use crate::learning::{
     LearningEngine, CompletedProject, RecordedAction, ActionContext, 
     ProjectSnapshot, TestResults, ProjectMetadata, AlignmentTrend
 };
+use crate::external::DependencyWatcher;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use uuid::Uuid;
@@ -75,12 +76,16 @@ pub struct CognitiveState {
 
     /// Engine for meta-learning
     learning_engine: LearningEngine,
+
+    /// Watcher for external dependencies
+    dependency_watcher: DependencyWatcher,
 }
 
 impl CognitiveState {
     /// Create a new cognitive state
     pub fn new(goal_manifold: GoalManifold, learning_engine: LearningEngine) -> Self {
         let alignment_field = AlignmentField::new(goal_manifold.clone());
+        let dependency_watcher = DependencyWatcher::new(std::path::PathBuf::from("."));
 
         Self {
             goal_manifold,
@@ -93,6 +98,7 @@ impl CognitiveState {
             decision_log: Vec::new(),
             alignment_field,
             learning_engine,
+            dependency_watcher,
         }
     }
 

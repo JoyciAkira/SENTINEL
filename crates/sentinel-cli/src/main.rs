@@ -26,7 +26,11 @@ enum Commands {
     },
 
     /// Mostra lo stato attuale dell'allineamento
-    Status,
+    Status {
+        /// Output in formato JSON per integrazioni
+        #[arg(long)]
+        json: bool,
+    },
 
     /// Avvia l'interfaccia TUI interattiva
     Ui,
@@ -47,10 +51,31 @@ async fn main() -> anyhow::Result<()> {
 
     match cli.command {
         Commands::Init { description } => {
-            println!("Inizializzazione nuovo manifold: {}", description);
+            let intent = sentinel_core::goal_manifold::Intent::new(description, Vec::<String>::new());
+            let manifold = sentinel_core::GoalManifold::new(intent);
+            let content = serde_json::to_string_pretty(&manifold)?;
+            std::fs::write(&cli.manifold, content)?;
+            println!("Inizializzato nuovo manifold in: {:?}", cli.manifold);
         }
-        Commands::Status => {
-            println!("Recupero stato di allineamento...");
+        Commands::Status { json } => {
+            if cli.manifold.exists() {
+                let content = std::fs::read_to_string(&cli.manifold)?;
+                let manifold: sentinel_core::GoalManifold = serde_json::from_str(&content)?;
+                
+                if json {
+                    println!("{}", serde_json::to_string(&manifold)?);
+                } else {
+                    println!("GOAL MANIFOLD: {}", manifold.root_intent.description);
+                    println!("COMPLETAMENTO: {:.1}%", manifold.completion_percentage() * 100.0);
+                    println!("VERSIONE: {}", manifold.current_version());
+                }
+            } else {
+                if json {
+                    println!("{{ \"error\": \"Manifold not found\" }}");
+                } else {
+                    println!("Errore: File {:?} non trovato. Esegui 'init' prima.", cli.manifold);
+                }
+            }
         }
         Commands::Ui => {
             tui::run_tui()?;
