@@ -16,8 +16,8 @@ Sentinel provides a 5-layer cognitive architecture that ensures **perfect alignm
 
 ```
 ┌────────────────────────────────────────────────────┐
-│  Layer 5: Meta-Learning (Cross-project learning)   │
-│  Layer 4: Memory Manifold (Infinite context)       │
+│  Layer 5: Meta-Learning (Cross-project learning)   │ 🚧 IN PROGRESS
+│  Layer 4: Memory Manifold (Infinite context)       │ ✅ IMPLEMENTED
 │  Layer 3: Cognitive State (Self-aware execution)   │ ✅ IMPLEMENTED
 │  Layer 2: Alignment Field (Continuous validation)  │ ✅ IMPLEMENTED
 │  Layer 1: Goal Manifold (Immutable truth)          │ ✅ IMPLEMENTED
@@ -51,10 +51,35 @@ The **Cognitive State Machine** gives Sentinel meta-cognition - awareness of its
 - **Self-Aware Action Gating**: Every action passes through 7-step validation before execution
 - **Meta-Cognitive Reasoning**: Agent must explain "Why am I doing this?" for every action
 - **Belief System**: Evidence-based belief network with confidence propagation
-- **Uncertainty Tracking**: Explicit tracking of what the agent knows and doesn't know
+- **Uncertainty Tracking**: Explicit tracking of what's agent knows and doesn't know
 - **Decision Logging**: Complete audit trail of all decisions with rationale
 - **Meta-Learning**: Tracks prediction accuracy and adjusts confidence in real-time
 - **Cognitive Load Monitoring**: Prevents overload by tracking complexity
+
+### Layer 4: Memory Manifold (✅ Complete)
+
+The **Memory Manifold** provides infinite context through hierarchical memory:
+
+- **Three-Level Memory Architecture**: Working memory (10 items), Episodic memory (vector DB), Semantic memory (knowledge graph)
+- **Candle-Based Embeddings**: All-MiniLM-L6-v2 model for semantic embeddings (CPU-only, no external dependencies)
+- **LRU Working Memory**: Fast cache with automatic eviction
+- **Semantic Retrieval**: Cosine similarity search across all memories
+- **Spreading Activation**: Memory retrieval follows conceptual relationships
+- **Auto-Compression**: Intelligent compression when context grows
+- **Cross-Project Learning**: Semantic memory retains patterns across projects
+
+### Layer 5: Meta-Learning Engine (🚧 In Progress)
+
+The **Meta-Learning Engine** enables Sentinel to improve from every project:
+
+- **Pattern Mining Engine**: FP-Growth algorithm extracts frequent action patterns from successful projects
+- **Deviation Classification**: Neural classifiers predict deviation probability before actions execute
+- **Knowledge Base**: Graph database stores cross-project learnings and relationships
+- **Strategy Synthesis**: Recommends optimal approaches based on past successes
+- **Continuous Improvement**: Each completed project enhances future performance
+- **Transfer Learning**: Patterns learned in one project apply to others
+
+**Current Progress**: Week 1/5 complete - Pattern Mining Engine implemented and tested
 
 ## Quick Start
 
