@@ -18,11 +18,11 @@ pub struct GuardrailDecision {
 impl GuardrailEngine {
     /// Valuta se permettere l'esecuzione di un'operazione
     pub fn evaluate(manifold: &GoalManifold) -> GuardrailDecision {
-        // Calcoliamo lo score attuale (placeholder per logica reale del Layer 2)
-        let current_score = manifold.completion_percentage(); // Esempio semplice
+        let current_score = manifold.completion_percentage();
         
-        // Se lo score è troppo basso rispetto alla sensibilità dell'OS
-        let threshold = 1.0 - manifold.sensitivity; // Se sensitivity è 0.8 (alta), threshold è 0.2
+        // Se sensitivity è 1.0, vogliamo allineamento perfetto (1.0)
+        // Se sensitivity è 0.5, vogliamo almeno 0.5, e così via.
+        let threshold = manifold.sensitivity; 
         
         if current_score < threshold {
             return GuardrailDecision {

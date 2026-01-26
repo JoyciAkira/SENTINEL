@@ -187,7 +187,7 @@ async fn handle_tool_call(params: Value) -> Option<Value> {
             let map_text = if manifold_path.exists() {
                 if let Ok(content) = std::fs::read_to_string(manifold_path) {
                     if let Ok(manifold) = serde_json::from_str::<sentinel_core::GoalManifold>(&content) {
-                        sentinel_core::architect::distiller::CognitiveDistiller::distill(&manifold)
+                        sentinel_core::architect::distiller::CognitiveDistiller::distill(&manifold).content
                     } else {
                         "ERROR: Manifold file is corrupted.".to_string()
                     }
