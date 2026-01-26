@@ -1157,7 +1157,30 @@ class MemoryManifold {
 
 The Meta-Learning Engine enables Sentinel to **improve from every project**.
 
-#### Architecture
+#### Real Implementation Status (2026-01-25)
+- **PatternMiningEngine**: Functional FP-Growth based sequence extraction.
+- **KnowledgeBase**: Persistent JSON-based storage for learned patterns.
+- **StrategySynthesizer**: Logic for ranking and proposing strategies based on historical success.
+- **Feedback Loop**: Automatically triggers learning upon goal completion in `CognitiveState`.
+
+### Layer 6: Integration & Tooling (Interface & External Connectivity)
+
+Layer 6 handles the interaction between Sentinel's core and the outside world.
+
+#### Components
+- **TUI (Terminal User Interface)**: Built with `ratatui` for real-time KPI monitoring.
+- **MCP Server (Model Context Protocol)**: Exposes Sentinel's reasoning to external LLMs like Cline and Claude.
+- **LSP Server (Language Server Protocol)**: Provides alignment diagnostics directly within Cursor and VS Code.
+- **CLI Dashboard**: Standard command-line interface for manual inspection and CI/CD.
+
+#### Integration Architecture
+Sentinel acts as a **Cognitive Gate**:
+1. **AI Agent (Cline/Cursor)** proposes an action.
+2. **Sentinel Bridge** intercepts the action and sends it to **Sentinel Core**.
+3. **Core** validates the action against the **Goal Manifold**.
+4. **Agent** proceeds only if the action is approved.
+
+#### Architecture (Planned/Conceptual)
 
 ```rust
 use std::collections::HashMap;
