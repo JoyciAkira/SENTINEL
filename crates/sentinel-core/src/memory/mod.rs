@@ -45,11 +45,13 @@
 //! let results = manifold.query("How did we handle user login?", 5);
 //! ```
 
+pub mod embeddings;
 pub mod episodic;
 pub mod manifold;
 pub mod semantic;
 pub mod working;
 
+pub use embeddings::Embedder;
 pub use episodic::{EpisodicMemory, MemoryEmbedding};
 pub use manifold::MemoryManifold;
 pub use semantic::{ConceptNode, ConceptRelation, SemanticMemory};

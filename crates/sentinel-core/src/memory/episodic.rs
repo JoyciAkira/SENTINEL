@@ -1,9 +1,10 @@
 //! Episodic Memory - Vector-based semantic storage
 //!
-//! Stores unlimited memories with semantic similarity search.
+//! Stores unlimited memories with SOTA semantic similarity search.
 
-use super::{MemoryItem, MemoryQueryResult, MemorySource};
+use super::{embeddings::Embedder, MemoryItem, MemoryQueryResult, MemorySource};
 use std::collections::HashMap;
+use std::sync::Arc;
 use uuid::Uuid;
 
 /// Vector embedding for semantic similarity
@@ -12,47 +13,20 @@ pub struct MemoryEmbedding {
     /// The memory item
     pub item: MemoryItem,
 
-    /// Vector embedding (simplified - in production use real embeddings)
+    /// Vector embedding (SOTA quality via FastEmbed)
     pub embedding: Vec<f32>,
 }
 
 impl MemoryEmbedding {
-    /// Create a new memory embedding
-    pub fn new(item: MemoryItem) -> Self {
-        let embedding = Self::compute_embedding(&item.content);
+    /// Create a new memory embedding using SOTA embedder
+    pub fn new(item: MemoryItem, embedder: &Embedder) -> Self {
+        let embedding = embedder.embed(&item.content);
         Self { item, embedding }
-    }
-
-    /// Compute embedding from text (simplified - use real model in production)
-    fn compute_embedding(text: &str) -> Vec<f32> {
-        // Simplified: hash-based pseudo-embedding (768 dimensions like BERT)
-        // In production, use sentence-transformers or similar
-        let mut embedding = vec![0.0; 768];
-
-        // Simple character frequency-based features
-        for (i, ch) in text.chars().enumerate() {
-            let idx = (ch as usize + i) % 768;
-            embedding[idx] += 1.0;
-        }
-
-        // Normalize
-        let magnitude: f32 = embedding.iter().map(|x| x * x).sum::<f32>().sqrt();
-        if magnitude > 0.0 {
-            for val in &mut embedding {
-                *val /= magnitude;
-            }
-        }
-
-        embedding
     }
 
     /// Compute cosine similarity with another embedding
     pub fn similarity(&self, other: &MemoryEmbedding) -> f32 {
-        self.embedding
-            .iter()
-            .zip(other.embedding.iter())
-            .map(|(a, b)| a * b)
-            .sum()
+        super::embeddings::cosine_similarity(&self.embedding, &other.embedding)
     }
 }
 
@@ -64,14 +38,18 @@ pub struct EpisodicMemory {
 
     /// Compression threshold (merge similar memories above this)
     compression_threshold: f32,
+
+    /// SOTA embedder (shared across all operations)
+    embedder: Arc<Embedder>,
 }
 
 impl EpisodicMemory {
-    /// Create a new episodic memory
+    /// Create a new episodic memory with SOTA embeddings
     pub fn new() -> Self {
         Self {
             memories: HashMap::new(),
             compression_threshold: 0.95, // Very high similarity = merge
+            embedder: Arc::new(Embedder::new()),
         }
     }
 
@@ -80,12 +58,13 @@ impl EpisodicMemory {
         Self {
             memories: HashMap::new(),
             compression_threshold: threshold.clamp(0.0, 1.0),
+            embedder: Arc::new(Embedder::new()),
         }
     }
 
     /// Store a memory
     pub fn store(&mut self, item: MemoryItem) {
-        let embedding = MemoryEmbedding::new(item);
+        let embedding = MemoryEmbedding::new(item, &self.embedder);
         let id = embedding.item.id;
         self.memories.insert(id, embedding);
     }
@@ -100,9 +79,9 @@ impl EpisodicMemory {
 
     /// Query by semantic similarity
     pub fn query(&mut self, query: &str, limit: usize) -> Vec<MemoryQueryResult> {
-        // Create embedding for query
+        // Create embedding for query using SOTA embedder
         let query_item = MemoryItem::new(query.to_string(), super::MemoryType::Observation);
-        let query_embedding = MemoryEmbedding::new(query_item);
+        let query_embedding = MemoryEmbedding::new(query_item, &self.embedder);
 
         // Compute similarities
         let mut results: Vec<_> = self
@@ -282,10 +261,11 @@ mod tests {
 
     #[test]
     fn test_embedding_creation() {
+        let embedder = Embedder::new();
         let item = MemoryItem::new("Test memory".to_string(), MemoryType::Action);
-        let embedding = MemoryEmbedding::new(item);
+        let embedding = MemoryEmbedding::new(item, &embedder);
 
-        assert_eq!(embedding.embedding.len(), 768);
+        assert_eq!(embedding.embedding.len(), embedder.dimension());
 
         // Check normalization
         let magnitude: f32 = embedding
@@ -299,13 +279,14 @@ mod tests {
 
     #[test]
     fn test_embedding_similarity() {
+        let embedder = Embedder::new();
         let item1 = MemoryItem::new("Hello world".to_string(), MemoryType::Action);
         let item2 = MemoryItem::new("Hello world".to_string(), MemoryType::Action);
         let item3 = MemoryItem::new("Goodbye universe".to_string(), MemoryType::Action);
 
-        let emb1 = MemoryEmbedding::new(item1);
-        let emb2 = MemoryEmbedding::new(item2);
-        let emb3 = MemoryEmbedding::new(item3);
+        let emb1 = MemoryEmbedding::new(item1, &embedder);
+        let emb2 = MemoryEmbedding::new(item2, &embedder);
+        let emb3 = MemoryEmbedding::new(item3, &embedder);
 
         // Identical strings should have high similarity
         let sim_same = emb1.similarity(&emb2);
