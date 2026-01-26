@@ -16,7 +16,19 @@ Sentinel provides a 5-layer cognitive architecture that ensures **perfect alignm
 
 ```
 ┌────────────────────────────────────────────────────┐
-│  Layer 6: Integration & Tooling (TUI, MCP, LSP)     │ 🚧 IN PROGRESS
+### Layer 6: Integration & Tooling (🚧 In Progress)
+
+Sentinel provides real-time feedback through multiple interfaces:
+
+- **TUI Dashboard**: Run `sentinel ui` for a full-terminal interactive experience with goal navigation and live alignment tracking.
+- **VS Code Extension**: Connects Cursor and VS Code to Sentinel's LSP server for inline alignment diagnostics.
+- **MCP Server**: Integration bridge for AI agents (Cline).
+
+#### Using the VS Code Extension
+1. Build the CLI: `cargo build --bin sentinel-cli`
+2. Install the extension in `integrations/vscode`.
+3. Configure `sentinel.path` to point to your binary.
+
 │  Layer 5: Meta-Learning (Cross-project learning)   │ ✅ COMPLETED
 │  Layer 4: Memory Manifold (Infinite context)       │ ✅ IMPLEMENTED
 │  Layer 3: Cognitive State (Self-aware execution)   │ ✅ IMPLEMENTED

@@ -1173,10 +1173,9 @@ The Meta-Learning Engine enables Sentinel to **improve from every project**.
 Layer 6 handles the interaction between Sentinel's core and the outside world.
 
 #### Components
-- **TUI (Terminal User Interface)**: Built with `ratatui` for real-time KPI monitoring.
+- **TUI (Terminal User Interface)**: Built with `ratatui`. Run with `sentinel ui`. Use arrows to navigate tabs and Up/Down to explore the Goal Tree.
+- **VS Code Extension**: TypeScript client that launches the Rust LSP server. Located in `integrations/vscode`.
 - **MCP Server (Model Context Protocol)**: Exposes Sentinel's reasoning to external LLMs like Cline and Claude.
-- **LSP Server (Language Server Protocol)**: Provides alignment diagnostics directly within Cursor and VS Code.
-- **CLI Dashboard**: Standard command-line interface for manual inspection and CI/CD.
 
 #### Integration Architecture
 Sentinel acts as a **Cognitive Gate**:
