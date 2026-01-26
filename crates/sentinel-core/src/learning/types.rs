@@ -209,7 +209,37 @@ pub enum ActionType {
     CreateDirectory,
     Dependency,
     Custom { type_name: String },
+    UpdateGoal,
 }
+
+impl From<crate::cognitive_state::action::ActionType> for ActionType {
+    fn from(other: crate::cognitive_state::action::ActionType) -> Self {
+        match other {
+            crate::cognitive_state::action::ActionType::CreateFile { path, .. } => {
+                let language = path
+                    .extension()
+                    .map(|e| e.to_string_lossy().into_owned())
+                    .unwrap_or_else(|| "unknown".to_string());
+                ActionType::CreateFile { language }
+            }
+            crate::cognitive_state::action::ActionType::EditFile { path, .. } => {
+                let language = path
+                    .extension()
+                    .map(|e| e.to_string_lossy().into_owned())
+                    .unwrap_or_else(|| "unknown".to_string());
+                ActionType::EditFile { language }
+            }
+            crate::cognitive_state::action::ActionType::DeleteFile { .. } => ActionType::DeleteFile,
+            crate::cognitive_state::action::ActionType::RunTests { .. } => ActionType::RunTests,
+            crate::cognitive_state::action::ActionType::RunCommand { .. } => ActionType::RunCommand,
+            crate::cognitive_state::action::ActionType::UpdateGoal { .. } => ActionType::UpdateGoal,
+            crate::cognitive_state::action::ActionType::Custom { name, .. } => {
+                ActionType::Custom { type_name: name }
+            }
+        }
+    }
+}
+
 
 /// Goal type for pattern classification
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]

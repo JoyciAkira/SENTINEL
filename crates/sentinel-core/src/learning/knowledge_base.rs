@@ -148,7 +148,7 @@ impl KnowledgeBase {
         project_id: Uuid,
         root_goal: &crate::goal_manifold::goal::Goal,
         patterns_used: &[Uuid],
-        _final_alignment: f64,
+        _final_alignment: f64, // Prefisso con underscore per disabilitare warning
     ) -> Result<()> {
         // In-memory implementation: non salviamo i progetti per ora
         // In futuro, potremmo salvare statistiche aggregate
