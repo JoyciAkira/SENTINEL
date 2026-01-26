@@ -18,6 +18,11 @@
         "onLanguage:python"
     ],
     "main": "./out/extension.js",
+    "scripts": {
+        "vscode:prepublish": "npm run compile",
+        "compile": "tsc -p ./",
+        "watch": "tsc -watch -p ./"
+    },
     "contributes": {
         "configuration": {
             "type": "object",
