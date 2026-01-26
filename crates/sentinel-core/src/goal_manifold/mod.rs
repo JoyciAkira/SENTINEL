@@ -59,15 +59,20 @@ use uuid::Uuid;
 ///
 /// manifold.add_goal(goal).unwrap();
 /// ```
+use crate::types::{HumanOverride, AlignmentReport};
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GoalManifold {
-    /// Unique identifier for this manifold
-    pub id: Uuid,
-
-    /// The original user intent - IMMUTABLE
+    /// The immutable original intent
     pub root_intent: Intent,
 
-    /// Directed Acyclic Graph of goals
+    /// Configuration for alignment sensitivity
+    pub sensitivity: f64, // 0.0 (Flexible) to 1.0 (Rigid)
+
+    /// History of human overrides (for learning)
+    pub overrides: Vec<HumanOverride>,
+
+    /// Graph of goals and their dependencies
     pub goal_dag: GoalDag,
 
     /// Hard constraints that can NEVER be violated
@@ -243,34 +248,20 @@ impl GoalManifold {
     /// let manifold = GoalManifold::new(intent);
     /// ```
     pub fn new(root_intent: Intent) -> Self {
-        let now = crate::types::now();
-        let id = Uuid::new_v4();
-
-        let mut manifold = Self {
-            id,
+        let now = chrono::Utc::now();
+        Self {
             root_intent,
+            sensitivity: 0.5,
+            overrides: Vec::new(),
             goal_dag: GoalDag::new(),
             invariants: Vec::new(),
             created_at: now,
             updated_at: now,
-            integrity_hash: Blake3Hash::new([0u8; 32]), // Placeholder
+            integrity_hash: Blake3Hash::empty(),
             version_history: Vec::new(),
-        };
-
-        // Compute initial hash
-        let hash = manifold.compute_hash();
-        manifold.integrity_hash = hash;
-
-        // Record initial version
-        manifold.version_history.push(ManifoldVersion {
-            version: 1,
-            timestamp: now,
-            hash,
-            change_description: "Initial creation".to_string(),
-        });
-
-        manifold
+        }
     }
+
 
     /// Compute the cryptographic hash of the entire manifold
     ///

@@ -43,6 +43,20 @@ enum Commands {
 
     /// Avvia il server LSP (Language Server Protocol) per integrazione IDE
     Lsp,
+
+    /// Valida manualmente una violazione (Human Override)
+    Override {
+        /// ID della violazione da approvare
+        violation_id: String,
+        /// Motivazione dell'approvazione
+        reason: String,
+    },
+
+    /// Imposta la sensibilità di Sentinel (0.0 - 1.0)
+    Calibrate {
+        /// Valore di sensibilità (più basso = più flessibile)
+        value: f64,
+    },
 }
 
 #[tokio::main]
@@ -89,7 +103,37 @@ async fn main() -> anyhow::Result<()> {
         Commands::Lsp => {
             lsp::run_server().await?;
         }
+        Commands::Override { violation_id, reason } => {
+            let mut manifold = load_manifold(&cli.manifold)?;
+            let vid = uuid::Uuid::parse_str(&violation_id)?;
+            
+            manifold.overrides.push(sentinel_core::types::HumanOverride {
+                violation_id: vid,
+                reason,
+                timestamp: chrono::Utc::now(),
+            });
+            
+            save_manifold(&cli.manifold, &manifold)?;
+            println!("Override registrato. Sentinel imparerà da questa eccezione.");
+        }
+        Commands::Calibrate { value } => {
+            let mut manifold = load_manifold(&cli.manifold)?;
+            manifold.sensitivity = value.clamp(0.0, 1.0);
+            save_manifold(&cli.manifold, &manifold)?;
+            println!("Sensibilità impostata a: {:.2}", manifold.sensitivity);
+        }
     }
 
+    Ok(())
+}
+
+fn load_manifold(path: &std::path::Path) -> anyhow::Result<sentinel_core::GoalManifold> {
+    let content = std::fs::read_to_string(path)?;
+    Ok(serde_json::from_str(&content)?)
+}
+
+fn save_manifold(path: &std::path::Path, manifold: &sentinel_core::GoalManifold) -> anyhow::Result<()> {
+    let content = serde_json::to_string_pretty(manifold)?;
+    std::fs::write(path, content)?;
     Ok(())
 }

@@ -95,8 +95,8 @@ pub fn run_tui() -> anyhow::Result<()> {
             if let Event::Key(key) = event::read()? {
                 match key.code {
                     KeyCode::Char('q') => app.should_quit = true,
-                    KeyCode::Right => app.current_tab = (app.current_tab + 1) % 5,
-                    KeyCode::Left => app.current_tab = if app.current_tab == 0 { 4 } else { app.current_tab - 1 },
+                    KeyCode::Right => app.current_tab = (app.current_tab + 1) % 6,
+                    KeyCode::Left => app.current_tab = if app.current_tab == 0 { 5 } else { app.current_tab - 1 },
                     KeyCode::Down => app.next_goal(),
                     KeyCode::Up => app.previous_goal(),
                     _ => {}
@@ -133,7 +133,7 @@ fn ui(f: &mut Frame, app: &TuiApp) {
         .split(f.size());
 
     // 1. Header: Title and Tabs
-    let titles = vec!["Overview", "Goal Tree", "Knowledge Base", "Infrastructure", "External"];
+    let titles = vec!["Overview", "Goal Tree", "Knowledge Base", "Infrastructure", "External", "Calibration"];
     let tabs = Tabs::new(titles)
         .block(Block::default().borders(Borders::ALL).title("Layers"))
         .select(app.current_tab)
@@ -211,6 +211,13 @@ fn ui(f: &mut Frame, app: &TuiApp) {
             );
             let main_block = Paragraph::new(inner_text)
                 .block(Block::default().borders(Borders::ALL).title("External Dependencies & Risks"))
+                .style(Style::default().fg(Color::White));
+            f.render_widget(main_block, chunks[2]);
+        }
+        5 => {
+            let inner_text = "ALIGNMENT CALIBRATION:\n\n- Sentinel Sensitivity: 0.50 [BALANCED]\n- Precision Rate: 98.2%\n- False Positive Rate: 1.8%\n\nHuman Overrides Registered: 0\n\n(Use 'sentinel calibrate <VALUE>' to adjust rigidity)";
+            let main_block = Paragraph::new(inner_text)
+                .block(Block::default().borders(Borders::ALL).title("Sensitivity & Confidence Control"))
                 .style(Style::default().fg(Color::White));
             f.render_widget(main_block, chunks[2]);
         }

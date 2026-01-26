@@ -46,7 +46,7 @@ impl DependencyWatcher {
         if cargo_path.exists() {
             let content = tokio::fs::read_to_string(cargo_path).await?;
             let value: toml::Value = toml::from_str(&content).map_err(|e| {
-                crate::error::SentinelError::CustomPredicateFailed(format!("TOML Error: {}", e))
+                crate::error::SentinelError::Predicate(crate::error::PredicateError::CustomPredicateFailed(format!("TOML Error: {}", e)))
             })?;
 
             if let Some(dependencies) = value.get("dependencies").and_then(|d| d.as_table()) {
