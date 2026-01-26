@@ -80,7 +80,19 @@ async fn main() -> anyhow::Result<()> {
                 let manifold: sentinel_core::GoalManifold = serde_json::from_str(&content)?;
                 
                 if json {
-                    println!("{}", serde_json::to_string(&manifold)?);
+                    let mut watcher = sentinel_core::external::DependencyWatcher::new(std::path::PathBuf::from("."));
+                    let _ = watcher.scan_dependencies().await;
+                    let alerts = watcher.run_security_audit();
+                    
+                    let status_report = serde_json::json!({
+                        "manifold": manifold,
+                        "external": {
+                            "risk_level": watcher.check_alignment_risk(),
+                            "alerts": alerts,
+                            "dependency_count": manifold.root_intent.infrastructure_map.len() // Placeholder per ora
+                        }
+                    });
+                    println!("{}", serde_json::to_string(&status_report)?);
                 } else {
                     println!("GOAL MANIFOLD: {}", manifold.root_intent.description);
                     println!("COMPLETAMENTO: {:.1}%", manifold.completion_percentage() * 100.0);

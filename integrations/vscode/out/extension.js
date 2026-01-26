@@ -69,30 +69,48 @@ class SentinelGoalProvider {
     }
     async getChildren(element) {
         if (element) {
-            return [];
+            return element.children || [];
         }
         else {
             try {
-                // Esegue il comando reale per ottenere i dati dal manifold
-                // Usiamo un array per gli argomenti e spawn per maggiore sicurezza con gli spazi
                 const { stdout } = await execAsync(`"${this.sentinelPath}" status --json`, {
                     cwd: this.workspaceRoot,
                     env: { ...process.env }
                 });
-                const manifold = JSON.parse(stdout);
+                const report = JSON.parse(stdout);
+                const manifold = report.manifold;
+                const external = report.external;
                 if (manifold.error) {
                     return [new GoalItem("Manifold non inizializzato", vscode.TreeItemCollapsibleState.None, "Usa 'sentinel init'")];
                 }
-                const goals = [];
-                goals.push(new GoalItem(manifold.root_intent.description, vscode.TreeItemCollapsibleState.None, "ROOT"));
-                // Aggiungiamo i goal reali dal DAG
+                const rootItems = [];
+                // 1. Goal Section
+                const goalRoot = new GoalItem("Goal Manifold", vscode.TreeItemCollapsibleState.Expanded, "CORE");
+                goalRoot.children = [];
+                goalRoot.children.push(new GoalItem(manifold.root_intent.description, vscode.TreeItemCollapsibleState.None, "ROOT"));
                 if (manifold.goal_dag && manifold.goal_dag.nodes) {
                     for (const node_id in manifold.goal_dag.nodes) {
                         const node = manifold.goal_dag.nodes[node_id];
-                        goals.push(new GoalItem(node.description, vscode.TreeItemCollapsibleState.None, node.status));
+                        goalRoot.children.push(new GoalItem(node.description, vscode.TreeItemCollapsibleState.None, node.status));
                     }
                 }
-                return goals;
+                rootItems.push(goalRoot);
+                // 2. External Awareness Section
+                const externalRoot = new GoalItem("External Awareness", vscode.TreeItemCollapsibleState.Expanded, `Risk: ${Math.round(external.risk_level * 100)}%`);
+                externalRoot.iconPath = new vscode.ThemeIcon('globe');
+                externalRoot.children = [];
+                if (external.alerts && external.alerts.length > 0) {
+                    for (const alert of external.alerts) {
+                        const item = new GoalItem(alert, vscode.TreeItemCollapsibleState.None, "ALERT");
+                        item.iconPath = new vscode.ThemeIcon('warning', new vscode.ThemeColor('notificationsWarningIcon.foreground'));
+                        externalRoot.children.push(item);
+                    }
+                }
+                else {
+                    externalRoot.children.push(new GoalItem("No threats detected", vscode.TreeItemCollapsibleState.None, "SECURE"));
+                }
+                rootItems.push(externalRoot);
+                return rootItems;
             }
             catch (error) {
                 console.error('Sentinel CLI Error:', error);
