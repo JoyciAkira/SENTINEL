@@ -11,7 +11,7 @@
 //! 2. **Alignment Field** (`alignment`): Continuous validation of goal alignment ✅
 //! 3. **Cognitive State** (`cognitive_state`): Self-aware execution with meta-cognition ✅
 //! 4. **Memory Manifold** (`memory`): Hierarchical infinite-context memory ✅
-//! 5. **Meta-Learning** (future): Cross-project learning and improvement
+//! 5. **Meta-Learning** (`learning`): Cross-project learning and improvement 🚧
 //!
 //! # Quick Start
 //!
@@ -81,6 +81,7 @@ pub mod alignment;
 pub mod cognitive_state;
 pub mod error;
 pub mod goal_manifold;
+pub mod learning;
 pub mod memory;
 pub mod types;
 
@@ -91,6 +92,10 @@ pub use alignment::{
 pub use cognitive_state::{Action, ActionDecision, CognitiveMode, CognitiveState};
 pub use error::{Result, SentinelError};
 pub use goal_manifold::{GoalManifold, Intent};
+pub use learning::{
+    CompletedProject, DeviationPattern, LearningReport, PatternMiningEngine, Strategy,
+    SuccessPattern,
+};
 pub use memory::{MemoryItem, MemoryManifold, MemoryType};
 pub use types::{Blake3Hash, GoalStatus, ProbabilityDistribution, Timestamp};
 

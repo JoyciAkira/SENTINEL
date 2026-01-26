@@ -108,7 +108,10 @@ impl Predicate {
                 Ok(std::fs::metadata(path).map(|m| m.is_dir()).unwrap_or(false))
             }
 
-            Predicate::TestsPassing { suite, min_coverage: _ } => {
+            Predicate::TestsPassing {
+                suite,
+                min_coverage: _,
+            } => {
                 // Placeholder - will integrate with test runner
                 Err(PredicateError::TestSuiteNotFound(suite.clone()).into())
             }
@@ -348,9 +351,9 @@ mod tests {
 
     #[test]
     fn test_predicate_simplify_double_negation() {
-        let pred = Predicate::Not(Box::new(Predicate::Not(Box::new(
-            Predicate::FileExists("main.rs".into()),
-        ))));
+        let pred = Predicate::Not(Box::new(Predicate::Not(Box::new(Predicate::FileExists(
+            "main.rs".into(),
+        )))));
 
         let simplified = pred.simplify();
         assert!(matches!(simplified, Predicate::FileExists(_)));
@@ -359,15 +362,15 @@ mod tests {
     #[test]
     fn test_predicate_complexity() {
         assert_eq!(Predicate::AlwaysTrue.complexity(), 0);
-        assert_eq!(
-            Predicate::FileExists("main.rs".into()).complexity(),
-            1
+        assert_eq!(Predicate::FileExists("main.rs".into()).complexity(), 1);
+        assert!(
+            Predicate::TestsPassing {
+                suite: "unit".to_string(),
+                min_coverage: 0.8
+            }
+            .complexity()
+                > 5
         );
-        assert!(Predicate::TestsPassing {
-            suite: "unit".to_string(),
-            min_coverage: 0.8
-        }
-        .complexity() > 5);
     }
 
     #[test]

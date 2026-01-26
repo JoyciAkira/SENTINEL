@@ -282,11 +282,8 @@ mod tests {
 
     #[test]
     fn test_uncertainty_creation() {
-        let uncertainty = Uncertainty::new(
-            "Test coverage".to_string(),
-            UncertaintyType::Epistemic,
-            0.5,
-        );
+        let uncertainty =
+            Uncertainty::new("Test coverage".to_string(), UncertaintyType::Epistemic, 0.5);
 
         assert_eq!(uncertainty.magnitude, 0.5);
         assert!(!uncertainty.is_critical());
@@ -294,23 +291,16 @@ mod tests {
 
     #[test]
     fn test_uncertainty_critical() {
-        let uncertainty = Uncertainty::new(
-            "Security".to_string(),
-            UncertaintyType::Epistemic,
-            0.8,
-        );
+        let uncertainty = Uncertainty::new("Security".to_string(), UncertaintyType::Epistemic, 0.8);
 
         assert!(uncertainty.is_critical());
     }
 
     #[test]
     fn test_uncertainty_resolvable() {
-        let uncertainty = Uncertainty::new(
-            "Code quality".to_string(),
-            UncertaintyType::Epistemic,
-            0.6,
-        )
-        .resolvable_by("Run linter".to_string());
+        let uncertainty =
+            Uncertainty::new("Code quality".to_string(), UncertaintyType::Epistemic, 0.6)
+                .resolvable_by("Run linter".to_string());
 
         assert_eq!(uncertainty.resolvable_by.unwrap(), "Run linter");
     }

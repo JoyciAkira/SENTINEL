@@ -181,11 +181,7 @@ impl AlignmentField {
     ///
     /// Vector pointing toward better alignment. Magnitude indicates
     /// how much alignment could improve.
-    pub async fn compute_gradient(
-        &self,
-        state: &ProjectState,
-        epsilon: f64,
-    ) -> Result<Vector> {
+    pub async fn compute_gradient(&self, state: &ProjectState, epsilon: f64) -> Result<Vector> {
         // Get current alignment
         let current = self.compute_alignment(state).await?;
 

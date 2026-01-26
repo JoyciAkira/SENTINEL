@@ -130,7 +130,10 @@ impl CognitiveState {
             if !alternatives.is_empty() {
                 return Ok(ActionDecision::propose_alternative(
                     &action,
-                    format!("{:.0}% chance of deviation", prediction.deviation_probability * 100.0),
+                    format!(
+                        "{:.0}% chance of deviation",
+                        prediction.deviation_probability * 100.0
+                    ),
                     alternatives,
                 ));
             } else {
@@ -169,7 +172,10 @@ impl CognitiveState {
 
         // 2. Check if alignment changed
         let current_state = self.get_current_state();
-        let new_alignment = self.alignment_field.compute_alignment(&current_state).await?;
+        let new_alignment = self
+            .alignment_field
+            .compute_alignment(&current_state)
+            .await?;
 
         // 3. Detect unexpected deviations
         if new_alignment.score < self.meta_state.expected_alignment {
@@ -183,10 +189,8 @@ impl CognitiveState {
         // 5. Meta-learning: Did prediction match reality?
         if let Some(last_decision) = self.decision_log.last_mut() {
             if last_decision.action.id == action.id {
-                let outcome = super::decision::DecisionOutcome::success(
-                    new_alignment.score,
-                    result.duration,
-                );
+                let outcome =
+                    super::decision::DecisionOutcome::success(new_alignment.score, result.duration);
                 last_decision.record_outcome(outcome);
 
                 // Update meta-state prediction accuracy
@@ -458,15 +462,13 @@ mod tests {
         let decision = state.before_action(action).await.unwrap();
         // Should have a valid decision (not error)
         // Since our Monte Carlo simulator might predict deviation, accept any decision
-        assert!(
-            matches!(
-                decision.decision_type,
-                super::super::action::DecisionType::Approve
-                    | super::super::action::DecisionType::Skip
-                    | super::super::action::DecisionType::Reject
-                    | super::super::action::DecisionType::ProposeAlternative
-            )
-        );
+        assert!(matches!(
+            decision.decision_type,
+            super::super::action::DecisionType::Approve
+                | super::super::action::DecisionType::Skip
+                | super::super::action::DecisionType::Reject
+                | super::super::action::DecisionType::ProposeAlternative
+        ));
     }
 
     #[tokio::test]

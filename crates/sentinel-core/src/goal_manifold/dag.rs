@@ -90,10 +90,7 @@ impl GoalDag {
 
         self.graph.remove_node(node_idx);
 
-        let goal = self
-            .goals
-            .remove(id)
-            .ok_or(DagError::NodeNotFound(*id))?;
+        let goal = self.goals.remove(id).ok_or(DagError::NodeNotFound(*id))?;
 
         Ok(goal)
     }
@@ -341,10 +338,7 @@ impl GoalDag {
 
         for root in roots {
             let path = self.find_longest_path_from(root.id);
-            let path_length: f64 = path
-                .iter()
-                .map(|g| g.complexity_estimate.mean)
-                .sum();
+            let path_length: f64 = path.iter().map(|g| g.complexity_estimate.mean).sum();
 
             if path_length > max_length {
                 max_length = path_length;
@@ -372,10 +366,7 @@ impl GoalDag {
 
         for dep_id in &goal.dependencies {
             let dep_path = self.find_longest_path_from(*dep_id);
-            let path_length: f64 = dep_path
-                .iter()
-                .map(|g| g.complexity_estimate.mean)
-                .sum();
+            let path_length: f64 = dep_path.iter().map(|g| g.complexity_estimate.mean).sum();
 
             if path_length > max_length {
                 max_length = path_length;

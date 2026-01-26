@@ -161,7 +161,9 @@ impl MonteCarloSimulator {
         let goal_completion_score = if state.goal_states.is_empty() {
             0.0
         } else {
-            let completed = state.goal_states.values()
+            let completed = state
+                .goal_states
+                .values()
                 .filter(|g| g.is_complete())
                 .count() as f64;
             let total = state.goal_states.len() as f64;
@@ -217,9 +219,16 @@ impl MonteCarloSimulator {
         let deviation_probability = deviations as f64 / alignment_scores.len() as f64;
 
         // Statistics
-        let expected_alignment = alignment_scores.iter().sum::<f64>() / alignment_scores.len() as f64;
-        let worst_case = alignment_scores.iter().copied().fold(f64::INFINITY, f64::min);
-        let best_case = alignment_scores.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+        let expected_alignment =
+            alignment_scores.iter().sum::<f64>() / alignment_scores.len() as f64;
+        let worst_case = alignment_scores
+            .iter()
+            .copied()
+            .fold(f64::INFINITY, f64::min);
+        let best_case = alignment_scores
+            .iter()
+            .copied()
+            .fold(f64::NEG_INFINITY, f64::max);
 
         // Standard deviation
         let variance = alignment_scores

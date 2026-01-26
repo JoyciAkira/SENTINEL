@@ -465,8 +465,7 @@ mod tests {
             .unwrap();
 
         let blocker = Uuid::new_v4();
-        goal.block("Waiting for dependency", vec![blocker])
-            .unwrap();
+        goal.block("Waiting for dependency", vec![blocker]).unwrap();
 
         assert_eq!(goal.status, GoalStatus::Blocked);
         assert_eq!(

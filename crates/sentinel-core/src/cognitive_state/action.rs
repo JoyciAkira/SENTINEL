@@ -48,6 +48,11 @@ impl Action {
         }
     }
 
+    /// Get action ID
+    pub fn id(&self) -> Uuid {
+        self.id
+    }
+
     /// Set the goal this action contributes to
     pub fn for_goal(mut self, goal_id: Uuid) -> Self {
         self.goal_id = Some(goal_id);
@@ -100,16 +105,10 @@ pub enum ActionType {
     },
 
     /// Create a new file
-    CreateFile {
-        path: PathBuf,
-        content: String,
-    },
+    CreateFile { path: PathBuf, content: String },
 
     /// Delete a file
-    DeleteFile {
-        path: PathBuf,
-        backup: bool,
-    },
+    DeleteFile { path: PathBuf, backup: bool },
 
     /// Run a command
     RunCommand {
@@ -118,9 +117,7 @@ pub enum ActionType {
     },
 
     /// Run tests
-    RunTests {
-        suite: String,
-    },
+    RunTests { suite: String },
 
     /// Update goal status
     UpdateGoal {
@@ -214,9 +211,7 @@ impl ActionResult {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum Change {
     /// File was created
-    FileCreated {
-        path: PathBuf,
-    },
+    FileCreated { path: PathBuf },
 
     /// File was modified
     FileModified {
@@ -232,10 +227,7 @@ pub enum Change {
     },
 
     /// Command was executed
-    CommandExecuted {
-        command: String,
-        exit_code: i32,
-    },
+    CommandExecuted { command: String, exit_code: i32 },
 }
 
 /// Decision about whether to execute an action

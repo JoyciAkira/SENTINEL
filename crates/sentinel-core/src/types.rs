@@ -215,7 +215,7 @@ impl ProbabilityDistribution {
             mean,
             std_dev,
             min: mean - 2.0 * std_dev, // ~p5
-            max: mean + 2.0 * std_dev,  // ~p95
+            max: mean + 2.0 * std_dev, // ~p95
             distribution_type: DistributionType::Normal,
         }
     }
@@ -274,10 +274,7 @@ impl ProbabilityDistribution {
                     c if (c - 0.99).abs() < 0.01 => 2.58, // 99%
                     _ => 1.96,                            // default to 95%
                 };
-                (
-                    self.mean - z * self.std_dev,
-                    self.mean + z * self.std_dev,
-                )
+                (self.mean - z * self.std_dev, self.mean + z * self.std_dev)
             }
             DistributionType::Uniform => (self.min, self.max),
             DistributionType::Point => (self.mean, self.mean),

@@ -286,8 +286,8 @@ impl GoalManifold {
                 hasher.update(&goal.value_to_root.to_le_bytes());
 
                 // Hash success criteria
-                let criteria_json = serde_json::to_string(&goal.success_criteria)
-                    .unwrap_or_default();
+                let criteria_json =
+                    serde_json::to_string(&goal.success_criteria).unwrap_or_default();
                 hasher.update(criteria_json.as_bytes());
             }
         }

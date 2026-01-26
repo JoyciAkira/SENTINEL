@@ -256,27 +256,25 @@ impl ProjectState {
                     goal_state.completion = (goal_state.completion + epsilon).clamp(0.0, 1.0);
                 }
             }
-            StateDimension::Metric(metric_type) => {
-                match metric_type {
-                    MetricType::LinesOfCode => {
-                        perturbed.metrics.lines_of_code =
-                            (perturbed.metrics.lines_of_code as f64 + epsilon).max(0.0) as usize;
-                    }
-                    MetricType::TestCoverage => {
-                        perturbed.metrics.test_coverage =
-                            (perturbed.metrics.test_coverage + epsilon).clamp(0.0, 1.0);
-                    }
-                    MetricType::TechDebtRatio => {
-                        perturbed.metrics.tech_debt_ratio =
-                            (perturbed.metrics.tech_debt_ratio + epsilon).clamp(0.0, 1.0);
-                    }
-                    MetricType::AvgComplexity => {
-                        perturbed.metrics.avg_complexity =
-                            (perturbed.metrics.avg_complexity + epsilon).max(0.0);
-                    }
-                    _ => {}
+            StateDimension::Metric(metric_type) => match metric_type {
+                MetricType::LinesOfCode => {
+                    perturbed.metrics.lines_of_code =
+                        (perturbed.metrics.lines_of_code as f64 + epsilon).max(0.0) as usize;
                 }
-            }
+                MetricType::TestCoverage => {
+                    perturbed.metrics.test_coverage =
+                        (perturbed.metrics.test_coverage + epsilon).clamp(0.0, 1.0);
+                }
+                MetricType::TechDebtRatio => {
+                    perturbed.metrics.tech_debt_ratio =
+                        (perturbed.metrics.tech_debt_ratio + epsilon).clamp(0.0, 1.0);
+                }
+                MetricType::AvgComplexity => {
+                    perturbed.metrics.avg_complexity =
+                        (perturbed.metrics.avg_complexity + epsilon).max(0.0);
+                }
+                _ => {}
+            },
             _ => {
                 // Other dimensions can be perturbed in future implementations
             }
