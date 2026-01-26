@@ -7,10 +7,12 @@
 pub mod classifier;
 pub mod knowledge_base;
 pub mod pattern_mining;
+pub mod strategy;
 pub mod types;
 
 // Re-exports
 pub use classifier::DeviationClassifier;
 pub use knowledge_base::KnowledgeBase;
 pub use pattern_mining::PatternMiningEngine;
+pub use strategy::StrategySynthesizer;
 pub use types::*;
