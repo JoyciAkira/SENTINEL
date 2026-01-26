@@ -89,7 +89,7 @@ async fn main() -> anyhow::Result<()> {
                         "external": {
                             "risk_level": watcher.check_alignment_risk(),
                             "alerts": alerts,
-                            "dependency_count": manifold.root_intent.infrastructure_map.len() // Placeholder per ora
+                            "dependency_count": manifold.root_intent.infrastructure_map.len()
                         }
                     });
                     println!("{}", serde_json::to_string(&status_report)?);
@@ -107,7 +107,7 @@ async fn main() -> anyhow::Result<()> {
             }
         }
         Commands::Ui => {
-            tui::run_tui()?;
+            tui::run_tui(cli.manifold)?;
         }
         Commands::Learnings => {
             println!("Esplorazione Knowledge Base...");

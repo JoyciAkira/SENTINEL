@@ -12,6 +12,8 @@ use ratatui::{
 };
 use std::{io, time::{Duration, Instant}};
 
+use std::path::PathBuf;
+
 pub struct AgentStatus {
     pub name: String,
     pub goal: String,
@@ -27,10 +29,12 @@ pub struct TuiApp {
     pub goals: Vec<String>,
     pub dependency_count: usize,
     pub agents: Vec<AgentStatus>,
+    pub conflicts: Vec<String>,
+    pub manifold_path: PathBuf,
 }
 
 impl TuiApp {
-    pub fn new() -> Self {
+    pub fn new(manifold_path: PathBuf) -> Self {
         let mut goal_list_state = ListState::default();
         goal_list_state.select(Some(0));
 
@@ -40,52 +44,40 @@ impl TuiApp {
             current_tab: 0,
             should_quit: false,
             goal_list_state,
-            goals: vec![
-                "Layer 6: Integration".to_string(),
-                "Layer 7: External Awareness".to_string(),
-                "Layer 8: Multi-Agent Sync".to_string(),
-            ],
-            dependency_count: 12,
-            agents: vec![
-                AgentStatus { name: "Cline-Sonnet".to_string(), goal: "Multi-Agent UI".to_string(), activity: "Writing Rust".to_string() },
-                AgentStatus { name: "Cursor-Copilot".to_string(), goal: "LSP Refinement".to_string(), activity: "Analyzing code".to_string() },
-                AgentStatus { name: "KiloCode-Agent".to_string(), goal: "Kernel Safety".to_string(), activity: "Verifying invariants".to_string() },
-            ],
+            goals: Vec::new(),
+            dependency_count: 0,
+            agents: Vec::new(),
+            conflicts: Vec::new(),
+            manifold_path,
         }
     }
 
-    pub fn next_goal(&mut self) {
-        let i = match self.goal_list_state.selected() {
-            Some(i) => {
-                if i >= self.goals.len() - 1 {
-                    0
-                } else {
-                    i + 1
+    pub fn on_tick(&mut self) {
+        // Polling reale dal file sentinel.json
+        if self.manifold_path.exists() {
+            if let Ok(content) = std::fs::read_to_string(&self.manifold_path) {
+                if let Ok(manifold) = serde_json::from_str::<sentinel_core::GoalManifold>(&content) {
+                    // Sincronizzazione Goal
+                    self.goals = manifold.goal_dag.nodes.values().map(|g| g.description.clone()).collect();
+                    
+                    // Rilevamento Conflitti Reali
+                    self.conflicts.clear();
+                    let mut files_seen = std::collections::HashMap::new();
+                    for (file, agent_id) in &manifold.file_locks {
+                        if let Some(other_agent) = files_seen.insert(file, agent_id) {
+                            if other_agent != agent_id {
+                                self.conflicts.push(format!("COLLISION: File {:?} is being touched by multiple agents!", file));
+                            }
+                        }
+                    }
                 }
             }
-            None => 0,
-        };
-        self.goal_list_state.select(Some(i));
+        }
     }
 
-    pub fn previous_goal(&mut self) {
-        let i = match self.goal_list_state.selected() {
-            Some(i) => {
-                if i == 0 {
-                    self.goals.len() - 1
-                } else {
-                    i - 1
-                }
-            }
-            None => 0,
-        };
-        self.goal_list_state.select(Some(i));
-    }
 
-    pub fn on_tick(&mut self) {}
-}
 
-pub fn run_tui() -> anyhow::Result<()> {
+pub fn run_tui(manifold_path: PathBuf) -> anyhow::Result<()> {
     enable_raw_mode()?;
     let mut stdout = io::stdout();
     execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
@@ -93,7 +85,7 @@ pub fn run_tui() -> anyhow::Result<()> {
     let mut terminal = Terminal::new(backend)?;
 
     let tick_rate = Duration::from_millis(250);
-    let mut app = TuiApp::new();
+    let mut app = TuiApp::new(manifold_path);
     let mut last_tick = Instant::now();
 
     loop {
@@ -133,16 +125,35 @@ pub fn run_tui() -> anyhow::Result<()> {
 }
 
 fn ui(f: &mut Frame, app: &TuiApp) {
+    let mut constraints = vec![
+        Constraint::Length(3), // Header
+        Constraint::Length(3), // Alignment Gauge
+        Constraint::Min(0),    // Main Content
+        Constraint::Length(3), // Footer
+    ];
+
+    // Se ci sono conflitti, aggiungiamo una riga di allarme in cima
+    if !app.conflicts.is_empty() {
+        constraints.insert(0, Constraint::Length(3));
+    }
+
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .margin(1)
-        .constraints([
-            Constraint::Length(3), // Header
-            Constraint::Length(3), // Alignment Gauge
-            Constraint::Min(0),    // Main Content
-            Constraint::Length(3), // Footer
-        ].as_ref())
+        .constraints(constraints.as_ref())
         .split(f.size());
+
+    let mut current_chunk = 0;
+
+    // 0. Conflict Alert (Se presente)
+    if !app.conflicts.is_empty() {
+        let alert_text = app.conflicts.join(" | ");
+        let alert_block = Paragraph::new(alert_text)
+            .block(Block::default().borders(Borders::ALL).title("!!! AGENT COLLISION DETECTED !!!"))
+            .style(Style::default().fg(Color::White).bg(Color::Red).add_modifier(Modifier::BOLD | Modifier::SLOW_BLINK));
+        f.render_widget(alert_block, chunks[current_chunk]);
+        current_chunk += 1;
+    }
 
     // 1. Header: Title and Tabs
     let titles = vec!["Overview", "Goal Tree", "Knowledge Base", "Infrastructure", "External", "Calibration", "Multi-Agent"];
@@ -151,7 +162,8 @@ fn ui(f: &mut Frame, app: &TuiApp) {
         .select(app.current_tab)
         .style(Style::default().fg(Color::Cyan))
         .highlight_style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD));
-    f.render_widget(tabs, chunks[0]);
+    f.render_widget(tabs, chunks[current_chunk]);
+    current_chunk += 1;
 
     // 2. Alignment Gauge
     let gauge_color = if app.alignment_score > 0.8 {
@@ -166,7 +178,8 @@ fn ui(f: &mut Frame, app: &TuiApp) {
         .block(Block::default().borders(Borders::ALL).title("Current Alignment Field"))
         .gauge_style(Style::default().fg(gauge_color).bg(Color::Black))
         .percent((app.alignment_score * 100.0) as u16);
-    f.render_widget(gauge, chunks[1]);
+    f.render_widget(gauge, chunks[current_chunk]);
+    current_chunk += 1;
 
     // 3. Main Content
     match app.current_tab {
@@ -175,13 +188,13 @@ fn ui(f: &mut Frame, app: &TuiApp) {
             let main_block = Paragraph::new(inner_text)
                 .block(Block::default().borders(Borders::ALL).title("Cognitive Status"))
                 .style(Style::default().fg(Color::White));
-            f.render_widget(main_block, chunks[2]);
+            f.render_widget(main_block, main_chunk);
         }
         1 => {
             let goal_chunks = Layout::default()
                 .direction(Direction::Horizontal)
                 .constraints([Constraint::Percentage(40), Constraint::Percentage(60)].as_ref())
-                .split(chunks[2]);
+                .split(main_chunk);
 
             // List of goals
             let items: Vec<ListItem> = app.goals.iter().map(|g| ListItem::new(g.as_str())).collect();
@@ -193,9 +206,10 @@ fn ui(f: &mut Frame, app: &TuiApp) {
 
             // Details
             let selected_index = app.goal_list_state.selected().unwrap_or(0);
+            let goal_name = if app.goals.is_empty() { "No goals" } else { &app.goals[selected_index] };
             let details = format!(
                 "GOAL: {}\n\nSTATUS: Active\nPROGRESS: 45%\n\nSUCCESS CRITERIA:\n- Validated by Layer 2\n- Code Coverage > 80%\n- Invariants Satisfied",
-                app.goals[selected_index]
+                goal_name
             );
             let detail_block = Paragraph::new(details)
                 .block(Block::default().borders(Borders::ALL).title("Context Details"))
@@ -207,14 +221,14 @@ fn ui(f: &mut Frame, app: &TuiApp) {
             let main_block = Paragraph::new(inner_text)
                 .block(Block::default().borders(Borders::ALL).title("Meta-Learning Insights"))
                 .style(Style::default().fg(Color::White));
-            f.render_widget(main_block, chunks[2]);
+            f.render_widget(main_block, main_chunk);
         }
         3 => {
             let inner_text = "INFRASTRUCTURE MAP:\n\n- Frontend IP: 192.168.1.50 [ONLINE]\n- API Gateway: api.sentinel.internal [ONLINE]\n- Database: db.cluster.local [STABLE]";
             let main_block = Paragraph::new(inner_text)
                 .block(Block::default().borders(Borders::ALL).title("Live Assets"))
                 .style(Style::default().fg(Color::White));
-            f.render_widget(main_block, chunks[2]);
+            f.render_widget(main_block, main_chunk);
         }
         4 => {
             let inner_text = format!(
@@ -224,20 +238,20 @@ fn ui(f: &mut Frame, app: &TuiApp) {
             let main_block = Paragraph::new(inner_text)
                 .block(Block::default().borders(Borders::ALL).title("External Dependencies & Risks"))
                 .style(Style::default().fg(Color::White));
-            f.render_widget(main_block, chunks[2]);
+            f.render_widget(main_block, main_chunk);
         }
         5 => {
             let inner_text = "ALIGNMENT CALIBRATION:\n\n- Sentinel Sensitivity: 0.50 [BALANCED]\n- Precision Rate: 98.2%\n- False Positive Rate: 1.8%\n\nHuman Overrides Registered: 0\n\n(Use 'sentinel calibrate <VALUE>' to adjust rigidity)";
             let main_block = Paragraph::new(inner_text)
                 .block(Block::default().borders(Borders::ALL).title("Sensitivity & Confidence Control"))
                 .style(Style::default().fg(Color::White));
-            f.render_widget(main_block, chunks[2]);
+            f.render_widget(main_block, main_chunk);
         }
         6 => {
             let social_chunks = Layout::default()
                 .direction(Direction::Vertical)
                 .constraints([Constraint::Percentage(60), Constraint::Percentage(40)].as_ref())
-                .split(chunks[2]);
+                .split(main_chunk);
 
             // Agent Herd Table
             let rows = app.agents.iter().map(|a| {

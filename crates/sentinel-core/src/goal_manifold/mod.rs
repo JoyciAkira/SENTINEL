@@ -75,6 +75,9 @@ pub struct GoalManifold {
     /// Cognitive handover notes between agents
     pub handover_log: Vec<HandoverNote>,
 
+    /// Active locks on specific files (File -> AgentID)
+    pub file_locks: std::collections::HashMap<std::path::PathBuf, uuid::Uuid>,
+
     /// Graph of goals and their dependencies
     pub goal_dag: GoalDag,
 
@@ -257,6 +260,7 @@ impl GoalManifold {
             sensitivity: 0.5,
             overrides: Vec::new(),
             handover_log: Vec::new(),
+            file_locks: std::collections::HashMap::new(),
             goal_dag: GoalDag::new(),
             invariants: Vec::new(),
             created_at: now,
