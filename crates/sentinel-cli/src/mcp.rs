@@ -92,6 +92,19 @@ async fn handle_request(req: McpRequest) -> McpResponse {
                         },
                         "required": ["goal_description"]
                     }
+                },
+                {
+                    "name": "record_handover",
+                    "description": "Registra una nota di passaggio di consegna per il prossimo agente",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {
+                            "goal_id": { "type": "string" },
+                            "content": { "type": "string" },
+                            "warnings": { "type": "array", "items": { "type": "string" } }
+                        },
+                        "required": ["goal_id", "content"]
+                    }
                 }
             ]
         })),
@@ -133,6 +146,14 @@ async fn handle_tool_call(params: Value) -> Option<Value> {
                 {
                     "type": "text",
                     "text": "STRATEGIA SUGGERITA (Layer 5):\n1. Inizializzazione Ambiente\n2. Definizione Invarianti Critiche\n3. Implementazione Incrementale con Test-Driven Development."
+                }
+            ]
+        })),
+        "record_handover" => Some(serde_json::json!({
+            "content": [
+                {
+                    "type": "text",
+                    "text": "COGNITIVE HANDOVER SUCCESS: Nota registrata nel Manifold. Il prossimo agente riceverà questo contesto."
                 }
             ]
         })),

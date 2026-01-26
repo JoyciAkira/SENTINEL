@@ -125,6 +125,18 @@ pub struct GoalLock {
     pub expires_at: Option<Timestamp>,
 }
 
+/// Nota cognitiva per il passaggio di consegne tra agenti (Cognitive Handover)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HandoverNote {
+    pub id: uuid::Uuid,
+    pub agent_id: uuid::Uuid,
+    pub goal_id: uuid::Uuid,
+    pub content: String,
+    pub technical_warnings: Vec<String>,
+    pub suggested_next_steps: Vec<String>,
+    pub timestamp: Timestamp,
+}
+
 /// Probability distribution for metrics
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ProbabilityDistribution {

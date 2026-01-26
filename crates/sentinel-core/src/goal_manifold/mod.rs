@@ -59,7 +59,7 @@ use uuid::Uuid;
 ///
 /// manifold.add_goal(goal).unwrap();
 /// ```
-use crate::types::{HumanOverride, AlignmentReport};
+use crate::types::{HumanOverride, AlignmentReport, HandoverNote};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GoalManifold {
@@ -71,6 +71,9 @@ pub struct GoalManifold {
 
     /// History of human overrides (for learning)
     pub overrides: Vec<HumanOverride>,
+
+    /// Cognitive handover notes between agents
+    pub handover_log: Vec<HandoverNote>,
 
     /// Graph of goals and their dependencies
     pub goal_dag: GoalDag,
@@ -253,6 +256,7 @@ impl GoalManifold {
             root_intent,
             sensitivity: 0.5,
             overrides: Vec::new(),
+            handover_log: Vec::new(),
             goal_dag: GoalDag::new(),
             invariants: Vec::new(),
             created_at: now,
