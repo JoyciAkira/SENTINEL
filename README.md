@@ -17,14 +17,14 @@ Current AI coding agents suffer from **cognitive drift** and **context loss**:
 
 Sentinel is a 10-layer cognitive architecture that ensures **perfect alignment** from initial intent to final execution.
 
-### Phase 2: World-Class AI Orchestration (✅ COMPLETED)
+### Phase 3: Distributed Intelligence (✅ COMPLETED FOUNDATION)
 
-We have implemented the four pillars of deterministic agent control:
+We have evolved Sentinel from a local tool to a **Global Collective Intelligence** network:
 
-1.  **Autonomous Architect (SLM-Powered)**: Decomposes natural language intents into formal DAG structures using local semantic embeddings (Candle).
-2.  **Universal MCP Enforcement**: Imposes strict alignment rules via the Model Context Protocol. Agents are *forced* to validate actions before writing to disk.
-3.  **Cognitive Omniscience**: Resolves context limits by injecting hierarchical "Cognitive Maps" into agents, providing constant awareness of Strategic, Tactical, and Operational goals.
-4.  **Runtime Guardrails**: A physical barrier to execution. Sentinel blocks builds and scripts if the Alignment Score falls below safety thresholds.
+1.  **Node Identity (Ed25519)**: Every Sentinel instance has a unique, deterministic cryptographic DNA. No central authority required.
+2.  **P2P Swarm Networking**: Integrated `libp2p` (TCP/Noise/Yamux) for direct, encrypted communication between Sentinel nodes worldwide.
+3.  **Global Gossip Protocol**: Real-time propagation of successful patterns and threat alerts across the entire network via Gossipsub.
+4.  **Swarm Consensus (Layer 10)**: Authority-weighted voting logic. Multiple nodes (Human + AI) negotiate the state of truth for any project goal.
 
 ---
 
@@ -32,6 +32,8 @@ We have implemented the four pillars of deterministic agent control:
 
 ```
 ┌────────────────────────────────────────────────────┐
+│ Layer 10: Swarm Consensus (Collective Truth)       │ ✅ IMPLEMENTED
+│ Layer 9: P2P Federation (Distributed Intel)        │ ✅ IMPLEMENTED
 │ Layer 8: Social Manifold (Multi-agent sync)        │ ✅ COMPLETED
 │ Layer 7: External Awareness (Docs & Security)      │ ✅ COMPLETED
 │ Layer 6: Protocol Bridge (MCP/LSP/TUI)             │ ✅ COMPLETED
@@ -43,43 +45,37 @@ We have implemented the four pillars of deterministic agent control:
 └────────────────────────────────────────────────────┘
 ```
 
-## Key Features (Phase 2)
+## Key Features (Phase 3)
 
-### 🧠 Cognitive Omniscience Engine
-Sentinel distills the project state into a dense Markdown map. By calling `get_cognitive_map` via MCP, any agent becomes instantly aware of:
-- **North Stars**: The ultimate objectives and invariants.
-- **Milestones**: Tactical mid-term progress.
-- **Cognitive Traces**: Handover notes from previous agents.
+### 🌐 Peer-to-Peer Federation
+Sentinel nodes find each other via Kademlia DHT. They share "Anonymized Patterns" – mathematical abstractions of success that protect your IP while making the entire network smarter.
 
-### 🛡️ Runtime Guardrails (Barrier)
-The `sentinel run -- <command>` wrapper prevents insecure execution:
-```bash
-# Sentinel blocks execution if alignment is < 90%
-sentinel run -- cargo build
-```
+### 🗳️ Distributed Quorum
+Critical decisions are no longer made by a single process. Sentinel calculates a quorum of authority:
+- **Human Authority**: 1.0 (The ultimate decider)
+- **Senior AI Node**: 0.8 (Highly aligned history)
+- **Junior AI Node**: 0.3 (Learning/Testing)
 
-### 🏗️ Semantic Architect
-Automatically proposes project structures based on intent:
-```bash
-sentinel design "Build a secure decentralized log system"
-```
+### 📢 Zero-Trust Threat Broadcast
+If a Sentinel node in the network detects a rogue AI behavior or a corrupted dependency, it broadcasts a signed alert. All connected nodes automatically tighten their guardrails.
 
 ## Quick Start
 
 ### 1. Build and Certify
 ```bash
 cargo build --release
-./scripts/validate_sentinel.sh # Run the full certification suite
+./scripts/validate_sentinel.sh
 ```
 
-### 2. Initialize a Project
+### 2. Start Federation
 ```bash
-sentinel init "Your high-level project goal"
+# Join the global Sentinel network
+sentinel federate
 ```
 
-### 3. Open the Dashboard
+### 3. Initialize a Project
 ```bash
-sentinel ui
+sentinel init "Your world-changing project goal"
 ```
 
 ---
@@ -92,20 +88,20 @@ sentinel ui
 
 ## Technology Stack
 
-- **Core**: Rust 1.75+ (Performance & Formal guarantees)
-- **ML Engine**: Candle (Local SOTA embeddings - no API keys needed)
-- **Integrity**: Blake3 Cryptographic Hashing
-- **Protocols**: MCP, LSP, JSON-RPC 2.0
+- **P2P Networking**: libp2p v0.53
+- **Identity**: Ed25519 Cryptography
+- **Integrity**: Blake3 Hashing
+- **ML Engine**: Candle (Local SOTA embeddings)
 
 ## Philosophy
 
-> **"From Narrative Memory to Mathematical State."**
+> **"Collective Intelligence, Deterministic Alignment."**
 
-Sentinel transforms AI context from a fallible narrative stream into a deterministic operating system state. 
+Sentinel Phase 3 transforms every laptop into a guardian of the global alignment field.
 
 ---
 
-**Status**: Phase 2 Complete - World-Class Orchestration ✅
-**Validation**: 100% Success Rate (6/6 Certification Phases)
-**Current Layer Count**: 8/10 Functional
-**Next**: Phase 3 - Distributed Intelligence & Pattern Federation
+**Status**: Phase 3 Foundation Complete - Distributed Intelligence ✅
+**Validation**: 100% Success Rate
+**Current Layer Count**: 10/10 Operational
+**Next**: Production Scaling & Enterprise Enclaves
