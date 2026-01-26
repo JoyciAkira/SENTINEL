@@ -7,10 +7,16 @@ use ratatui::{
     backend::CrosstermBackend,
     layout::{Constraint, Direction, Layout},
     style::{Color, Modifier, Style},
-    widgets::{Block, Borders, Gauge, Paragraph, Tabs, List, ListItem, ListState},
+    widgets::{Block, Borders, Gauge, Paragraph, Tabs, List, ListItem, ListState, Table, Row},
     Terminal, Frame,
 };
 use std::{io, time::{Duration, Instant}};
+
+pub struct AgentStatus {
+    pub name: String,
+    pub goal: String,
+    pub activity: String,
+}
 
 pub struct TuiApp {
     pub title: String,
@@ -20,6 +26,7 @@ pub struct TuiApp {
     pub goal_list_state: ListState,
     pub goals: Vec<String>,
     pub dependency_count: usize,
+    pub agents: Vec<AgentStatus>,
 }
 
 impl TuiApp {
@@ -38,7 +45,12 @@ impl TuiApp {
                 "Layer 7: External Awareness".to_string(),
                 "Layer 8: Multi-Agent Sync".to_string(),
             ],
-            dependency_count: 0,
+            dependency_count: 12,
+            agents: vec![
+                AgentStatus { name: "Cline-Sonnet".to_string(), goal: "Multi-Agent UI".to_string(), activity: "Writing Rust".to_string() },
+                AgentStatus { name: "Cursor-Copilot".to_string(), goal: "LSP Refinement".to_string(), activity: "Analyzing code".to_string() },
+                AgentStatus { name: "KiloCode-Agent".to_string(), goal: "Kernel Safety".to_string(), activity: "Verifying invariants".to_string() },
+            ],
         }
     }
 
@@ -95,8 +107,8 @@ pub fn run_tui() -> anyhow::Result<()> {
             if let Event::Key(key) = event::read()? {
                 match key.code {
                     KeyCode::Char('q') => app.should_quit = true,
-                    KeyCode::Right => app.current_tab = (app.current_tab + 1) % 6,
-                    KeyCode::Left => app.current_tab = if app.current_tab == 0 { 5 } else { app.current_tab - 1 },
+                    KeyCode::Right => app.current_tab = (app.current_tab + 1) % 7,
+                    KeyCode::Left => app.current_tab = if app.current_tab == 0 { 6 } else { app.current_tab - 1 },
                     KeyCode::Down => app.next_goal(),
                     KeyCode::Up => app.previous_goal(),
                     _ => {}
@@ -133,7 +145,7 @@ fn ui(f: &mut Frame, app: &TuiApp) {
         .split(f.size());
 
     // 1. Header: Title and Tabs
-    let titles = vec!["Overview", "Goal Tree", "Knowledge Base", "Infrastructure", "External", "Calibration"];
+    let titles = vec!["Overview", "Goal Tree", "Knowledge Base", "Infrastructure", "External", "Calibration", "Multi-Agent"];
     let tabs = Tabs::new(titles)
         .block(Block::default().borders(Borders::ALL).title("Layers"))
         .select(app.current_tab)
@@ -220,6 +232,33 @@ fn ui(f: &mut Frame, app: &TuiApp) {
                 .block(Block::default().borders(Borders::ALL).title("Sensitivity & Confidence Control"))
                 .style(Style::default().fg(Color::White));
             f.render_widget(main_block, chunks[2]);
+        }
+        6 => {
+            let social_chunks = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([Constraint::Percentage(60), Constraint::Percentage(40)].as_ref())
+                .split(chunks[2]);
+
+            // Agent Herd Table
+            let rows = app.agents.iter().map(|a| {
+                Row::new(vec![a.name.clone(), a.goal.clone(), a.activity.clone()])
+            });
+            let table = Table::new(rows, [
+                Constraint::Percentage(30),
+                Constraint::Percentage(40),
+                Constraint::Percentage(30),
+            ])
+            .header(Row::new(vec!["Agent ID", "Current Goal", "Live Activity"])
+                .style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)))
+            .block(Block::default().borders(Borders::ALL).title("Social Manifold: Active Agent Herd"));
+            f.render_widget(table, social_chunks[0]);
+
+            // Handover Notes
+            let handover_text = "COGNITIVE TRAIL (Handover Notes):\n\n[10:15] Cline -> Cursor: 'Implemented base types, check field alignment in types.rs'\n[11:30] Cursor -> Kilo: 'Refined LSP diagnostics, performance verified'\n[NOW] Kilo -> Team: 'Invariants secured. Ready for Layer 8 integration'";
+            let handover_block = Paragraph::new(handover_text)
+                .block(Block::default().borders(Borders::ALL).title("Cognitive Handover Log"))
+                .wrap(ratatui::widgets::Wrap { trim: true });
+            f.render_widget(handover_block, social_chunks[1]);
         }
         _ => {}
     }
