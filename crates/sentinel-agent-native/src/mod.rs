@@ -12,6 +12,7 @@ pub use consensus::P2PConsensus;
 pub use context::ContextManager;
 pub use orchestrator::AgentOrchestrator;
 pub use planning::HierarchicalPlanner;
+pub use llm_integration::LLMIntegrationManager;
 pub use reasoning::StructuredReasoner;
 
 pub use crate::SentinelAgent;
