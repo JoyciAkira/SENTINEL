@@ -1,12 +1,10 @@
 {
     "mcpServers": {
         "sentinel": {
-            "command": "sentinel",
+            "command": "/Users/danielecorrao/Documents/REPOSITORIES_GITHUB/SENTINEL /target/debug/sentinel-cli",
             "args": ["mcp"],
-            "description": "Sentinel AI Alignment & Goal Monitoring",
-            "env": {
-                "PATH": "/usr/local/bin:/usr/bin:/bin"
-            }
+            "disabled": false,
+            "autoApprove": []
         }
     }
 }

@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "crates/sentinel-core",
     "crates/sentinel-cli",
+    "crates/sentinel-agent-native",
 ]
 
 [workspace.package]
@@ -34,6 +35,21 @@ blake3 = "1.5"
 
 # Date/Time
 chrono = { version = "0.4", features = ["serde"] }
+
+# Code generation (Tree-Sitter)
+tree-sitter = "0.20"
+tree-sitter-rust = "0.20"
+tree-sitter-typescript = "0.20"
+tree-sitter-python = "0.20"
+
+# Async runtime
+futures = "0.3"
+
+# Cryptography (Blake3)
+blake3 = "1.5"
+
+# Protobuf (for P2P messaging)
+prost = "0.12"
 
 # Error handling
 thiserror = "1.0"
