@@ -7,6 +7,7 @@
 use crate::error::{PredicateError, Result};
 use crate::types::Comparison;
 use serde::{Deserialize, Serialize};
+use std::fmt;
 use std::path::PathBuf;
 
 /// Formal predicate for success criteria
@@ -37,35 +38,49 @@ pub enum Predicate {
 
     /// Tests pass in a given suite
     TestsPassing {
+        /// Suite name
         suite: String,
-        min_coverage: f64, // 0.0-1.0
+        /// Minimum coverage required (0.0-1.0)
+        min_coverage: f64,
     },
 
     /// API endpoint responds correctly
     ApiEndpoint {
+        /// Endpoint URL
         url: String,
+        /// Expected HTTP status code
         expected_status: u16,
+        /// Expected string in body
         expected_body_contains: Option<String>,
     },
 
     /// Performance metric meets threshold
     Performance {
+        /// Metric name
         metric: String,
+        /// Threshold value
         threshold: f64,
+        /// Comparison operator
         comparison: Comparison,
     },
 
     /// Command executes successfully
     CommandSucceeds {
+        /// Command to execute
         command: String,
+        /// Arguments for command
         args: Vec<String>,
+        /// Expected exit code
         expected_exit_code: i32,
     },
 
     /// Custom predicate (code that returns bool)
     Custom {
+        /// Code to execute
         code: String,
+        /// Language of code
         language: PredicateLanguage,
+        /// Human-readable description
         description: String,
     },
 
@@ -85,6 +100,25 @@ pub enum Predicate {
     AlwaysFalse,
 }
 
+impl fmt::Display for Predicate {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Predicate::FileExists(path) => write!(f, "FileExists({:?})", path),
+            Predicate::DirectoryExists(path) => write!(f, "DirectoryExists({:?})", path),
+            Predicate::TestsPassing { suite, .. } => write!(f, "TestsPassing({})", suite),
+            Predicate::ApiEndpoint { url, .. } => write!(f, "ApiEndpoint({})", url),
+            Predicate::Performance { metric, .. } => write!(f, "Performance({})", metric),
+            Predicate::CommandSucceeds { command, .. } => write!(f, "CommandSucceeds({})", command),
+            Predicate::Custom { description, .. } => write!(f, "Custom({})", description),
+            Predicate::And(preds) => write!(f, "And({} items)", preds.len()),
+            Predicate::Or(preds) => write!(f, "Or({} items)", preds.len()),
+            Predicate::Not(pred) => write!(f, "Not({})", pred),
+            Predicate::AlwaysTrue => write!(f, "AlwaysTrue"),
+            Predicate::AlwaysFalse => write!(f, "AlwaysFalse"),
+        }
+    }
+}
+
 /// Languages supported for custom predicates
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -100,7 +134,7 @@ impl Predicate {
     ///
     /// This is a placeholder that will be implemented with actual
     /// project state evaluation in the future.
-    pub async fn evaluate(&self, _state: &ProjectState) -> Result<bool> {
+    pub async fn evaluate(&self, _state: &PredicateState) -> Result<bool> {
         match self {
             Predicate::FileExists(path) => Ok(std::fs::metadata(path).is_ok()),
 
@@ -296,17 +330,17 @@ impl Predicate {
     }
 }
 
-/// Project state for predicate evaluation
+/// State representation for predicate evaluation
 ///
 /// This is a placeholder that will be expanded as we implement
 /// the full project state tracking system.
 #[derive(Debug, Clone)]
-pub struct ProjectState {
+pub struct PredicateState {
     pub working_directory: PathBuf,
     // TODO: Add test results, metrics, etc.
 }
 
-impl ProjectState {
+impl PredicateState {
     pub fn new(working_directory: PathBuf) -> Self {
         Self { working_directory }
     }
@@ -386,7 +420,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_predicate_evaluate_always_true() {
-        let state = ProjectState::new(PathBuf::from("."));
+        let state = PredicateState::new(PathBuf::from("."));
         let result = Predicate::AlwaysTrue.evaluate(&state).await;
         assert!(result.is_ok());
         assert!(result.unwrap());
@@ -394,7 +428,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_predicate_evaluate_and() {
-        let state = ProjectState::new(PathBuf::from("."));
+        let state = PredicateState::new(PathBuf::from("."));
         let pred = Predicate::And(vec![Predicate::AlwaysTrue, Predicate::AlwaysTrue]);
 
         let result = pred.evaluate(&state).await;
@@ -404,7 +438,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_predicate_evaluate_or() {
-        let state = ProjectState::new(PathBuf::from("."));
+        let state = PredicateState::new(PathBuf::from("."));
         let pred = Predicate::Or(vec![Predicate::AlwaysFalse, Predicate::AlwaysTrue]);
 
         let result = pred.evaluate(&state).await;

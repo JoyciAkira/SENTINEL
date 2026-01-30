@@ -103,7 +103,7 @@ pub enum RelationType {
 }
 
 /// Semantic memory with knowledge graph
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct SemanticMemory {
     /// Concept nodes
     concepts: HashMap<Uuid, ConceptNode>,

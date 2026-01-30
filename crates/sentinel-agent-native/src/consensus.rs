@@ -22,53 +22,62 @@
 //! ```
 //! ┌─────────────────────────────────────────────────────┐
 //! │              Local Sentinel Agent                 │
-│ │                                                │
-│ │  Query: "How to implement X?"                   │
-│         │                                          │
-│         v                                          │
-│  ┌─────────────────────────────────────────┐         │
-│  │      P2P Consensus Query            │         │
-│  │  1. Similar tasks (past 1000s)       │         │
-│  │  2. Successful patterns (90% success)    │         │
-│  │  3. Threat alerts (from global network)  │         │
-│  │  4. Known pitfalls (to avoid)           │         │
-│  └─────────────────────────────────────────┘         │
-│         │                                          │
-│         v                                          │
-│  Informed Reasoning (collective wisdom + local)      │
-│                                                │
-└─────────────────────────────────────────────────────┘
+//! │ │                                                │
+//! │ │  Query: "How to implement X?"                   │
+//! │         │                                          │
+//! │         v                                          │
+//! │  ┌─────────────────────────────────────────┐         │
+//! │  │      P2P Consensus Query            │         │
+//! │  │  1. Similar tasks (past 1000s)       │         │
+//! │  │  2. Successful patterns (90% success)    │         │
+//! │  │  3. Threat alerts (from global network)  │         │
+//! │  │  4. Known pitfalls (to avoid)           │         │
+//! │  └─────────────────────────────────────────┘         │
+//! │         │                                          │
+//! │         v                                          │
+//! │  Informed Reasoning (collective wisdom + local)      │
+//! │                                                │
+//! └─────────────────────────────────────────────────────┘
 //! ```
 
 use anyhow::{Context, Result};
 use chrono::Utc;
-use ed25519_dalek::{Keypair, PublicKey, SecretKey, Signature};
+use ed25519_dalek::{SigningKey, VerifyingKey, Signature, Signer};
 use libp2p::{
-    gossipsub::{self, Gossipsub, GossipsubConfigBuilder, MessageAuthenticity, Sha256Topic, ValidationMode},
+    gossipsub,
     identity::Keypair as Libp2pKeypair,
     swarm::{NetworkBehaviour, Swarm},
     PeerId,
 };
-use sentinel_core::federation::{self, GossipMessage, NetworkMessage, ThreatAlert};
+use sentinel_core::federation::{
+    gossip::{GossipMessage, GossipPayload},
+    consensus::Proposal,
+    ThreatAlert, ThreatType, Severity,
+};
+
+#[derive(Debug, Serialize, Deserialize)]
+pub enum NetworkMessage {
+    TaskQuery { goals: Vec<sentinel_core::goal_manifold::Goal>, requester_id: String },
+    PatternQuery { goal_types: Vec<String>, requester_id: String },
+    ThreatQuery { keywords: Vec<String>, requester_id: String },
+    PatternShare { pattern: Pattern, source_id: String },
+    ThreatBroadcast { threat: ThreatAlert, source_id: String },
+}
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::Duration;
 use uuid::Uuid;
 
 /// P2P Consensus Module - The bridge to global collective intelligence
-#[derive(Debug)]
 pub struct P2PConsensus {
     /// Local node identity (Ed25519)
-    pub keypair: Keypair,
+    pub keypair: ed25519_dalek::SigningKey,
 
     /// PeerId for libp2p
     pub peer_id: PeerId,
 
     /// P2P network swarm
     pub swarm: Swarm<Behaviour>,
-
-    /// Gossip protocol for pattern/threat propagation
-    pub gossipsub: Gossipsub,
 
     /// Local knowledge base (patterns learned by this node)
     pub local_patterns: HashMap<Uuid, Pattern>,
@@ -78,6 +87,17 @@ pub struct P2PConsensus {
 
     /// Statistics about network activity
     pub stats: NetworkStats,
+}
+
+impl std::fmt::Debug for P2PConsensus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("P2PConsensus")
+            .field("peer_id", &self.peer_id)
+            .field("local_patterns", &self.local_patterns)
+            .field("local_threats", &self.local_threats)
+            .field("stats", &self.stats)
+            .finish()
+    }
 }
 
 /// Network statistics
@@ -106,6 +126,9 @@ pub struct Pattern {
     /// Goals this pattern applies to (for matching)
     pub applicable_goals: Vec<String>,
 
+    /// Steps involved in this pattern
+    pub steps: Vec<String>,
+
     /// Expected alignment impact (0.0-1.0)
     pub alignment_impact: f64,
 
@@ -117,6 +140,19 @@ pub struct Pattern {
 
     /// Timestamp when pattern was created
     pub timestamp: chrono::DateTime<Utc>,
+}
+
+impl Pattern {
+    pub fn applicable_to_goal(&self, goal: &sentinel_core::goal_manifold::goal::Goal) -> bool {
+        let desc = goal.description.to_lowercase();
+        self.applicable_goals.iter().any(|g| desc.contains(&g.to_lowercase()))
+    }
+
+    pub async fn apply(&self) -> Result<()> {
+        tracing::info!("Applying pattern: {}", self.name);
+        // Pattern application logic would go here
+        Ok(())
+    }
 }
 
 /// Pattern type
@@ -151,12 +187,27 @@ pub struct ConsensusQueryResult {
 
     /// Active threats related to this domain
     pub threats: Vec<ThreatAlert>,
+
+    /// Number of active nodes participating in the network
+    pub network_participants: usize,
 }
 
 /// Behavior for P2P network
-#[derive(Debug)]
+#[derive(NetworkBehaviour)]
+#[behaviour(out_event = "BehaviourEvent")]
 pub struct Behaviour {
-    pub gossipsub: Gossipsub,
+    pub gossipsub: gossipsub::Behaviour,
+}
+
+#[derive(Debug)]
+pub enum BehaviourEvent {
+    Gossipsub(gossipsub::Event),
+}
+
+impl From<gossipsub::Event> for BehaviourEvent {
+    fn from(event: gossipsub::Event) -> Self {
+        BehaviourEvent::Gossipsub(event)
+    }
 }
 
 /// Network event
@@ -197,35 +248,38 @@ impl P2PConsensus {
         tracing::info!("Initializing P2P Consensus module");
 
         // Generate Ed25519 keypair for cryptographic identity
-        let keypair = Keypair::generate(&mut rand::rngs::OsRng);
-        let peer_id = PeerId::from(keypair.public);
+        let keypair_bytes = rand::RngCore::next_u32(&mut rand::rngs::OsRng).to_le_bytes(); // Simple seed for now
+        let mut seed = [0u8; 32];
+        seed[..4].copy_from_slice(&keypair_bytes);
+        let keypair = ed25519_dalek::SigningKey::from_bytes(&seed);
+        let peer_id = PeerId::from_public_key(&libp2p::identity::PublicKey::from(libp2p::identity::ed25519::PublicKey::try_from_bytes(keypair.verifying_key().as_bytes()).unwrap()));
 
-        // Configure Gossipsub for pattern/threat propagation
-        let gossip_config = GossipsubConfigBuilder::default()
+        // Configure Gossipsub
+        let gossip_config = gossipsub::ConfigBuilder::default()
             .heartbeat_interval(Duration::from_secs(10))
-            .validation_mode(ValidationMode::Strict)
-            .message_authenticity(MessageAuthenticity::Signed(authority))
+            .validation_mode(gossipsub::ValidationMode::Strict)
             .build()
-            .context("Failed to build Gossipsub config")?;
+            .map_err(|e| anyhow::anyhow!(e))?;
 
-        // Create Gossipsub
-        let gossipsub = Gossipsub::new(
-            MessageAuthenticity::Signed(authority),
+        let gossipsub = gossipsub::Behaviour::new(
+            gossipsub::MessageAuthenticity::Signed(libp2p::identity::Keypair::ed25519_from_bytes(seed.clone()).unwrap()),
             gossip_config,
-        )
-        .context("Failed to create Gossipsub")?;
+        ).map_err(|e| anyhow::anyhow!(e))?;
 
         // Create network behavior
         let behaviour = Behaviour { gossipsub };
 
-        // Create Swarm
-        let swarm = Swarm::new(
-            tokio::task::spawn(async move {
-                unimplemented!("Swarm initialization")
-            })
-            .await
-            .context("Failed to create Swarm")?,
-        );
+        // Create Swarm using SwarmBuilder
+        let swarm = libp2p::SwarmBuilder::with_existing_identity(libp2p::identity::Keypair::ed25519_from_bytes(seed).unwrap())
+            .with_tokio()
+            .with_tcp(
+                libp2p::tcp::Config::default(),
+                libp2p::noise::Config::new,
+                libp2p::yamux::Config::default,
+            )?
+            .with_behaviour(|_key| behaviour)?
+            .with_swarm_config(|c| c.with_idle_connection_timeout(Duration::from_secs(60)))
+            .build();
 
         tracing::info!("P2P Consensus initialized with peer_id: {}", peer_id);
 
@@ -233,7 +287,6 @@ impl P2PConsensus {
             keypair,
             peer_id,
             swarm,
-            gossipsub,
             local_patterns: HashMap::new(),
             local_threats: HashMap::new(),
             stats: NetworkStats::default(),
@@ -254,7 +307,7 @@ impl P2PConsensus {
         // Create query message
         let query = NetworkMessage::TaskQuery {
             goals: goals.to_vec(),
-            requester_id: self.peer_id.clone(),
+            requester_id: self.peer_id.to_string(),
         };
 
         // Serialize and sign query
@@ -262,8 +315,8 @@ impl P2PConsensus {
         let signature = self.keypair.sign(&serialized);
 
         // Broadcast to P2P network via Gossipsub
-        let topic = Sha256Topic::new(b"tasks");
-        self.gossipsub
+        let topic = gossipsub::IdentTopic::new("tasks".to_string());
+        self.swarm.behaviour_mut().gossipsub
             .publish(topic, serialized)
             .context("Failed to publish query to P2P network")?;
 
@@ -319,15 +372,15 @@ impl P2PConsensus {
         let mut patterns = local_patterns;
 
         if patterns.len() < 5 {
-            let query = NetworkMessage::PatternQuery {
-                goal_types: goal_types.clone(),
-                requester_id: self.peer_id.clone(),
-            };
+        let query = NetworkMessage::PatternQuery {
+            goal_types: goal_types.to_vec(),
+            requester_id: self.peer_id.to_string(),
+        };
 
             let serialized = bincode::serialize(&query).context("Failed to serialize query")?;
 
-            let topic = Sha256Topic::new(b"patterns");
-            self.gossipsub
+            let topic = gossipsub::IdentTopic::new("patterns".to_string());
+            self.swarm.behaviour_mut().gossipsub
                 .publish(topic, serialized)
                 .context("Failed to publish pattern query")?;
 
@@ -370,15 +423,15 @@ impl P2PConsensus {
 
         // Query network if needed
         if threats.is_empty() {
-            let query = NetworkMessage::ThreatQuery {
-                keywords: keywords.clone(),
-                requester_id: self.peer_id.clone(),
-            };
+        let query = NetworkMessage::ThreatQuery {
+            keywords: keywords.to_vec(),
+            requester_id: self.peer_id.to_string(),
+        };
 
             let serialized = bincode::serialize(&query).context("Failed to serialize query")?;
 
-            let topic = Sha256Topic::new(b"threats");
-            self.gossipsub
+            let topic = gossipsub::IdentTopic::new("threats".to_string());
+            self.swarm.behaviour_mut().gossipsub
                 .publish(topic, serialized)
                 .context("Failed to publish threat query")?;
 
@@ -425,7 +478,7 @@ impl P2PConsensus {
         // Create pattern message
         let message = NetworkMessage::PatternShare {
             pattern: pattern.clone(),
-            source_id: self.peer_id.clone(),
+            source_id: self.peer_id.to_string(),
         };
 
         // Serialize
@@ -435,8 +488,8 @@ impl P2PConsensus {
         let signature = self.keypair.sign(&serialized);
 
         // Publish via Gossipsub
-        let topic = Sha256Topic::new(b"patterns");
-        self.gossipsub
+        let topic = gossipsub::IdentTopic::new("patterns".to_string());
+        self.swarm.behaviour_mut().gossipsub
             .publish(topic, serialized)
             .context("Failed to publish pattern to P2P network")?;
 
@@ -448,6 +501,12 @@ impl P2PConsensus {
             pattern.success_rate * 100.0
         );
 
+        Ok(())
+    }
+
+    pub async fn learn_deviation_pattern(&mut self, pattern: sentinel_core::learning::DeviationPattern) -> Result<()> {
+        tracing::warn!("Learning deviation pattern: {}", pattern.id);
+        // Implementation for learning and broadcasting deviation patterns
         Ok(())
     }
 
@@ -465,7 +524,7 @@ impl P2PConsensus {
         // Create threat message
         let message = NetworkMessage::ThreatBroadcast {
             threat: threat.clone(),
-            source_id: self.peer_id.clone(),
+            source_id: self.peer_id.to_string(),
         };
 
         // Serialize and sign
@@ -473,8 +532,8 @@ impl P2PConsensus {
         let signature = self.keypair.sign(&serialized);
 
         // Publish via Gossipsub
-        let topic = Sha256Topic::new(b"threats");
-        self.gossipsub
+        let topic = gossipsub::IdentTopic::new("threats".to_string());
+        self.swarm.behaviour_mut().gossipsub
             .publish(topic, serialized)
             .context("Failed to publish threat to P2P network")?;
 

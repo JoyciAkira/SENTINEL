@@ -88,6 +88,7 @@ pub mod memory;
 pub mod types;
 
 // Re-export commonly used types for convenience
+pub use uuid::Uuid;
 pub use alignment::{
     AlignmentField, AlignmentVector, MonteCarloSimulator, ProjectState, SimulationResult,
 };

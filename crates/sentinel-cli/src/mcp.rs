@@ -145,6 +145,17 @@ async fn handle_request(req: McpRequest, id: Value) -> McpResponse {
                         "name": "get_enforcement_rules",
                         "description": "Recupera le invarianti e le regole di condotta attive nel progetto",
                         "inputSchema": { "type": "object", "properties": {} }
+                    },
+                    {
+                        "name": "decompose_goal",
+                        "description": "Scompone un goal complesso in una serie di task atomici deterministici (Atomic Truth)",
+                        "inputSchema": {
+                            "type": "object",
+                            "properties": {
+                                "goal_id": { "type": "string", "description": "L'UUID del goal da scomporre" }
+                            },
+                            "required": ["goal_id"]
+                        }
                     }
                 ]
             })),
@@ -277,11 +288,19 @@ async fn handle_tool_call(params: Option<Value>) -> Option<Value> {
             let goal_desc = arguments.and_then(|a| a.get("goal_description")).and_then(|v| v.as_str()).unwrap_or("");
             let kb = std::sync::Arc::new(sentinel_core::learning::knowledge_base::KnowledgeBase::new());
             let synthesizer = sentinel_core::learning::strategy::StrategySynthesizer::new(kb);
-            let temp_goal = sentinel_core::goal_manifold::goal::Goal::builder().description(goal_desc).build().unwrap();
-            let response_text = match synthesizer.suggest_strategy(&temp_goal).await {
-                Ok(s) => format!("STRATEGIA SUGGERITA (Layer 5):\n- Confidenza: {:.0}%\n- {} approcci trovati.", 
-                    s.confidence * 100.0, s.recommended_approaches.len()),
-                Err(_) => "Errore sintesi strategia.".to_string(),
+            use sentinel_core::goal_manifold::goal::Goal;
+            use sentinel_core::goal_manifold::predicate::Predicate;
+            let temp_goal = Goal::builder()
+                .description(goal_desc)
+                .add_success_criterion(Predicate::AlwaysTrue)
+                .build();
+            let response_text = match temp_goal {
+                Ok(goal) => match synthesizer.suggest_strategy(&goal).await {
+                    Ok(s) => format!("STRATEGIA SUGGERITA (Layer 5):\n- Confidenza: {:.0}%\n- {} approcci trovati.",
+                        s.confidence * 100.0, s.recommended_approaches.len()),
+                    Err(e) => format!("STRATEGIA (Layer 5): Knowledge base vuota. Nessun pattern disponibile per '{}'. Errore: {}", goal_desc, e),
+                },
+                Err(e) => format!("STRATEGIA (Layer 5): Impossibile costruire il goal temporaneo: {}", e),
             };
             Some(serde_json::json!({ "content": [{ "type": "text", "text": response_text }] }))
         },
@@ -324,6 +343,40 @@ async fn handle_tool_call(params: Option<Value>) -> Option<Value> {
                         rules.push(format!("- [INVARIANTE] {}", inv.description)); 
                     }
                     format!("SENTINEL ENFORCEMENT RULES:\n{}", rules.join("\n"))
+                },
+                Err(e) => e,
+            };
+            Some(serde_json::json!({ "content": [{ "type": "text", "text": response_text }] }))
+        },
+
+        "decompose_goal" => {
+            let gid_str = arguments.and_then(|a| a.get("goal_id")).and_then(|v| v.as_str()).unwrap_or("");
+            let response_text = match get_manifold() {
+                Ok(mut manifold) => {
+                    let gid = match uuid::Uuid::parse_str(gid_str) {
+                        Ok(id) => id,
+                        Err(_) => return Some(serde_json::json!({ "isError": true, "content": [{ "type": "text", "text": "UUID goal non valido." }] })),
+                    };
+
+                    let goal = match manifold.get_goal(&gid) {
+                        Some(g) => g.clone(),
+                        None => return Some(serde_json::json!({ "isError": true, "content": [{ "type": "text", "text": "Goal non trovato." }] })),
+                    };
+
+                    use sentinel_core::goal_manifold::slicer::AtomicSlicer;
+                    match AtomicSlicer::decompose(&goal) {
+                        Ok(sub_goals) => {
+                            let count = sub_goals.len();
+                            for sg in sub_goals {
+                                let _ = manifold.add_goal(sg);
+                            }
+                            match save_manifold(&manifold) {
+                                Ok(_) => format!("ATOMIC DECOMPOSITION SUCCESS: Goal '{}' scomposto in {} task atomici.", goal.description, count),
+                                Err(e) => format!("Errore salvataggio manifold: {}", e),
+                            }
+                        },
+                        Err(e) => format!("Errore scomposizione: {}", e),
+                    }
                 },
                 Err(e) => e,
             };

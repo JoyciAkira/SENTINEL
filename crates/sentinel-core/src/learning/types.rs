@@ -210,6 +210,8 @@ pub enum ActionType {
     Dependency,
     Custom { type_name: String },
     UpdateGoal,
+    Query,
+    ApplyPattern,
 }
 
 impl From<crate::cognitive_state::action::ActionType> for ActionType {
@@ -236,6 +238,8 @@ impl From<crate::cognitive_state::action::ActionType> for ActionType {
             crate::cognitive_state::action::ActionType::Custom { name, .. } => {
                 ActionType::Custom { type_name: name }
             }
+            crate::cognitive_state::action::ActionType::Query { .. } => ActionType::Query,
+            crate::cognitive_state::action::ActionType::ApplyPattern { .. } => ActionType::ApplyPattern,
         }
     }
 }

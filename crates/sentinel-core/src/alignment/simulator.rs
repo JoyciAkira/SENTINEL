@@ -51,6 +51,12 @@ pub struct MonteCarloSimulator {
     rng: rand::rngs::ThreadRng,
 }
 
+impl Clone for MonteCarloSimulator {
+    fn clone(&self) -> Self {
+        Self::new()
+    }
+}
+
 impl MonteCarloSimulator {
     /// Create a new simulator
     pub fn new() -> Self {

@@ -7,6 +7,7 @@ use ed25519_dalek::{SigningKey, VerifyingKey, Signer, Verifier, Signature};
 use rand::RngCore;
 use rand::rngs::OsRng;
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 /// Identità crittografica di un nodo Sentinel
 #[derive(Debug, Serialize, Deserialize)]
@@ -82,6 +83,43 @@ impl FederatedPattern {
         }
     }
 }
+
+/// Types of threats detected by Sentinel nodes
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ThreatType {
+    /// AI is deviating from its assigned goals
+    AlignmentDeviation,
+    /// Vulnerable dependency detected
+    SecurityVulnerability,
+    /// Unauthorized action attempt
+    UnauthorizedAction,
+    /// Network-level attack detected
+    NetworkAttack,
+}
+
+/// Severity level of a threat or violation
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub enum Severity {
+    Low,
+    Medium,
+    High,
+    Critical,
+}
+
+/// A threat detected by a Sentinel node
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ThreatAlert {
+    pub threat_id: Uuid,
+    pub threat_type: ThreatType,
+    pub severity: Severity,
+    pub description: String,
+    pub source_agent_id: Uuid,
+    pub timestamp: chrono::DateTime<chrono::Utc>,
+}
+
 pub mod gossip;
 pub mod consensus;
 pub mod network;
+
+pub use gossip::{GossipMessage, GossipPayload};
+pub use consensus::{Proposal, Vote};

@@ -30,6 +30,9 @@ pub struct Action {
     /// Timestamp when action was created
     pub created_at: Timestamp,
 
+    /// Dependencies (other actions that must complete before this one)
+    pub dependencies: Vec<Uuid>,
+
     /// Metadata
     pub metadata: ActionMetadata,
 }
@@ -44,6 +47,7 @@ impl Action {
             goal_id: None,
             expected_value: 0.5,
             created_at: Utc::now(),
+            dependencies: Vec::new(),
             metadata: ActionMetadata::default(),
         }
     }
@@ -129,6 +133,17 @@ pub enum ActionType {
     Custom {
         name: String,
         payload: serde_json::Value,
+    },
+
+    /// Query information
+    Query {
+        query_type: String,
+        parameters: String,
+    },
+
+    /// Apply a learned pattern from the knowledge base or P2P network
+    ApplyPattern {
+        pattern_id: Uuid,
     },
 }
 

@@ -7,11 +7,15 @@
 pub mod dag;
 pub mod goal;
 pub mod predicate;
+pub mod atomic;
+pub mod slicer;
+
+pub use dag::GoalDag;
+pub use goal::Goal;
+pub use self::InvariantSeverity as GoalInvariantSeverity;
 
 use crate::error::{Result, ResultExt};
 use crate::types::{Blake3Hash, Timestamp};
-use dag::GoalDag;
-use goal::Goal;
 use predicate::Predicate;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -430,7 +434,7 @@ impl GoalManifold {
     /// Returns violations if any are found.
     pub async fn validate_invariants(
         &self,
-        state: &predicate::ProjectState,
+        state: &predicate::PredicateState,
     ) -> Vec<InvariantViolation> {
         let mut violations = Vec::new();
 

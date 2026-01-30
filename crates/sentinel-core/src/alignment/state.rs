@@ -4,7 +4,7 @@
 //! to compute alignment with goals and predict future trajectories.
 
 use crate::goal_manifold::goal::Goal;
-use crate::goal_manifold::predicate::ProjectState as PredicateState;
+use crate::goal_manifold::predicate::PredicateState;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;

@@ -1,22 +1,57 @@
 import * as vscode from 'vscode';
 import { LanguageClient, LanguageClientOptions, ServerOptions } from 'vscode-languageclient/node';
-import { spawn } from 'child_process';
+import { MCPClient } from './mcp/client';
+import { AlignmentProvider } from './providers/alignmentProvider';
+import { GoalTreeProvider } from './providers/goalTreeProvider';
+import { AgentProvider } from './providers/agentProvider';
+import { SecurityProvider } from './providers/securityProvider';
+import { NetworkProvider } from './providers/networkProvider';
+import { SentinelStatusBar } from './providers/statusBar';
+import { SentinelCodeLensProvider } from './providers/codeLensProvider';
+import { SentinelChatViewProvider } from './webview-providers/SentinelChatViewProvider';
+import {
+    CONFIG_SENTINEL_PATH,
+    CONFIG_DEFAULT_PATH,
+    CMD_OPEN_CHAT,
+    CMD_REFRESH_GOALS,
+    CMD_VALIDATE_ACTION,
+    CMD_SHOW_ALIGNMENT,
+    VIEW_ALIGNMENT,
+    VIEW_GOALS,
+    VIEW_AGENTS,
+    VIEW_SECURITY,
+    VIEW_NETWORK,
+    POLL_INTERVAL_MS,
+} from './shared/constants';
 
-let client: LanguageClient;
+let lspClient: LanguageClient | undefined;
+let mcpClient: MCPClient | undefined;
+let pollTimer: ReturnType<typeof setInterval> | undefined;
 
 export function activate(context: vscode.ExtensionContext) {
-    let sentinelPath = vscode.workspace.getConfiguration('sentinel').get<string>('path') || 'sentinel';
+    const outputChannel = vscode.window.createOutputChannel('Sentinel');
+    context.subscriptions.push(outputChannel);
+
+    let sentinelPath = vscode.workspace.getConfiguration('sentinel').get<string>(CONFIG_SENTINEL_PATH) || CONFIG_DEFAULT_PATH;
     sentinelPath = sentinelPath.replace(/^["'](.+)["']$/, '$1');
 
-    const workspaceRoot = vscode.workspace.workspaceFolders 
-        ? vscode.workspace.workspaceFolders[0].uri.fsPath 
-        : ".";
+    const workspaceRoot = vscode.workspace.workspaceFolders
+        ? vscode.workspace.workspaceFolders[0].uri.fsPath
+        : '.';
 
-    // 1. Setup LSP Client
+    // ── 1. MCP Client ────────────────────────────────────────
+    mcpClient = new MCPClient(sentinelPath, workspaceRoot, outputChannel);
+
+    // Start MCP connection (non-blocking, will reconnect on failure)
+    mcpClient.start().catch((err) => {
+        outputChannel.appendLine(`MCP initial connection failed: ${err.message}`);
+    });
+
+    // ── 2. LSP Client ────────────────────────────────────────
     const serverOptions: ServerOptions = {
         command: sentinelPath,
         args: ['lsp'],
-        options: { cwd: workspaceRoot }
+        options: { cwd: workspaceRoot },
     };
 
     const clientOptions: LanguageClientOptions = {
@@ -24,228 +59,167 @@ export function activate(context: vscode.ExtensionContext) {
             { scheme: 'file', language: 'rust' },
             { scheme: 'file', language: 'typescript' },
             { scheme: 'file', language: 'javascript' },
-            { scheme: 'file', language: 'python' }
-        ]
+            { scheme: 'file', language: 'python' },
+        ],
     };
 
-    client = new LanguageClient('sentinelLSP', 'Sentinel LSP', serverOptions, clientOptions);
-    client.start();
+    lspClient = new LanguageClient('sentinelLSP', 'Sentinel LSP', serverOptions, clientOptions);
+    lspClient.start();
 
-    // 2. Setup Goal TreeView
-    const goalProvider = new SentinelGoalProvider(sentinelPath, workspaceRoot);
-    vscode.window.registerTreeDataProvider('sentinel-goals', goalProvider);
+    // ── 3. TreeView Providers ────────────────────────────────
+    const alignmentProvider = new AlignmentProvider(mcpClient);
+    const goalTreeProvider = new GoalTreeProvider(mcpClient, sentinelPath, workspaceRoot);
+    const agentProvider = new AgentProvider(mcpClient, sentinelPath, workspaceRoot);
+    const securityProvider = new SecurityProvider(mcpClient, sentinelPath, workspaceRoot);
+    const networkProvider = new NetworkProvider(mcpClient, sentinelPath, workspaceRoot);
 
-    // 3. Setup Network TreeView
-    const networkProvider = new SentinelNetworkProvider(sentinelPath, workspaceRoot);
-    vscode.window.registerTreeDataProvider('sentinel-network', networkProvider);
+    context.subscriptions.push(
+        vscode.window.registerTreeDataProvider(VIEW_ALIGNMENT, alignmentProvider),
+        vscode.window.registerTreeDataProvider(VIEW_GOALS, goalTreeProvider),
+        vscode.window.registerTreeDataProvider(VIEW_AGENTS, agentProvider),
+        vscode.window.registerTreeDataProvider(VIEW_SECURITY, securityProvider),
+        vscode.window.registerTreeDataProvider(VIEW_NETWORK, networkProvider),
+    );
 
-    vscode.commands.registerCommand('sentinel.refreshGoals', () => {
-        goalProvider.refresh();
-        networkProvider.refresh();
-    });
+    // ── 4. Status Bar ────────────────────────────────────────
+    const statusBar = new SentinelStatusBar(mcpClient);
+    context.subscriptions.push({ dispose: () => statusBar.dispose() });
 
-    console.log('Sentinel extension activated. Path:', sentinelPath);
-}
+    // ── 5. CodeLens ──────────────────────────────────────────
+    const codeLensProvider = new SentinelCodeLensProvider(mcpClient);
+    context.subscriptions.push(
+        vscode.languages.registerCodeLensProvider(
+            [
+                { language: 'rust' },
+                { language: 'typescript' },
+                { language: 'javascript' },
+                { language: 'python' },
+            ],
+            codeLensProvider
+        )
+    );
 
-function runSentinelJson(sentinelPath: string, args: string[], cwd: string): Promise<any> {
-    return new Promise((resolve, reject) => {
-        const proc = spawn(sentinelPath, args, { cwd, shell: false });
-        let stdout = '';
-        let stderr = '';
+    // ── 6. Chat Webview ──────────────────────────────────────
+    const chatProvider = new SentinelChatViewProvider(
+        context.extensionUri,
+        mcpClient,
+        outputChannel
+    );
+    context.subscriptions.push(
+        vscode.window.registerWebviewViewProvider(
+            SentinelChatViewProvider.viewId,
+            chatProvider,
+            { webviewOptions: { retainContextWhenHidden: true } }
+        )
+    );
 
-        proc.stdout.on('data', (data) => stdout += data.toString());
-        proc.stderr.on('data', (data) => stderr += data.toString());
+    // ── 7. Commands ──────────────────────────────────────────
+    context.subscriptions.push(
+        vscode.commands.registerCommand(CMD_OPEN_CHAT, () => {
+            vscode.commands.executeCommand('sentinel-chat.focus');
+        }),
 
-        proc.on('error', (err) => reject(new Error(`Spawn error: ${err.message}`)));
+        vscode.commands.registerCommand(CMD_REFRESH_GOALS, () => {
+            alignmentProvider.refresh();
+            goalTreeProvider.refresh();
+            agentProvider.refresh();
+            securityProvider.refresh();
+            networkProvider.refresh();
+        }),
 
-        proc.on('close', (code) => {
-            if (code === 0) {
-                try {
-                    resolve(JSON.parse(stdout));
-                } catch (e) {
-                    reject(new Error(`JSON Parse error. Output was: ${stdout}`));
-                }
-            } else {
-                reject(new Error(`Exit code ${code}. Stderr: ${stderr}`));
+        vscode.commands.registerCommand(CMD_VALIDATE_ACTION, async () => {
+            if (!mcpClient?.connected) {
+                vscode.window.showWarningMessage('Sentinel is not connected.');
+                return;
             }
-        });
-    });
-}
 
-class GoalItem extends vscode.TreeItem {
-    public children?: GoalItem[];
+            const description = await vscode.window.showInputBox({
+                prompt: 'Describe the action to validate',
+                placeHolder: 'e.g., Implement JWT authentication',
+            });
 
-    constructor(
-        public readonly label: string,
-        public readonly collapsibleState: vscode.TreeItemCollapsibleState,
-        public readonly progress: string
-    ) {
-        super(label, collapsibleState);
-        this.tooltip = `${this.label} - ${this.progress}`;
-        this.description = this.progress;
-    }
-}
+            if (!description) return;
 
-class SentinelGoalProvider implements vscode.TreeDataProvider<GoalItem> {
-    private _onDidChangeTreeData: vscode.EventEmitter<GoalItem | undefined | null | void> = new vscode.EventEmitter<GoalItem | undefined | null | void>();
-    readonly onDidChangeTreeData: vscode.Event<GoalItem | undefined | null | void> = this._onDidChangeTreeData.event;
-
-    constructor(private sentinelPath: string, private workspaceRoot: string) {}
-
-    refresh(): void {
-        this._onDidChangeTreeData.fire();
-    }
-
-    getTreeItem(element: GoalItem): vscode.TreeItem {
-        return element;
-    }
-
-    async getChildren(element?: GoalItem): Promise<GoalItem[]> {
-        if (element) {
-            return element.children || [];
-        } else {
             try {
-                const report = await runSentinelJson(this.sentinelPath, ["status", "--json"], this.workspaceRoot);
-                
-                if (!report.manifold || report.manifold.error) {
-                    return [new GoalItem("Manifold non inizializzato", vscode.TreeItemCollapsibleState.None, "Esegui 'sentinel init'")];
-                }
-
-                const manifold = report.manifold;
-                const external = report.external;
-                const rootItems: GoalItem[] = [];
-                
-                // 1. Goal Section
-                const goalRoot = new GoalItem("Goal Manifold", vscode.TreeItemCollapsibleState.Expanded, "CORE");
-                goalRoot.iconPath = new vscode.ThemeIcon('target');
-                goalRoot.children = [];
-                goalRoot.children.push(new GoalItem(manifold.root_intent.description, vscode.TreeItemCollapsibleState.None, "ROOT"));
-                
-                if (manifold.goal_dag && manifold.goal_dag.nodes) {
-                    Object.values(manifold.goal_dag.nodes).forEach((node: any) => {
-                        goalRoot.children?.push(new GoalItem(node.description, vscode.TreeItemCollapsibleState.None, node.status));
-                    });
-                }
-                rootItems.push(goalRoot);
-
-                // 2. Multi-Agent Section (Social Manifold)
-                const agentsRoot = new GoalItem("Active Agents", vscode.TreeItemCollapsibleState.Collapsed, "HERD");
-                agentsRoot.iconPath = new vscode.ThemeIcon('organization');
-                agentsRoot.children = [];
-                
-                if (manifold.file_locks && Object.keys(manifold.file_locks).length > 0) {
-                    for (const file in manifold.file_locks) {
-                        const agentId = manifold.file_locks[file].substring(0, 8);
-                        const item = new GoalItem(`Agent ${agentId}`, vscode.TreeItemCollapsibleState.None, `Working on ${file.split('/').pop()}`);
-                        item.iconPath = new vscode.ThemeIcon('account');
-                        agentsRoot.children.push(item);
-                    }
+                const result = await mcpClient.validateAction('user_action', description);
+                const msg = `Alignment: ${result.alignment_score.toFixed(1)}% | Risk: ${result.risk_level} | ${result.approved ? 'APPROVED' : 'REJECTED'}: ${result.rationale}`;
+                if (result.approved) {
+                    vscode.window.showInformationMessage(msg);
                 } else {
-                    agentsRoot.children.push(new GoalItem("No active agents", vscode.TreeItemCollapsibleState.None, "IDLE"));
+                    vscode.window.showWarningMessage(msg);
                 }
-                rootItems.push(agentsRoot);
-
-                // 3. Cognitive Trail (Handover Notes)
-                const trailRoot = new GoalItem("Cognitive Trail", vscode.TreeItemCollapsibleState.Collapsed, "MEMORY");
-                trailRoot.iconPath = new vscode.ThemeIcon('history');
-                trailRoot.children = [];
-                
-                if (manifold.handover_log && manifold.handover_log.length > 0) {
-                    manifold.handover_log.slice(-5).reverse().forEach((note: any) => {
-                        const item = new GoalItem(note.content, vscode.TreeItemCollapsibleState.None, "NOTE");
-                        item.iconPath = new vscode.ThemeIcon('note');
-                        trailRoot.children?.push(item);
-                    });
-                } else {
-                    trailRoot.children.push(new GoalItem("No handover notes", vscode.TreeItemCollapsibleState.None, "EMPTY"));
-                }
-                rootItems.push(trailRoot);
-
-                // 4. External Awareness Section
-                const riskLevel = external ? Math.round(external.risk_level * 100) : 0;
-                const externalRoot = new GoalItem("External Awareness", vscode.TreeItemCollapsibleState.Collapsed, `Risk: ${riskLevel}%`);
-                externalRoot.iconPath = new vscode.ThemeIcon('globe');
-                externalRoot.children = [];
-                
-                if (external && external.alerts && external.alerts.length > 0) {
-                    external.alerts.forEach((alert: string) => {
-                        const item = new GoalItem(alert, vscode.TreeItemCollapsibleState.None, "ALERT");
-                        item.iconPath = new vscode.ThemeIcon('warning', new vscode.ThemeColor('notificationsWarningIcon.foreground'));
-                        externalRoot.children?.push(item);
-                    });
-                } else {
-                    externalRoot.children.push(new GoalItem("No threats detected", vscode.TreeItemCollapsibleState.None, "SECURE"));
-                }
-                rootItems.push(externalRoot);
-
-                // 5. Distributed Intelligence (Phase 3)
-                const networkRoot = new GoalItem("Sentinel Network", vscode.TreeItemCollapsibleState.Collapsed, "P2P");
-                networkRoot.iconPath = new vscode.ThemeIcon('hubot');
-                networkRoot.children = [];
-                
-                // Questi dati verranno popolati dal comando status --json aggiornato con i dati del Layer 9/10
-                const peerCount = manifold.peer_count || 0;
-                networkRoot.children.push(new GoalItem(`Connected Peers: ${peerCount}`, vscode.TreeItemCollapsibleState.None, peerCount > 0 ? "ONLINE" : "SEARCHING"));
-                
-                if (manifold.consensus_active) {
-                    const item = new GoalItem("Consensus Vote in Progress", vscode.TreeItemCollapsibleState.None, "VOTING");
-                    item.iconPath = new vscode.ThemeIcon('check-all');
-                    networkRoot.children.push(item);
-                } else {
-                    networkRoot.children.push(new GoalItem("Global Consensus Stable", vscode.TreeItemCollapsibleState.None, "SYNCED"));
-                }
-                rootItems.push(networkRoot);
-                
-                return rootItems;
-            } catch (error: any) {
-                return [new GoalItem("Errore Sentinel", vscode.TreeItemCollapsibleState.None, error.message)];
+            } catch (err: any) {
+                vscode.window.showErrorMessage(`Validation failed: ${err.message}`);
             }
-        }
-    }
-}
+        }),
 
-class SentinelNetworkProvider implements vscode.TreeDataProvider<GoalItem> {
-    private _onDidChangeTreeData: vscode.EventEmitter<GoalItem | undefined | null | void> = new vscode.EventEmitter<GoalItem | undefined | null | void>();
-    readonly onDidChangeTreeData: vscode.Event<GoalItem | undefined | null | void> = this._onDidChangeTreeData.event;
+        vscode.commands.registerCommand(CMD_SHOW_ALIGNMENT, async () => {
+            if (!mcpClient?.connected) {
+                vscode.window.showWarningMessage('Sentinel is not connected. Ensure sentinel-cli is installed and accessible.');
+                return;
+            }
 
-    constructor(private sentinelPath: string, private workspaceRoot: string) {}
+            try {
+                const report = await mcpClient.getAlignment();
+                const lines = [
+                    `Score: ${report.score.toFixed(1)}%`,
+                    `Confidence: ${(report.confidence * 100).toFixed(0)}%`,
+                    `Status: ${report.status}`,
+                ];
+                if (report.violations.length > 0) {
+                    lines.push('', 'Violations:');
+                    for (const v of report.violations) {
+                        lines.push(`  - ${v.description} (severity: ${v.severity})`);
+                    }
+                }
+                vscode.window.showInformationMessage(lines.join('\n'), { modal: true });
+            } catch (err: any) {
+                vscode.window.showErrorMessage(`Failed to get alignment: ${err.message}`);
+            }
+        }),
+    );
 
-    refresh(): void {
-        this._onDidChangeTreeData.fire();
-    }
+    // ── 8. Polling ───────────────────────────────────────────
+    pollTimer = setInterval(async () => {
+        if (!mcpClient?.connected) return;
 
-    getTreeItem(element: GoalItem): vscode.TreeItem {
-        return element;
-    }
-
-    async getChildren(element?: GoalItem): Promise<GoalItem[]> {
-        if (element) return [];
-        
         try {
-            const report = await runSentinelJson(this.sentinelPath, ["status", "--json"], this.workspaceRoot);
-            const manifold = report.manifold;
-            
-            const peerCount = manifold.peer_count || 0;
-            const peerItem = new GoalItem(`Connected Peers: ${peerCount}`, vscode.TreeItemCollapsibleState.None, peerCount > 0 ? "ONLINE" : "SEARCHING");
-            peerItem.iconPath = new vscode.ThemeIcon('broadcast');
+            const report = await mcpClient.getAlignment();
 
-            const consensusItem = new GoalItem(
-                manifold.consensus_active ? "Consensus: VOTING" : "Global Consensus Stable", 
-                vscode.TreeItemCollapsibleState.None, 
-                manifold.consensus_active ? "ACTIVE" : "SYNCED"
-            );
-            consensusItem.iconPath = new vscode.ThemeIcon(manifold.consensus_active ? 'check-all' : 'shield');
-
-            return [peerItem, consensusItem];
-        } catch (e) {
-            return [new GoalItem("Network Offline", vscode.TreeItemCollapsibleState.None, "OFFLINE")];
+            // Update all consumers
+            statusBar.update(report);
+            codeLensProvider.updateReport(report);
+            alignmentProvider.updateReport(report);
+            chatProvider.updateAlignment(report);
+        } catch {
+            // Silently fail on poll; will retry next interval
         }
-    }
+    }, POLL_INTERVAL_MS);
+
+    // ── 9. Connection status updates ─────────────────────────
+    mcpClient.on('connected', () => {
+        outputChannel.appendLine('Sentinel MCP connected');
+        // Trigger initial data load
+        vscode.commands.executeCommand(CMD_REFRESH_GOALS);
+    });
+
+    mcpClient.on('disconnected', () => {
+        statusBar.showDisconnected();
+        outputChannel.appendLine('Sentinel MCP disconnected');
+    });
+
+    outputChannel.appendLine(`Sentinel extension activated. Path: ${sentinelPath}`);
 }
 
 export function deactivate(): Thenable<void> | undefined {
-    if (!client) {
+    if (pollTimer) {
+        clearInterval(pollTimer);
+    }
+
+    mcpClient?.stop();
+
+    if (!lspClient) {
         return undefined;
     }
-    return client.stop();
+    return lspClient.stop();
 }

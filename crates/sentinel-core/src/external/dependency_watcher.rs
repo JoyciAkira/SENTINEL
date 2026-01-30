@@ -17,7 +17,8 @@ pub struct ExternalDependency {
     pub risk_level: f64, // 0.0 - 1.0
 }
 
-/// Motore di monitoraggio dipendenze
+/// Watcher for external dependencies
+#[derive(Debug, Clone)]
 pub struct DependencyWatcher {
     project_root: PathBuf,
     watched_dependencies: HashMap<String, ExternalDependency>,

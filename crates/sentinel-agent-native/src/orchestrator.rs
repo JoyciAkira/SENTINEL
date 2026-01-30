@@ -57,7 +57,8 @@ use anyhow::{Context, Result};
 use sentinel_core::{
     cognitive_state::{Action, ActionDecision, ActionType, ActionResult},
     goal_manifold::Goal,
-    types::Uuid,
+    types::Timestamp,
+    Uuid,
 };
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
@@ -198,12 +199,12 @@ pub struct ConflictDetector {
 }
 
 /// Conflict resolution
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct ConflictResolution {
     pub conflict_id: Uuid,
     pub conflict_type: ConflictType,
     pub resolution_strategy: ResolutionStrategy,
-    pub resolved_at: chrono::DateTime<chrono::Utc>,
+    pub resolved_at: Timestamp,
     pub involved_agents: Vec<Uuid>,
 }
 
@@ -372,11 +373,11 @@ impl AgentOrchestrator {
         // Step 3: Build dependency graph
         self.build_dependency_graph(&tasks)?;
 
-        // Step 4: Detect conflicts
-        let conflicts = self.conflict_detector.detect_conflicts(&assignments)?;
+        // Step 2: Detect conflicts
+        let conflicts = self.conflict_detector.detect_conflicts(&assignments, &self.task_queue.pending);
 
-        // Step 5: Resolve conflicts
-        let resolutions = self.resolve_conflicts(&conflicts)?;
+        // Step 3: Resolve conflicts
+        let resolutions = self.conflict_detector.resolve_conflicts(&conflicts);
 
         // Step 6: Execute tasks (parallel where possible)
         let results = self.execute_tasks(&assignments, &resolutions).await?;
@@ -667,37 +668,27 @@ impl AgentOrchestrator {
         }
 
         // Wait for all parallel tasks
-        while !join_set.is_empty() {
-            join_set.join_next().await?;
-        }
-
-        // Collect results
-        for assignment in &parallel_tasks {
-            let result = join_set
-                .remove(&assignment.agent_id)
-                .unwrap()
-                .await?;
-
+        while let Some(join_result) = join_set.join_next().await {
+            let result = join_result??;
             results.push(result);
         }
 
         // Execute conflicted tasks serially
-        for task_id in conflicted_tasks {
+        for task_id in &conflicted_tasks {
             let task = self
                 .task_queue
                 .pending
                 .iter()
-                .find(|t| t.id == task_id)
+                .find(|t| t.id == *task_id)
                 .ok_or_else(|| anyhow::anyhow!("Task not found: {}", task_id))?;
 
             let assignment = assignments
                 .iter()
-                .find(|a| a.task_id == task_id)
+                .find(|a| a.task_id == *task_id)
                 .ok_or_else(|| anyhow::anyhow!("Assignment not found: {}", task_id))?;
 
             // Execute serially (one at a time)
             let result = Self::execute_single_task(task.clone(), assignment.agent_id).await?;
-
             results.push(result);
         }
 
@@ -725,44 +716,28 @@ impl AgentOrchestrator {
         // In production, this would delegate to the actual specialized agent
         let (status, execution_time_ms) = match task.required_agent {
             AgentType::Testing => {
-                tokio::time::sleep(tokio::time::Duration::from_millis(task.estimated_duration_ms)).await;
+                tokio::time::sleep(tokio::time::Duration::from_millis(task.estimated_duration_ms.into())).await;
                 (TaskStatus::Completed, task.estimated_duration_ms)
             }
             AgentType::CodeGeneration => {
-                tokio::time::sleep(tokio::time::Duration::from_millis(task.estimated_duration_ms)).await;
+                tokio::time::sleep(tokio::time::Duration::from_millis(task.estimated_duration_ms.into())).await;
                 (TaskStatus::Completed, task.estimated_duration_ms)
             }
             AgentType::Refactoring => {
-                tokio::time::sleep(tokio::time::Duration::from_millis(task.estimated_duration_ms)).await;
+                tokio::time::sleep(tokio::time::Duration::from_millis(task.estimated_duration_ms.into())).await;
                 (TaskStatus::Completed, task.estimated_duration_ms)
             }
             AgentType::Documentation => {
-                tokio::time::sleep(tokio::time::Duration::from_millis(task.estimated_duration_ms)).await;
+                tokio::time::sleep(tokio::time::Duration::from_millis(task.estimated_duration_ms.into())).await;
                 (TaskStatus::Completed, task.estimated_duration_ms)
             }
             AgentType::Deployment => {
-                tokio::time::sleep(tokio::time::Duration::from_millis(task.estimated_duration_ms)).await;
+                tokio::time::sleep(tokio::time::Duration::from_millis(task.estimated_duration_ms.into())).await;
                 (TaskStatus::Completed, task.estimated_duration_ms)
             }
         };
 
-        let execution_time = start_time.elapsed().as_millis() as u32;
-
-        // Update agent statistics
-        if let Some(agents) = self.agents.get_mut(&task.required_agent) {
-            if let Some(agent) = agents.iter_mut().find(|a| a.agent_id == agent_id) {
-                match status {
-                    TaskStatus::Completed => {
-                        agent.stats.tasks_completed += 1;
-                        agent.stats.total_execution_time_ms += execution_time as u64;
-                    }
-                    TaskStatus::Failed { .. } => {
-                        agent.stats.tasks_failed += 1;
-                    }
-                    TaskStatus::Pending | TaskStatus::Running => {}
-                }
-            }
-        }
+        let execution_time = start_time.elapsed().as_millis();
 
         Ok(OrchestrationResult {
             task_id: task.id,
@@ -818,7 +793,7 @@ impl AgentOrchestrator {
                         conflict_type: conflict.conflict_type.clone(),
                         resolution_strategy: ResolutionStrategy::Serialization,
                         resolved_at: chrono::Utc::now(),
-                        involved_agents: conflict.involved_agents,
+                        involved_agents: conflict.involved_agents.clone(),
                     }
                 }
                 ConflictType::GoalConflict { .. } => {
@@ -831,7 +806,7 @@ impl AgentOrchestrator {
                         conflict_type: conflict.conflict_type.clone(),
                         resolution_strategy: ResolutionStrategy::AuthorityBased,
                         resolved_at: chrono::Utc::now(),
-                        involved_agents: conflict.involved_agents,
+                        involved_agents: conflict.involved_agents.clone(),
                     }
                 }
                 ConflictType::DependencyCycle { .. } => {
@@ -841,7 +816,7 @@ impl AgentOrchestrator {
                         conflict_type: conflict.conflict_type.clone(),
                         resolution_strategy: ResolutionStrategy::Deferral,
                         resolved_at: chrono::Utc::now(),
-                        involved_agents: conflict.involved_agents,
+                        involved_agents: conflict.involved_agents.clone(),
                     }
                 }
                 ConflictType::AntiDependencyViolation { .. } => {
@@ -851,7 +826,7 @@ impl AgentOrchestrator {
                         conflict_type: conflict.conflict_type.clone(),
                         resolution_strategy: ResolutionStrategy::Serialization,
                         resolved_at: chrono::Utc::now(),
-                        involved_agents: conflict.involved_agents,
+                        involved_agents: conflict.involved_agents.clone(),
                     }
                 }
             };
@@ -867,9 +842,10 @@ impl AgentOrchestrator {
     fn find_higher_authority_agent(&self, agents: &[Uuid]) -> Uuid {
         agents
             .iter()
-            .max_by_key(|agent_id| {
-                // Find agent with highest authority
-                self.get_agent_authority(agent_id)
+            .max_by(|a, b| {
+                let auth_a = self.get_agent_authority(a);
+                let auth_b = self.get_agent_authority(b);
+                auth_a.total_cmp(&auth_b)
             })
             .copied()
             .unwrap_or(*agents.first().unwrap())
@@ -972,18 +948,17 @@ impl ConflictDetector {
         }
     }
 
-    /// Detect conflicts in current state
-    pub fn detect_conflicts(&self, assignments: &[TaskAssignment]) -> Vec<ConflictDetectionResult> {
+    /// Detect conflicts between assignments
+    pub fn detect_conflicts(&self, assignments: &[TaskAssignment], tasks: &[Task]) -> Vec<ConflictDetectionResult> {
         let mut conflicts = Vec::new();
 
-        // Check for resource conflicts (same file/resource)
+        // Check for resource contention
         for (i, assignment_a) in assignments.iter().enumerate() {
             for assignment_b in assignments.iter().skip(i + 1) {
-                // Check if both agents might access same resource
                 if self.tasks_share_resource(
-                    &assignments,
-                    assignment_a.task_id,
-                    assignment_b.task_id,
+                    tasks,
+                    &assignment_a.task_id,
+                    &assignment_b.task_id,
                 ) {
                     let conflict_id = Uuid::new_v4();
 
@@ -1007,6 +982,27 @@ impl ConflictDetector {
         conflicts
     }
 
+    /// Resolve detected conflicts
+    pub fn resolve_conflicts(&mut self, conflicts: &[ConflictDetectionResult]) -> Vec<ConflictResolution> {
+        let mut resolutions = Vec::new();
+        
+        for conflict in conflicts {
+            // Simple resolution: serialize execution
+            let resolution = ConflictResolution {
+                conflict_id: conflict.conflict_id,
+                conflict_type: conflict.conflict_type.clone(),
+                resolution_strategy: ResolutionStrategy::Serialization,
+                resolved_at: chrono::Utc::now(),
+                involved_agents: conflict.involved_agents.clone(),
+            };
+            
+            resolutions.push(resolution.clone());
+            self.resolved_conflicts.push(resolution);
+        }
+        
+        resolutions
+    }
+
     /// Check if two tasks share a resource
     fn tasks_share_resource(
         &self,
@@ -1024,25 +1020,19 @@ impl ConflictDetector {
             let desc_b = task_b.description.to_lowercase();
 
             // Both tasks mention same file
-            let file_pattern = r"\b(\w+\.(rs|ts|py|js|json|md|txt))\b";
+            let file_regex = regex::Regex::new(r"\b(\w+\.(rs|ts|py|js|json|md|txt))\b").unwrap();
 
             let mut files_a = Vec::new();
-            let mut caps = file_pattern.captures_iter(&desc_a);
-            while let Some(caps) = caps.next() {
-                for cap in caps {
-                    if let Some(file_match) = cap.get(1) {
-                        files_a.push(file_match.to_string());
-                    }
+            for cap in file_regex.captures_iter(&desc_a) {
+                if let Some(file_match) = cap.get(1) {
+                    files_a.push(file_match.as_str().to_string());
                 }
             }
 
             let mut files_b = Vec::new();
-            let mut caps = file_pattern.captures_iter(&desc_b);
-            while let Some(caps) = caps.next() {
-                for cap in caps {
-                    if let Some(file_match) = cap.get(1) {
-                        files_b.push(file_match.to_string());
-                    }
+            for cap in file_regex.captures_iter(&desc_b) {
+                if let Some(file_match) = cap.get(1) {
+                    files_b.push(file_match.as_str().to_string());
                 }
             }
 

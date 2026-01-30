@@ -24,6 +24,7 @@ struct KnowledgeBaseData {
 ///
 /// Gestisce lo storage e il retrieval di pattern appresi.
 /// Supporta il salvataggio automatico su disco in formato JSON.
+#[derive(Debug)]
 pub struct KnowledgeBase {
     patterns: Arc<RwLock<HashMap<Uuid, SuccessPattern>>>,
     pattern_by_goal_type: Arc<RwLock<HashMap<GoalType, Vec<Uuid>>>>,

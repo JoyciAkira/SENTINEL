@@ -7,7 +7,7 @@ use std::collections::{HashMap, VecDeque};
 use uuid::Uuid;
 
 /// Working memory with LRU eviction
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct WorkingMemory {
     /// Maximum capacity
     capacity: usize,

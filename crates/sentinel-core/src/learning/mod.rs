@@ -24,6 +24,7 @@ pub use strategy::StrategySynthesizer;
 pub use types::*;
 
 /// Orchestratore centrale per il Meta-Learning
+#[derive(Clone, Debug)]
 pub struct LearningEngine {
     miner: PatternMiningEngine,
     knowledge_base: Arc<KnowledgeBase>,

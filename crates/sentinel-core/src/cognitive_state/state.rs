@@ -46,6 +46,7 @@ pub enum CognitiveMode {
 ///
 /// This is the "working memory" of the agent - everything it knows
 /// about the project, its goals, and its own thinking process.
+#[derive(Debug, Clone)]
 pub struct CognitiveState {
     /// Reference to the goal manifold (source of truth)
     goal_manifold: GoalManifold,
@@ -377,10 +378,6 @@ impl CognitiveState {
     fn resolve_uncertainties(&mut self, _action: &Action, _result: &ActionResult) {
     }
 
-    fn get_current_state(&self) -> crate::alignment::ProjectState {
-        crate::alignment::ProjectState::new(std::path::PathBuf::from("."))
-    }
-
     /// Get the current status of mapped infrastructure endpoints
     pub async fn check_infrastructure_health(&self) -> HashMap<String, bool> {
         let mut health_map = HashMap::new();
@@ -433,6 +430,11 @@ impl CognitiveState {
 
     pub fn execution_trace(&self) -> &[Action] {
         &self.execution_trace
+    }
+
+    /// Get current project state
+    pub fn get_current_state(&self) -> crate::alignment::state::ProjectState {
+        crate::alignment::state::ProjectState::new(std::path::PathBuf::from("."))
     }
 }
 

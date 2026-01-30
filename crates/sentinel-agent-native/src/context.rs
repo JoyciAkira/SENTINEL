@@ -58,18 +58,29 @@
 //! ```
 
 use anyhow::{Context, Result};
+use chrono::Utc;
 use sentinel_core::{
-    memory::{MemoryItem, MemoryManifold, MemoryQueryResult, MemorySource, Query},
-    types::Uuid,
+    memory::{MemoryManifold, MemoryQueryResult, MemorySource},
+    Uuid,
 };
 use std::collections::HashMap;
 use std::sync::Arc;
 
+/// Context query
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Query {
+    pub text: String,
+    pub goal_id: Option<Uuid>,
+    pub tags: Vec<String>,
+}
+
+use tokio::sync::Mutex;
+
 /// Context Manager - Hierarchical memory access with intelligent retrieval
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ContextManager {
     /// Access to memory manifold (Layer 4)
-    pub memory_manifold: Arc<MemoryManifold>,
+    pub memory_manifold: Arc<Mutex<MemoryManifold>>,
 
     /// Query cache for fast repeated queries
     pub query_cache: HashMap<String, CachedContext>,
@@ -81,7 +92,7 @@ pub struct ContextManager {
 /// Cached context result
 #[derive(Debug, Clone)]
 struct CachedContext {
-    pub results: Vec<MemoryQueryResult>,
+    pub context: UnifiedContext,
     pub timestamp: chrono::DateTime<chrono::Utc>,
     pub ttl_seconds: u64,
 }
@@ -137,8 +148,8 @@ pub struct CompressedContext {
 }
 
 impl ContextManager {
-    /// Create new context manager
-    pub fn new(memory_manifold: Arc<MemoryManifold>) -> Self {
+    /// Create a new context manager
+    pub fn new(memory_manifold: Arc<Mutex<MemoryManifold>>) -> Self {
         tracing::info!("Initializing Context Manager");
 
         Self {
@@ -156,13 +167,13 @@ impl ContextManager {
     /// 3. Query semantic memory (knowledge graph, 300ms)
     /// 4. Merge, deduplicate, re-rank
     /// 5. Compress to token budget
-    pub fn retrieve_context(&mut self, query: &Query, limit: usize) -> Result<UnifiedContext> {
+    pub async fn retrieve_context(&mut self, query: &Query, limit: usize) -> Result<UnifiedContext> {
         tracing::debug!("Retrieving context for query: {}", query.text);
 
         let start_time = std::time::Instant::now();
 
         // Check cache first
-        if let Some(cached) = self.check_cache(query) {
+        if let Some(cached) = self.query_cache.get(&query.text) {
             tracing::debug!("Cache hit for query");
             self.stats.cache_hits += 1;
             self.stats.total_queries += 1;
@@ -171,26 +182,40 @@ impl ContextManager {
         }
 
         // Step 1: Query Working Memory (instant)
-        let working_results = self.query_working_memory(query, 10);
+        let working_results = self.query_working_memory(query, 10).await;
         let working_hits = working_results.len();
 
         // Step 2: Query Episodic Memory (semantic search)
         let episodic_results = if working_hits < 5 {
-            self.memory_manifold.episodic.query(query, limit)?
+            let mut manifold = self.memory_manifold.lock().await;
+            manifold.episodic.query(&query.text, limit)
         } else {
             vec![]
         };
 
         // Step 3: Query Semantic Memory (knowledge graph)
         let semantic_results = if working_hits < 5 && episodic_results.len() < 15 {
-            self.memory_manifold.semantic.query(query, limit)?
+            let mut manifold = self.memory_manifold.lock().await;
+            let concept_ids = manifold.semantic.query(&query.text, limit);
+            // Convert concept IDs to memories
+            let mut results = Vec::new();
+            for id in concept_ids {
+                if let Some(item) = manifold.episodic.get(&id) {
+                    results.push(MemoryQueryResult {
+                        item: item.clone(),
+                        score: 0.5, // Heuristic for now
+                        source: MemorySource::Semantic,
+                    });
+                }
+            }
+            results
         } else {
             vec![]
         };
 
         // Step 4: Merge and rank all results
         let all_results =
-            self.merge_and_rank_results(working_results, episodic_results, semantic_results);
+            self.merge_and_rank_results(working_results.clone(), episodic_results.clone(), semantic_results.clone());
 
         // Step 5: Compress context to token budget
         let target_tokens = 128_000; // 128k token budget
@@ -208,6 +233,15 @@ impl ContextManager {
             + retrieval_time)
             / self.stats.total_queries as f64;
 
+        tracing::info!(
+            "Retrieved {} results ({} WM, {} EM, {} SM) in {}ms",
+            all_results.len(),
+            working_hits,
+            episodic_results.len(),
+            semantic_results.len(),
+            retrieval_time
+        );
+
         // Cache result
         let unified_context = UnifiedContext {
             working: working_results,
@@ -220,26 +254,13 @@ impl ContextManager {
 
         self.cache_query(query.clone(), &unified_context);
 
-        tracing::info!(
-            "Retrieved {} results ({} WM, {} EM, {} SM) in {}ms",
-            all_results.len(),
-            working_hits,
-            episodic_results.len(),
-            semantic_results.len(),
-            retrieval_time
-        );
-
         Ok(unified_context)
     }
 
     /// Query working memory (instant, 10-item LRU cache)
-    fn query_working_memory(&self, query: &Query, limit: usize) -> Vec<MemoryQueryResult> {
-        tracing::debug!("Querying working memory");
-
-        // Access working memory from memory manifold
-        let results = self.memory_manifold.working.query(&query.text, limit);
-
-        results
+    async fn query_working_memory(&self, query: &Query, limit: usize) -> Vec<MemoryQueryResult> {
+        let mut manifold = self.memory_manifold.lock().await;
+        manifold.working.query(&query.text, limit)
     }
 
     /// Merge and rank results from all memory levels
@@ -278,7 +299,7 @@ impl ContextManager {
 
         // Add semantic memory results with goal contribution scoring
         for result in semantic {
-            let goal_score = result.item.goal_id.map(|_| 0.2).unwrap_or(0.0);
+            let goal_score = if !result.item.goal_ids.is_empty() { 0.2 } else { 0.0 };
             all_results.push(MemoryQueryResult {
                 item: result.item.clone(),
                 score: result.score * 0.6 + goal_score,
@@ -355,21 +376,21 @@ impl ContextManager {
         content_parts.push("## Critical Context\n\n".to_string());
 
         for item in &critical_items {
-            content_parts.push(&format!("- {}: {}\n", item.item.description, item.score));
+            content_parts.push(format!("- {}: {}\n", item.item.content, item.score));
         }
 
         // Section 2: Compressed History
         if !compressed_verbose.is_empty() {
             content_parts.push("\n## Compressed History\n\n".to_string());
-            content_parts.push(&compressed_verbose);
+            content_parts.push(compressed_verbose);
         }
 
         // Section 3: Summary Statistics
         content_parts.push("\n## Context Statistics\n\n".to_string());
-        content_parts.push(&format!("- Total memories: {}\n", results.len()));
-        content_parts.push(&format!("- Critical: {}\n", critical_items.len()));
-        content_parts.push(&format!("- Compressed: {}\n", verbose_items.len()));
-        content_parts.push(&format!(
+        content_parts.push(format!("- Total memories: {}\n", results.len()));
+        content_parts.push(format!("- Critical: {}\n", critical_items.len()));
+        content_parts.push(format!("- Compressed: {}\n", verbose_items.len()));
+        content_parts.push(format!(
             "- Token usage: {}/{}\n",
             self.estimate_token_count_from_content(&content_parts.join("")),
             target_tokens
@@ -412,7 +433,7 @@ impl ContextManager {
     /// 3. Learnings and patterns (what worked)
     /// 4. Goal progress (current state)
     fn is_critical_item(&self, result: &MemoryQueryResult) -> bool {
-        let desc_lower = result.item.description.to_lowercase();
+        let desc_lower = result.item.content.to_lowercase();
 
         desc_lower.contains("decision")
             || desc_lower.contains("rationale")
@@ -468,9 +489,9 @@ impl ContextManager {
             } else {
                 // Keep all items if few
                 for item in category_items {
-                    compressed.push(&format!(
+                    compressed.push(format!(
                         "{} (score: {:.1})\n",
-                        item.item.description, item.score
+                        item.item.content, item.score
                     ));
                 }
                 compressed.push("\n".to_string());
@@ -482,7 +503,7 @@ impl ContextManager {
 
     /// Categorize memory item
     fn categorize_item(&self, item: &MemoryQueryResult) -> String {
-        let desc_lower = item.item.description.to_lowercase();
+        let desc_lower = item.item.content.to_lowercase();
 
         if desc_lower.contains("file") || desc_lower.contains("create") {
             "File Operations".to_string()
@@ -523,10 +544,10 @@ impl ContextManager {
         summary.push("- Top items:\n".to_string());
 
         for (i, item) in sorted.iter().take(3).enumerate() {
-            summary.push(&format!(
+            summary.push(format!(
                 "  {}. {} (score: {:.1})\n",
                 i + 1,
-                item.item.description,
+                item.item.content,
                 item.score
             ));
         }
@@ -537,7 +558,7 @@ impl ContextManager {
     /// Estimate token count from memory results
     fn estimate_token_count(&self, results: &[MemoryQueryResult]) -> u64 {
         // Approximate: 1 token per 4 characters
-        let total_chars: usize = results.iter().map(|r| r.item.description.len()).sum();
+        let total_chars: usize = results.iter().map(|r| r.item.content.len()).sum();
 
         (total_chars / 4) as u64
     }
@@ -547,12 +568,12 @@ impl ContextManager {
         let mut formatted = Vec::new();
 
         for (i, result) in results.iter().enumerate() {
-            formatted.push(&format!(
-                "{}. [{} {:.1}] {}\n",
+            formatted.push(format!(
+                "{}. [{:?} {:.1}] {}\n",
                 i + 1,
                 result.source,
                 result.score,
-                result.item.description
+                result.item.content
             ));
         }
 
@@ -579,9 +600,9 @@ impl ContextManager {
                 let unified = cached.context.clone();
 
                 return Some(CachedContext {
-                    results: unified.ranked.clone(),
-                    timestamp: cached.timestamp,
-                    ttl_seconds: cached.ttl_seconds,
+                    context: unified.clone(),
+                    timestamp: Utc::now(),
+                    ttl_seconds: 300,
                 });
             }
         }
@@ -594,9 +615,9 @@ impl ContextManager {
         let cache_key = self.cache_key(&query);
 
         let cached = CachedContext {
-            results: context.ranked.clone(),
-            timestamp: chrono::Utc::now(),
-            ttl_seconds: 300, // 5 minutes TTL
+            context: context.clone(),
+            timestamp: Utc::now(),
+            ttl_seconds: 300, // 5 minute TTL
         };
 
         self.query_cache.insert(cache_key, cached);

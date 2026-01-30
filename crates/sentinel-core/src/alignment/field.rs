@@ -54,7 +54,7 @@ use serde::{Deserialize, Serialize};
 ///
 /// The field computes alignment scores for project states and provides
 /// gradient information for continuous improvement.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct AlignmentField {
     /// The goal manifold we're aligning to
     manifold: GoalManifold,

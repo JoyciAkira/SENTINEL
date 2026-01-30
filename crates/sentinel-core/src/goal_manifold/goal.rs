@@ -6,6 +6,7 @@
 
 use crate::error::{GoalError, Result};
 use crate::goal_manifold::predicate::Predicate;
+use crate::goal_manifold::atomic::AtomicContract;
 use crate::types::{GoalStatus, ProbabilityDistribution, Timestamp, GoalLock};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -80,8 +81,14 @@ pub struct Goal {
     /// Current lock holder (Social Manifold - Layer 8)
     pub current_lock: Option<GoalLock>,
 
+    /// Formal atomic contract for this goal (Atomic Truth - Phase 4)
+    pub atomic_contract: Option<AtomicContract>,
+
     /// Optional parent goal (for hierarchical decomposition)
     pub parent_id: Option<Uuid>,
+
+    /// Specific tests to validate this goal
+    pub validation_tests: Vec<String>,
 
     /// Metadata for tracking and learning
     pub metadata: GoalMetadata,
@@ -141,7 +148,9 @@ impl Goal {
             value_to_root: 0.0,
             status: GoalStatus::Pending,
             current_lock: None,
+            atomic_contract: None,
             parent_id: None,
+            validation_tests: Vec::new(),
             metadata: GoalMetadata::default(),
             created_at: now,
             updated_at: now,
@@ -289,7 +298,9 @@ pub struct GoalBuilder {
     anti_dependencies: Vec<Uuid>,
     complexity_estimate: Option<ProbabilityDistribution>,
     value_to_root: f64,
+    atomic_contract: Option<AtomicContract>,
     parent_id: Option<Uuid>,
+    validation_tests: Vec<String>,
     tags: Vec<String>,
 }
 
@@ -342,9 +353,21 @@ impl GoalBuilder {
         self
     }
 
+    /// Set atomic contract
+    pub fn atomic_contract(mut self, contract: AtomicContract) -> Self {
+        self.atomic_contract = Some(contract);
+        self
+    }
+
     /// Set parent goal
     pub fn parent(mut self, parent_id: Uuid) -> Self {
         self.parent_id = Some(parent_id);
+        self
+    }
+
+    /// Set validation tests
+    pub fn validation_tests(mut self, tests: Vec<String>) -> Self {
+        self.validation_tests = tests;
         self
     }
 
@@ -378,7 +401,9 @@ impl GoalBuilder {
             value_to_root: self.value_to_root,
             status: GoalStatus::Pending,
             current_lock: None,
+            atomic_contract: self.atomic_contract,
             parent_id: self.parent_id,
+            validation_tests: self.validation_tests,
             metadata: GoalMetadata {
                 tags: self.tags,
                 ..Default::default()

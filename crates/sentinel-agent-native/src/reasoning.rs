@@ -64,8 +64,9 @@ use anyhow::{Context, Result};
 use sentinel_core::{
     cognitive_state::{Action, ActionType},
     goal_manifold::Goal,
-    types::Uuid,
+    Uuid,
 };
+use crate::consensus::ConsensusQueryResult;
 use std::collections::HashMap;
 
 /// Structured Reasoner - Deterministic, explainable reasoning
@@ -226,9 +227,9 @@ impl StructuredReasoner {
     /// - Reasoning is explainable
     /// - No hallucinations
     pub fn plan_actions_for_goal(
-        &self,
+        &mut self,
         goal: &Goal,
-        consensus: &super::ConsensusQueryResult,
+        consensus: &ConsensusQueryResult,
     ) -> Result<Vec<Action>> {
         tracing::debug!("Planning actions for goal: {}", goal.description);
 
@@ -546,7 +547,13 @@ impl StructuredReasoner {
             alignment_score: pattern.alignment_impact,
             success_probability: pattern.success_rate,
             estimated_effort: analysis.complexity * 0.5, // Patterns are usually faster
-            steps: pattern.steps.clone(),
+            steps: pattern.steps.iter().enumerate().map(|(i, s)| ReasoningStep {
+                step_number: i + 1,
+                description: s.clone(),
+                reasoning_type: ReasoningType::PatternMatching { pattern_id: pattern.id.to_string() },
+                evidence: vec![],
+                conclusion: "Step derived from proven pattern".to_string(),
+            }).collect(),
         })
     }
 
@@ -580,7 +587,7 @@ impl StructuredReasoner {
 
         Ok(Solution {
             id: Uuid::new_v4(),
-            description: format!("Apply reasoning rules for {}", analysis.goal_type),
+            description: format!("Apply reasoning rules for {:?}", analysis.goal_type),
             approach: "Rule-based reasoning".to_string(),
             alignment_score: 0.85,
             success_probability: 0.8,
@@ -685,8 +692,8 @@ impl StructuredReasoner {
 
         Ok(Solution {
             id: Uuid::new_v4(),
-            description: format!("Standard approach for {}", analysis.goal_type),
-            approach: format!("Standard {} approach", analysis.goal_type),
+            description: format!("Standard approach for {:?}", analysis.goal_type),
+            approach: format!("Standard {:?} approach", analysis.goal_type),
             alignment_score: 0.75,
             success_probability: 0.85,
             estimated_effort: analysis.complexity * 0.8,
@@ -750,7 +757,8 @@ impl StructuredReasoner {
         scored.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap());
 
         tracing::info!(
-            "Top solution scores: {}",
+            "Scored {} solutions. Top scores: {:?}",
+            scored.len(),
             scored.iter().take(3).map(|s| s.score).collect::<Vec<_>>()
         );
 
@@ -861,16 +869,22 @@ impl StructuredReasoner {
             let action = Action {
                 id: Uuid::new_v4(),
                 action_type: self.step_to_action_type(step, goal)?,
-                rationale: format!(
+                description: format!(
                     "{} (Step {} of {})",
                     step.description,
                     i + 1,
                     solution.description
                 ),
-                expected_alignment_impact: solution.alignment_score / solution.steps.len() as f64,
+                goal_id: Some(goal.id),
+                expected_value: solution.alignment_score / solution.steps.len() as f64,
+                created_at: chrono::Utc::now(),
                 dependencies: vec![],
-                estimated_duration_ms: (solution.estimated_effort * 60000.0
-                    / solution.steps.len() as f64) as u32,
+                metadata: sentinel_core::cognitive_state::action::ActionMetadata {
+                    estimated_duration: Some(solution.estimated_effort * 60.0 / solution.steps.len() as f64),
+                    risk_level: 0.1,
+                    reversible: true,
+                    tags: vec![],
+                },
             };
 
             actions.push(action);
@@ -887,11 +901,11 @@ impl StructuredReasoner {
         if desc.contains("create") || desc.contains("implement") {
             match goal.description.to_lowercase().as_str() {
                 g if g.contains("auth") => Ok(ActionType::CreateFile {
-                    path: "src/auth/mod.rs".to_string(),
+                    path: "src/auth/mod.rs".into(),
                     content: "// Auth module".to_string(),
                 }),
                 _ => Ok(ActionType::CreateFile {
-                    path: "src/module.rs".to_string(),
+                    path: "src/module.rs".into(),
                     content: "".to_string(),
                 }),
             }
@@ -907,6 +921,7 @@ impl StructuredReasoner {
         } else {
             Ok(ActionType::RunCommand {
                 command: "echo 'Generic action'".to_string(),
+                working_dir: std::path::PathBuf::from("."),
             })
         }
     }

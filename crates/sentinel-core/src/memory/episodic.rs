@@ -31,7 +31,7 @@ impl MemoryEmbedding {
 }
 
 /// Episodic memory with vector-based retrieval
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct EpisodicMemory {
     /// All stored memories with embeddings
     memories: HashMap<Uuid, MemoryEmbedding>,

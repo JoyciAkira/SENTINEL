@@ -6,6 +6,7 @@ use std::collections::{HashMap, HashSet};
 use uuid::Uuid;
 use crate::learning::types::{RecordedAction, SuccessPattern, DeviationPattern, CompletedProject, GoalType, ActionType, DeviationEvent};
 
+#[derive(Debug, Clone)]
 pub struct PatternMiningEngine {
     pub success_patterns: HashMap<Uuid, SuccessPattern>,
     pub deviation_patterns: HashMap<Uuid, DeviationPattern>,

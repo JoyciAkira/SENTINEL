@@ -11,6 +11,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 /// Sintetizzatore di strategie basato su meta-learning
+#[derive(Debug, Clone)]
 pub struct StrategySynthesizer {
     knowledge_base: Arc<KnowledgeBase>,
 }

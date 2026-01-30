@@ -44,7 +44,7 @@
 use anyhow::{Context, Result};
 use sentinel_core::{
     goal_manifold::{Goal, GoalDag, GoalManifold},
-    types::Uuid,
+    Uuid,
 };
 use std::collections::HashMap;
 
@@ -68,7 +68,7 @@ pub struct ExecutionPlan {
     pub sub_goals: Vec<GoalId>,
 
     /// All actions in execution order
-    pub actions: Vec<Action>,
+    pub actions: Vec<sentinel_core::cognitive_state::Action>,
 
     /// Plan complexity score
     pub complexity: f64,
@@ -239,14 +239,15 @@ impl HierarchicalPlanner {
     /// Decompose "implement" goal into sub-goals
     fn decompose_implement_goal(&self, goal: &Goal, complexity: f64) -> Result<Vec<Goal>> {
         // Extract what to implement
-        let what_to_implement = goal.description.replace("implement", "").trim();
+        let binding = goal.description.replace("implement", "");
+        let what_to_implement = binding.trim();
 
         let num_sub_goals = self.num_sub_goals_for_complexity(complexity);
 
         let sub_goals = (0..num_sub_goals)
             .map(|i| {
                 let description = match i {
-                    0 => format!("Create {} model/struct", what_to_implement),
+                    0 => format!("Define {} interface/contract", what_to_implement),
                     1 => format!("Implement {} core logic", what_to_implement),
                     2 => format!("Add {} error handling", what_to_implement),
                     3 => format!("Write {} tests", what_to_implement),
@@ -254,22 +255,16 @@ impl HierarchicalPlanner {
                     _ => format!("Refine {} implementation", what_to_implement),
                 };
 
-                Goal {
-                    id: Uuid::new_v4(),
-                    description,
-                    success_criteria: vec![],
-                    dependencies: vec![],
-                    anti_dependencies: vec![],
-                    complexity_estimate: sentinel_core::types::ProbabilityDistribution {
-                        mean: complexity / num_sub_goals as f64,
-                        std_dev: 5.0,
-                    },
-                    value_to_root: goal.value_to_root / num_sub_goals as f64,
-                    status: sentinel_core::goal_manifold::goal::GoalStatus::Pending,
-                    parent_id: Some(goal.id),
-                    validation_tests: vec![],
-                    metadata: sentinel_core::goal_manifold::goal::GoalMetadata::default(),
-                }
+                Goal::builder()
+                    .description(description)
+                    .parent(goal.id)
+                    .complexity(sentinel_core::types::ProbabilityDistribution::normal(
+                        complexity / num_sub_goals as f64,
+                        1.0,
+                    ))
+                    .value_to_root(goal.value_to_root / num_sub_goals as f64)
+                    .build()
+                    .unwrap()
             })
             .collect();
 
@@ -278,7 +273,8 @@ impl HierarchicalPlanner {
 
     /// Decompose "create" goal into sub-goals
     fn decompose_create_goal(&self, goal: &Goal, complexity: f64) -> Result<Vec<Goal>> {
-        let what_to_create = goal.description.replace("create", "").trim();
+        let binding = goal.description.replace("create", "");
+        let what_to_create = binding.trim();
         let num_sub_goals = self.num_sub_goals_for_complexity(complexity);
 
         let sub_goals = (0..num_sub_goals)
@@ -291,22 +287,16 @@ impl HierarchicalPlanner {
                     _ => format!("Review and polish {}", what_to_create),
                 };
 
-                Goal {
-                    id: Uuid::new_v4(),
-                    description,
-                    success_criteria: vec![],
-                    dependencies: vec![],
-                    anti_dependencies: vec![],
-                    complexity_estimate: sentinel_core::types::ProbabilityDistribution {
-                        mean: complexity / num_sub_goals as f64,
-                        std_dev: 5.0,
-                    },
-                    value_to_root: goal.value_to_root / num_sub_goals as f64,
-                    status: sentinel_core::goal_manifold::goal::GoalStatus::Pending,
-                    parent_id: Some(goal.id),
-                    validation_tests: vec![],
-                    metadata: sentinel_core::goal_manifold::goal::GoalMetadata::default(),
-                }
+                Goal::builder()
+                    .description(description)
+                    .parent(goal.id)
+                    .complexity(sentinel_core::types::ProbabilityDistribution::normal(
+                        complexity / num_sub_goals as f64,
+                        1.0,
+                    ))
+                    .value_to_root(goal.value_to_root / num_sub_goals as f64)
+                    .build()
+                    .unwrap()
             })
             .collect();
 
@@ -315,7 +305,8 @@ impl HierarchicalPlanner {
 
     /// Decompose "build" goal into sub-goals
     fn decompose_build_goal(&self, goal: &Goal, complexity: f64) -> Result<Vec<Goal>> {
-        let what_to_build = goal.description.replace("build", "").trim();
+        let binding = goal.description.replace("build", "");
+        let what_to_build = binding.trim();
         let num_sub_goals = self.num_sub_goals_for_complexity(complexity);
 
         let sub_goals = (0..num_sub_goals)
@@ -328,22 +319,16 @@ impl HierarchicalPlanner {
                     _ => format!("Review and optimize {}", what_to_build),
                 };
 
-                Goal {
-                    id: Uuid::new_v4(),
-                    description,
-                    success_criteria: vec![],
-                    dependencies: vec![],
-                    anti_dependencies: vec![],
-                    complexity_estimate: sentinel_core::types::ProbabilityDistribution {
-                        mean: complexity / num_sub_goals as f64,
-                        std_dev: 5.0,
-                    },
-                    value_to_root: goal.value_to_root / num_sub_goals as f64,
-                    status: sentinel_core::goal_manifold::goal::GoalStatus::Pending,
-                    parent_id: Some(goal.id),
-                    validation_tests: vec![],
-                    metadata: sentinel_core::goal_manifold::goal::GoalMetadata::default(),
-                }
+                Goal::builder()
+                    .description(description)
+                    .parent(goal.id)
+                    .complexity(sentinel_core::types::ProbabilityDistribution::normal(
+                        complexity / num_sub_goals as f64,
+                        1.0,
+                    ))
+                    .value_to_root(goal.value_to_root / num_sub_goals as f64)
+                    .build()
+                    .unwrap()
             })
             .collect();
 
@@ -352,7 +337,8 @@ impl HierarchicalPlanner {
 
     /// Decompose "add" goal into sub-goals
     fn decompose_add_goal(&self, goal: &Goal, complexity: f64) -> Result<Vec<Goal>> {
-        let what_to_add = goal.description.replace("add", "").trim();
+        let binding = goal.description.replace("add", "");
+        let what_to_add = binding.trim();
         let num_sub_goals = self.num_sub_goals_for_complexity(complexity);
 
         let sub_goals = (0..num_sub_goals)
@@ -365,22 +351,16 @@ impl HierarchicalPlanner {
                     _ => format!("Update documentation for {}", what_to_add),
                 };
 
-                Goal {
-                    id: Uuid::new_v4(),
-                    description,
-                    success_criteria: vec![],
-                    dependencies: vec![],
-                    anti_dependencies: vec![],
-                    complexity_estimate: sentinel_core::types::ProbabilityDistribution {
-                        mean: complexity / num_sub_goals as f64,
-                        std_dev: 5.0,
-                    },
-                    value_to_root: goal.value_to_root / num_sub_goals as f64,
-                    status: sentinel_core::goal_manifold::goal::GoalStatus::Pending,
-                    parent_id: Some(goal.id),
-                    validation_tests: vec![],
-                    metadata: sentinel_core::goal_manifold::goal::GoalMetadata::default(),
-                }
+                Goal::builder()
+                    .description(description)
+                    .parent(goal.id)
+                    .complexity(sentinel_core::types::ProbabilityDistribution::normal(
+                        complexity / num_sub_goals as f64,
+                        1.0,
+                    ))
+                    .value_to_root(goal.value_to_root / num_sub_goals as f64)
+                    .build()
+                    .unwrap()
             })
             .collect();
 
@@ -389,7 +369,8 @@ impl HierarchicalPlanner {
 
     /// Decompose "fix" goal into sub-goals
     fn decompose_fix_goal(&self, goal: &Goal, complexity: f64) -> Result<Vec<Goal>> {
-        let what_to_fix = goal.description.replace("fix", "").trim();
+        let binding = goal.description.replace("fix", "");
+        let what_to_fix = binding.trim();
         let num_sub_goals = self.num_sub_goals_for_complexity(complexity);
 
         let sub_goals = (0..num_sub_goals)
@@ -403,22 +384,16 @@ impl HierarchicalPlanner {
                     _ => format!("Verify fix for {}", what_to_fix),
                 };
 
-                Goal {
-                    id: Uuid::new_v4(),
-                    description,
-                    success_criteria: vec![],
-                    dependencies: vec![],
-                    anti_dependencies: vec![],
-                    complexity_estimate: sentinel_core::types::ProbabilityDistribution {
-                        mean: complexity / num_sub_goals as f64,
-                        std_dev: 5.0,
-                    },
-                    value_to_root: goal.value_to_root / num_sub_goals as f64,
-                    status: sentinel_core::goal_manifold::goal::GoalStatus::Pending,
-                    parent_id: Some(goal.id),
-                    validation_tests: vec![],
-                    metadata: sentinel_core::goal_manifold::goal::GoalMetadata::default(),
-                }
+                Goal::builder()
+                    .description(description)
+                    .parent(goal.id)
+                    .complexity(sentinel_core::types::ProbabilityDistribution::normal(
+                        complexity / num_sub_goals as f64,
+                        1.0,
+                    ))
+                    .value_to_root(goal.value_to_root / num_sub_goals as f64)
+                    .build()
+                    .unwrap()
             })
             .collect();
 
@@ -427,7 +402,8 @@ impl HierarchicalPlanner {
 
     /// Decompose "refactor" goal into sub-goals
     fn decompose_refactor_goal(&self, goal: &Goal, complexity: f64) -> Result<Vec<Goal>> {
-        let what_to_refactor = goal.description.replace("refactor", "").trim();
+        let binding = goal.description.replace("refactor", "");
+        let what_to_refactor = binding.trim();
         let num_sub_goals = self.num_sub_goals_for_complexity(complexity);
 
         let sub_goals = (0..num_sub_goals)
@@ -441,22 +417,16 @@ impl HierarchicalPlanner {
                     _ => format!("Update documentation for {}", what_to_refactor),
                 };
 
-                Goal {
-                    id: Uuid::new_v4(),
-                    description,
-                    success_criteria: vec![],
-                    dependencies: vec![],
-                    anti_dependencies: vec![],
-                    complexity_estimate: sentinel_core::types::ProbabilityDistribution {
-                        mean: complexity / num_sub_goals as f64,
-                        std_dev: 5.0,
-                    },
-                    value_to_root: goal.value_to_root / num_sub_goals as f64,
-                    status: sentinel_core::goal_manifold::goal::GoalStatus::Pending,
-                    parent_id: Some(goal.id),
-                    validation_tests: vec![],
-                    metadata: sentinel_core::goal_manifold::goal::GoalMetadata::default(),
-                }
+                Goal::builder()
+                    .description(description)
+                    .parent(goal.id)
+                    .complexity(sentinel_core::types::ProbabilityDistribution::normal(
+                        complexity / num_sub_goals as f64,
+                        1.0,
+                    ))
+                    .value_to_root(goal.value_to_root / num_sub_goals as f64)
+                    .build()
+                    .unwrap()
             })
             .collect();
 
@@ -471,22 +441,16 @@ impl HierarchicalPlanner {
             .map(|i| {
                 let description = format!("Sub-goal {} of {}", i + 1, goal.description);
 
-                Goal {
-                    id: Uuid::new_v4(),
-                    description,
-                    success_criteria: vec![],
-                    dependencies: vec![],
-                    anti_dependencies: vec![],
-                    complexity_estimate: sentinel_core::types::ProbabilityDistribution {
-                        mean: complexity / num_sub_goals as f64,
-                        std_dev: 5.0,
-                    },
-                    value_to_root: goal.value_to_root / num_sub_goals as f64,
-                    status: sentinel_core::goal_manifold::goal::GoalStatus::Pending,
-                    parent_id: Some(goal.id),
-                    validation_tests: vec![],
-                    metadata: sentinel_core::goal_manifold::goal::GoalMetadata::default(),
-                }
+                Goal::builder()
+                    .description(description)
+                    .parent(goal.id)
+                    .complexity(sentinel_core::types::ProbabilityDistribution::normal(
+                        complexity / num_sub_goals as f64,
+                        1.0,
+                    ))
+                    .value_to_root(goal.value_to_root / num_sub_goals as f64)
+                    .build()
+                    .unwrap()
             })
             .collect();
 
@@ -555,17 +519,26 @@ impl HierarchicalPlanner {
         let mut graph: HashMap<GoalId, Vec<GoalId>> = HashMap::new();
 
         for action in &plan.actions {
-            // Each action depends on a goal
-            if !graph.contains_key(&action.goal_id) {
-                graph.insert(action.goal_id, action.dependencies.clone());
-            } else {
-                graph
-                    .get_mut(&action.goal_id)
-                    .unwrap()
-                    .extend(action.dependencies.clone());
-            }
-        }
+            let goal_id = action.goal_id?;
+            if !graph.contains_key(&goal_id) {
 
+                                graph.insert(goal_id, action.dependencies.clone());
+
+                            } else {
+
+                                graph
+
+                                    .get_mut(&goal_id)
+
+                                    .unwrap()
+
+                                    .extend(action.dependencies.clone());
+
+                            }
+
+                        }
+
+                
         // Check for cycles using DFS
         for goal_id in &plan.sub_goals {
             if self.has_cycle(&graph, goal_id, &mut vec![]) {
@@ -612,10 +585,10 @@ impl HierarchicalPlanner {
         for action in &plan.actions {
             for invariant in &invariants {
                 if self.action_violates_invariant(action, invariant) {
-                    violations.push(format!(
-                        "Action {:?} violates invariant: {}",
+                    let violation = format!(
+                        "Action {:?} violates invariant {:?}",
                         action.action_type, invariant
-                    ));
+                    );
                 }
             }
         }
@@ -626,20 +599,21 @@ impl HierarchicalPlanner {
     /// Check if action violates invariant
     fn action_violates_invariant(
         &self,
-        action: &Action,
+        action: &sentinel_core::cognitive_state::Action,
         invariant: &sentinel_core::goal_manifold::Invariant,
     ) -> bool {
         // Invariant checking logic
-        match action.action_type {
-            ActionType::RunCommand { command } => {
+        match &action.action_type {
+            sentinel_core::cognitive_state::ActionType::RunCommand { command, .. } => {
                 // Check if command tries to delete source code
                 command.contains("rm -rf") || command.contains("del /Q")
             }
-            ActionType::DeleteFile { path } => {
+            sentinel_core::cognitive_state::ActionType::DeleteFile { path, .. } => {
                 // Check if trying to delete critical files
-                path.contains("Cargo.toml")
-                    || path.contains("package.json")
-                    || path.contains("README.md")
+                let path_str = path.to_string_lossy();
+                path_str.contains("Cargo.toml")
+                    || path_str.contains("package.json")
+                    || path_str.contains("README.md")
             }
             _ => false,
         }
@@ -660,22 +634,12 @@ mod tests {
         let goal_manifold = create_test_goal_manifold();
         let planner = HierarchicalPlanner::new(goal_manifold);
 
-        let simple_goal = Goal {
-            id: Uuid::new_v4(),
-            description: "Add simple function".to_string(),
-            success_criteria: vec![],
-            dependencies: vec![],
-            anti_dependencies: vec![],
-            complexity_estimate: sentinel_core::types::ProbabilityDistribution {
-                mean: 30.0,
-                std_dev: 5.0,
-            },
-            value_to_root: 1.0,
-            status: sentinel_core::goal_manifold::goal::GoalStatus::Pending,
-            parent_id: None,
-            validation_tests: vec![],
-            metadata: sentinel_core::goal_manifold::goal::GoalMetadata::default(),
-        };
+        let simple_goal = Goal::builder()
+            .description("Add simple function")
+            .complexity(sentinel_core::types::ProbabilityDistribution::normal(30.0, 1.0))
+            .value_to_root(1.0)
+            .build()
+            .unwrap();
 
         let result = planner.decompose_single_goal(&simple_goal);
 
@@ -689,24 +653,12 @@ mod tests {
         let goal_manifold = create_test_goal_manifold();
         let planner = HierarchicalPlanner::new(goal_manifold);
 
-        let complex_goal = Goal {
-            id: Uuid::new_v4(),
-            description:
-                "Implement complex authentication system with JWT, OAuth, and session management"
-                    .to_string(),
-            success_criteria: vec![],
-            dependencies: vec![],
-            anti_dependencies: vec![],
-            complexity_estimate: sentinel_core::types::ProbabilityDistribution {
-                mean: 85.0,
-                std_dev: 5.0,
-            },
-            value_to_root: 1.0,
-            status: sentinel_core::goal_manifold::goal::GoalStatus::Pending,
-            parent_id: None,
-            validation_tests: vec![],
-            metadata: sentinel_core::goal_manifold::goal::GoalMetadata::default(),
-        };
+        let complex_goal = Goal::builder()
+            .description("Implement complex authentication system with JWT, OAuth, and session management")
+            .complexity(sentinel_core::types::ProbabilityDistribution::normal(85.0, 1.0))
+            .value_to_root(1.0)
+            .build()
+            .unwrap();
 
         let result = planner.decompose_single_goal(&complex_goal);
 

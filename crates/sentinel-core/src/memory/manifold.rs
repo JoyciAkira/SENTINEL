@@ -10,23 +10,23 @@ use std::collections::HashMap;
 use uuid::Uuid;
 
 /// Memory manifold orchestrator
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct MemoryManifold {
     /// Hot cache (10 items, LRU)
-    working: WorkingMemory,
+    pub working: WorkingMemory,
 
     /// Vector-based semantic storage (unlimited)
-    episodic: EpisodicMemory,
+    pub episodic: EpisodicMemory,
 
     /// Knowledge graph
-    semantic: SemanticMemory,
+    pub semantic: SemanticMemory,
 
     /// Query statistics
     stats: QueryStats,
 }
 
 /// Query statistics
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 struct QueryStats {
     total_queries: u64,
     working_hits: u64,
