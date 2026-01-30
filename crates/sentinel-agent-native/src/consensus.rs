@@ -601,6 +601,7 @@ impl P2PConsensus {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use sentinel_core::federation::{ThreatType, Severity};
 
     #[tokio::test]
     async fn test_p2p_consensus_initialization() {
@@ -629,6 +630,7 @@ mod tests {
             success_rate: 0.9,
             success_count: 100,
             applicable_goals: vec!["Build REST API".to_string()],
+            steps: vec!["Step 1".to_string()],
             alignment_impact: 0.85,
             pattern_type: PatternType::CodeGeneration,
             source_node_id: Uuid::new_v4(),
@@ -653,8 +655,8 @@ mod tests {
 
         let threat = ThreatAlert {
             threat_id: Uuid::new_v4(),
-            threat_type: federation::ThreatType::AlignmentDeviation,
-            severity: federation::Severity::High,
+            threat_type: ThreatType::AlignmentDeviation,
+            severity: Severity::High,
             description: "Test threat".to_string(),
             source_agent_id: Uuid::new_v4(),
             timestamp: Utc::now(),

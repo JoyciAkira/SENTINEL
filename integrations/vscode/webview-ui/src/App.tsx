@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import ChatPanel from './components/Chat/ChatPanel';
+import GoalGraph from './components/AtomicForge/GoalGraph';
 import { useStore } from './state/store';
 import { useVSCodeAPI } from './hooks/useVSCodeAPI';
 import { useMCPMessages } from './hooks/useMCPMessages';
@@ -7,8 +8,8 @@ import { useMCPMessages } from './hooks/useMCPMessages';
 export default function App() {
     const vscodeApi = useVSCodeAPI();
     useMCPMessages(vscodeApi);
-
     const connected = useStore((s) => s.connected);
+    const [activeTab, setActiveTab] = useState<'chat' | 'forge'>('chat');
 
     return (
         <div style={{
@@ -32,7 +33,45 @@ export default function App() {
                     Sentinel not connected. Install sentinel-cli and restart.
                 </div>
             )}
-            <ChatPanel />
+            
+            <div style={{
+                display: 'flex',
+                borderBottom: '1px solid var(--vscode-panel-border)',
+                backgroundColor: 'var(--vscode-editor-background)'
+            }}>
+                <button 
+                    onClick={() => setActiveTab('chat')}
+                    style={{
+                        padding: '10px 20px',
+                        background: 'none',
+                        border: 'none',
+                        borderBottom: activeTab === 'chat' ? '2px solid var(--vscode-panelTitle-activeBorder)' : 'none',
+                        color: activeTab === 'chat' ? 'var(--vscode-panelTitle-activeForeground)' : 'var(--vscode-panelTitle-inactiveForeground)',
+                        cursor: 'pointer',
+                        fontFamily: 'inherit'
+                    }}
+                >
+                    Chat
+                </button>
+                <button 
+                    onClick={() => setActiveTab('forge')}
+                    style={{
+                        padding: '10px 20px',
+                        background: 'none',
+                        border: 'none',
+                        borderBottom: activeTab === 'forge' ? '2px solid var(--vscode-panelTitle-activeBorder)' : 'none',
+                        color: activeTab === 'forge' ? 'var(--vscode-panelTitle-activeForeground)' : 'var(--vscode-panelTitle-inactiveForeground)',
+                        cursor: 'pointer',
+                        fontFamily: 'inherit'
+                    }}
+                >
+                    Atomic Forge (Graph)
+                </button>
+            </div>
+
+            <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+                {activeTab === 'chat' ? <ChatPanel /> : <GoalGraph />}
+            </div>
         </div>
     );
 }

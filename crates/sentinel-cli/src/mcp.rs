@@ -147,6 +147,11 @@ async fn handle_request(req: McpRequest, id: Value) -> McpResponse {
                         "inputSchema": { "type": "object", "properties": {} }
                     },
                     {
+                        "name": "get_goal_graph",
+                        "description": "Restituisce il Goal Manifold come grafo (Nodes/Edges) per visualizzazione frontend",
+                        "inputSchema": { "type": "object", "properties": {} }
+                    },
+                    {
                         "name": "decompose_goal",
                         "description": "Scompone un goal complesso in una serie di task atomici deterministici (Atomic Truth)",
                         "inputSchema": {
@@ -347,6 +352,60 @@ async fn handle_tool_call(params: Option<Value>) -> Option<Value> {
                 Err(e) => e,
             };
             Some(serde_json::json!({ "content": [{ "type": "text", "text": response_text }] }))
+        },
+
+        "get_goal_graph" => {
+            let json_graph = match get_manifold() {
+                Ok(manifold) => {
+                    let mut nodes = Vec::new();
+                    let mut edges = Vec::new();
+                    
+                    // Root Node
+                    nodes.push(serde_json::json!({
+                        "id": "root",
+                        "type": "input",
+                        "data": { "label": manifold.root_intent.description },
+                        "position": { "x": 250, "y": 0 }
+                    }));
+
+                    let goals: Vec<_> = manifold.goal_dag.goals().collect();
+                    for (i, goal) in goals.iter().enumerate() {
+                        let y_pos = (i + 1) * 150;
+                        let x_pos = 250 + (if i % 2 == 0 { -150 } else { 150 }); // Simple layout
+                        
+                        nodes.push(serde_json::json!({
+                            "id": goal.id.to_string(),
+                            "data": { 
+                                "label": goal.description,
+                                "status": format!("{:?}", goal.status)
+                            },
+                            "position": { "x": x_pos, "y": y_pos }
+                        }));
+
+                        // Edge from Root (semplificato) o dependencies
+                        if goal.dependencies.is_empty() {
+                            edges.push(serde_json::json!({
+                                "id": format!("e-root-{}", goal.id),
+                                "source": "root",
+                                "target": goal.id.to_string(),
+                                "animated": true
+                            }));
+                        } else {
+                            for dep in &goal.dependencies {
+                                edges.push(serde_json::json!({
+                                    "id": format!("e-{}-{}", dep, goal.id),
+                                    "source": dep.to_string(),
+                                    "target": goal.id.to_string()
+                                }));
+                            }
+                        }
+                    }
+
+                    serde_json::json!({ "nodes": nodes, "edges": edges })
+                },
+                Err(e) => serde_json::json!({ "error": e }),
+            };
+            Some(serde_json::json!({ "content": [{ "type": "text", "text": json_graph.to_string() }] }))
         },
 
         "decompose_goal" => {

@@ -27,3 +27,5 @@ logs/
 .env
 .env.local
 claude.md.bak
+node_modules/
+integrations/vscode/node_modules/

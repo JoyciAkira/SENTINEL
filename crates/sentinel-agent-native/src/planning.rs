@@ -696,17 +696,18 @@ mod tests {
         let plan = ExecutionPlan {
             root_task: "Test task".to_string(),
             sub_goals: vec![goal_id.clone()],
-            actions: vec![Action {
+            actions: vec![sentinel_core::cognitive_state::Action {
                 id: action_id,
-                action_type: ActionType::CreateFile {
-                    path: "test.rs".to_string(),
+                action_type: sentinel_core::cognitive_state::ActionType::CreateFile {
+                    path: "test.rs".into(),
                     content: "test".to_string(),
                 },
-                goal_id: goal_id.clone(),
-                rationale: "Test".to_string(),
-                expected_alignment_impact: 0.5,
+                description: "Test action".to_string(),
+                goal_id: Some(goal_id.clone()),
+                expected_value: 0.5,
+                created_at: chrono::Utc::now(),
                 dependencies: vec![action_id], // Circular dependency!
-                estimated_duration_ms: 1000,
+                metadata: Default::default(),
             }],
             complexity: 50.0,
             estimated_duration_minutes: 10,

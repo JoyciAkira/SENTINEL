@@ -1059,6 +1059,7 @@ impl ConflictDetector {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use sentinel_core::types::{ProbabilityDistribution, GoalStatus};
 
     #[test]
     fn test_agent_orchestrator_initialization() {
@@ -1073,22 +1074,11 @@ mod tests {
     fn test_decompose_goal_into_tasks() {
         let orchestrator = AgentOrchestrator::new();
 
-        let goal = Goal {
-            id: Uuid::new_v4(),
-            description: "Implement JWT authentication".to_string(),
-            success_criteria: vec![],
-            dependencies: vec![],
-            anti_dependencies: vec![],
-            complexity_estimate: sentinel_core::tests::ProbabilityDistribution {
-                mean: 70.0,
-                std_dev: 5.0,
-            },
-            value_to_root: 1.0,
-            status: sentinel_core::goal_manifold::goal::GoalStatus::Pending,
-            parent_id: None,
-            validation_tests: vec![],
-            metadata: sentinel_core::goal_manifold::goal::GoalMetadata::default(),
-        };
+        // Use builder for robust initialization
+        let goal = Goal::builder()
+            .description("Implement JWT authentication")
+            .build()
+            .expect("Failed to build goal");
 
         let tasks = orchestrator
             .decompose_goal_into_tasks(&goal)
@@ -1110,9 +1100,9 @@ mod tests {
             },
         ];
 
-        let conflicts = vec![];
+        let resolutions = vec![];
 
-        let (conflicted, parallel) = orchestrator.separate_conflicted_and_parallel_tasks(&assignments, &conflicts);
+        let (conflicted, parallel) = orchestrator.separate_conflicted_and_parallel_tasks(&assignments, &resolutions);
 
         // No conflicts, all parallel
         assert_eq!(conflicted.len(), 0);
@@ -1123,22 +1113,13 @@ mod tests {
     fn test_estimate_task_duration() {
         let orchestrator = AgentOrchestrator::new();
 
-        let goal = Goal {
-            id: Uuid::new_v4(),
-            description: "Test goal".to_string(),
-            success_criteria: vec![],
-            dependencies: vec![],
-            anti_dependencies: vec![],
-            complexity_estimate: sentinel_core::tests::ProbabilityDistribution {
-                mean: 50.0,
-                std_dev: 5.0,
-            },
-            value_to_root: 1.0,
-            status: sentinel_core::goal_manifold::goal::GoalStatus::Pending,
-            parent_id: None,
-            validation_tests: vec![],
-            metadata: sentinel_core::goal_manifold::goal::GoalMetadata::default(),
-        };
+        let mut goal = Goal::builder()
+            .description("Test goal")
+            .build()
+            .expect("Failed to build goal");
+        
+        // Manually set complexity for deterministic test
+        goal.complexity_estimate = ProbabilityDistribution::normal(50.0, 5.0);
 
         let duration = orchestrator.estimate_task_duration(&goal, AgentType::CodeGeneration);
 

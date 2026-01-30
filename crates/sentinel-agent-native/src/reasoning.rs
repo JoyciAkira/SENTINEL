@@ -1073,6 +1073,7 @@ struct ScoredSolution {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use sentinel_core::types::{ProbabilityDistribution, GoalStatus};
 
     #[test]
     fn test_structured_reasoner_initialization() {
@@ -1086,22 +1087,10 @@ mod tests {
     fn test_classify_goal_type() {
         let reasoner = StructuredReasoner::new();
 
-        let auth_goal = Goal {
-            id: Uuid::new_v4(),
-            description: "Implement JWT authentication".to_string(),
-            success_criteria: vec![],
-            dependencies: vec![],
-            anti_dependencies: vec![],
-            complexity_estimate: sentinel_core::types::ProbabilityDistribution {
-                mean: 70.0,
-                std_dev: 5.0,
-            },
-            value_to_root: 1.0,
-            status: sentinel_core::goal_manifold::goal::GoalStatus::Pending,
-            parent_id: None,
-            validation_tests: vec![],
-            metadata: sentinel_core::goal_manifold::goal::GoalMetadata::default(),
-        };
+        let auth_goal = Goal::builder()
+            .description("Implement JWT authentication")
+            .build()
+            .unwrap();
 
         let goal_type = reasoner.classify_goal_type(&auth_goal);
 
@@ -1132,7 +1121,7 @@ mod tests {
             estimated_success_criteria: vec![],
         };
 
-        let consensus = super::ConsensusQueryResult {
+        let consensus = crate::consensus::ConsensusQueryResult {
             similar_tasks: vec![],
             patterns: vec![],
             threats: vec![],

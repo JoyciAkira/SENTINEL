@@ -671,10 +671,11 @@ impl ContextManager {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use sentinel_core::memory::{MemoryItem, MemoryType};
 
     #[test]
     fn test_context_manager_initialization() {
-        let memory_manifold = Arc::new(sentinel_core::memory::MemoryManifold::new());
+        let memory_manifold = Arc::new(Mutex::new(sentinel_core::memory::MemoryManifold::new()));
         let context_manager = ContextManager::new(memory_manifold);
 
         assert!(context_manager.query_cache.is_empty());
@@ -683,7 +684,7 @@ mod tests {
 
     #[test]
     fn test_merge_and_rank_results() {
-        let memory_manifold = Arc::new(sentinel_core::memory::MemoryManifold::new());
+        let memory_manifold = Arc::new(Mutex::new(sentinel_core::memory::MemoryManifold::new()));
         let mut context_manager = ContextManager::new(memory_manifold);
 
         let working = vec![];
@@ -700,32 +701,24 @@ mod tests {
 
     #[test]
     fn test_is_critical_item() {
-        let memory_manifold = Arc::new(sentinel_core::memory::MemoryManifold::new());
+        let memory_manifold = Arc::new(Mutex::new(sentinel_core::memory::MemoryManifold::new()));
         let context_manager = ContextManager::new(memory_manifold);
 
         // Critical items
         assert!(context_manager.is_critical_item(&MemoryQueryResult {
-            item: MemoryItem {
-                id: Uuid::new_v4(),
-                description: "Decision: Use JWT for authentication".to_string(),
-                timestamp: chrono::Utc::now(),
-                goal_id: None,
-                alignment_score: 0.9,
-                metadata: None,
-            },
+            item: MemoryItem::new(
+                "Decision: Use JWT for authentication".to_string(),
+                MemoryType::Decision
+            ),
             score: 0.9,
             source: sentinel_core::memory::MemorySource::Episodic,
         }));
 
         assert!(!context_manager.is_critical_item(&MemoryQueryResult {
-            item: MemoryItem {
-                id: Uuid::new_v4(),
-                description: "Created auth.rs file".to_string(),
-                timestamp: chrono::Utc::now(),
-                goal_id: None,
-                alignment_score: 0.85,
-                metadata: None,
-            },
+            item: MemoryItem::new(
+                "Created auth.rs file".to_string(),
+                MemoryType::Action
+            ),
             score: 0.85,
             source: sentinel_core::memory::MemorySource::Episodic,
         }));
@@ -733,18 +726,14 @@ mod tests {
 
     #[test]
     fn test_estimate_token_count() {
-        let memory_manifold = Arc::new(sentinel_core::memory::MemoryManifold::new());
+        let memory_manifold = Arc::new(Mutex::new(sentinel_core::memory::MemoryManifold::new()));
         let context_manager = ContextManager::new(memory_manifold);
 
         let results = vec![MemoryQueryResult {
-            item: MemoryItem {
-                id: Uuid::new_v4(),
-                description: "Test description 1".to_string(),
-                timestamp: chrono::Utc::now(),
-                goal_id: None,
-                alignment_score: 0.9,
-                metadata: None,
-            },
+            item: MemoryItem::new(
+                "Test description 1".to_string(),
+                MemoryType::Observation
+            ),
             score: 0.9,
             source: sentinel_core::memory::MemorySource::Episodic,
         }];
