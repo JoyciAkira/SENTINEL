@@ -422,19 +422,62 @@ async fn handle_tool_call(params: Option<Value>) -> Option<Value> {
                         None => return Some(serde_json::json!({ "isError": true, "content": [{ "type": "text", "text": "Goal non trovato." }] })),
                     };
 
-                    use sentinel_core::goal_manifold::slicer::AtomicSlicer;
-                    match AtomicSlicer::decompose(&goal) {
-                        Ok(sub_goals) => {
-                            let count = sub_goals.len();
-                            for sg in sub_goals {
-                                let _ = manifold.add_goal(sg);
+                    // Tentativo di scomposizione tramite LLM
+                    let api_key = std::env::var("OPENROUTER_API_KEY").ok();
+                    let mut sub_goals = Vec::new();
+
+                    if let Some(key) = api_key {
+                        use sentinel_agent_native::openrouter::{OpenRouterClient, OpenRouterModel};
+                        use sentinel_agent_native::llm_integration::{LLMContext, LLMClient};
+                        
+                        let model_id = std::env::var("OPENROUTER_MODEL").unwrap_or_else(|_| "deepseek/deepseek-r1:free".to_string());
+                        let client = OpenRouterClient::new(key, OpenRouterModel::Custom(model_id));
+                        
+                        let prompt = format!(
+                            "Decompose the following software goal into 3-5 atomic, deterministic sub-tasks: '{}'. \
+                            Return ONLY a JSON array of strings representing the sub-task descriptions.", 
+                            goal.description
+                        );
+
+                        let context = LLMContext {
+                            goal_description: goal.description.clone(),
+                            context: "Atomic Slicing phase.".to_string(),
+                            p2p_intelligence: "".to_string(),
+                            constraints: vec![],
+                            previous_approaches: vec![],
+                        };
+
+                        if let Ok(suggestion) = client.generate_code(&prompt, &context).await {
+                            // Tenta di parsare il JSON dall'output dell'LLM
+                            if let Ok(tasks) = serde_json::from_str::<Vec<String>>(&suggestion.content) {
+                                for task_desc in tasks {
+                                    if let Ok(sg) = sentinel_core::goal_manifold::goal::Goal::builder()
+                                        .description(task_desc)
+                                        .parent(goal.id)
+                                        .build() {
+                                        sub_goals.push(sg);
+                                    }
+                                }
                             }
-                            match save_manifold(&manifold) {
-                                Ok(_) => format!("ATOMIC DECOMPOSITION SUCCESS: Goal '{}' scomposto in {} task atomici.", goal.description, count),
-                                Err(e) => format!("Errore salvataggio manifold: {}", e),
-                            }
-                        },
-                        Err(e) => format!("Errore scomposizione: {}", e),
+                        }
+                    }
+
+                    // Fallback su euristica locale se LLM fallisce o non disponibile
+                    if sub_goals.is_empty() {
+                        use sentinel_core::goal_manifold::slicer::AtomicSlicer;
+                        if let Ok(decomposed) = AtomicSlicer::decompose(&goal) {
+                            sub_goals = decomposed;
+                        }
+                    }
+
+                    let count = sub_goals.len();
+                    for sg in sub_goals {
+                        let _ = manifold.add_goal(sg);
+                    }
+
+                    match save_manifold(&manifold) {
+                        Ok(_) => format!("ATOMIC DECOMPOSITION SUCCESS: Goal '{}' scomposto in {} task.", goal.description, count),
+                        Err(e) => format!("Errore salvataggio manifold: {}", e),
                     }
                 },
                 Err(e) => e,
