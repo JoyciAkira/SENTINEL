@@ -19,7 +19,7 @@ use crate::llm_integration::{
     LLMClient, LLMContext, LLMSuggestion, LLMSuggestionType,
     DocFormat, ExplanationStyle, ImprovementMetric,
 };
-use sentinel_core::types::Uuid;
+use sentinel_core::Uuid;
 
 /// OpenRouter API base URL
 const OPENROUTER_API_URL: &str = "https://openrouter.ai/api/v1/chat/completions";

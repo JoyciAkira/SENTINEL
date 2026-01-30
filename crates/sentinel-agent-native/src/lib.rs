@@ -33,6 +33,8 @@ pub mod context;
 pub mod planning;
 pub mod reasoning;
 pub mod orchestrator;
+pub mod openrouter;
+pub mod llm_integration;
 
 use anyhow::{Context, Result};
 use sentinel_core::{
