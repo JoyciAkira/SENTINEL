@@ -259,7 +259,7 @@ impl GoalManifold {
     /// ```
     pub fn new(root_intent: Intent) -> Self {
         let now = chrono::Utc::now();
-        Self {
+        let mut manifold = Self {
             root_intent,
             sensitivity: 0.5,
             overrides: Vec::new(),
@@ -271,7 +271,12 @@ impl GoalManifold {
             updated_at: now,
             integrity_hash: Blake3Hash::empty(),
             version_history: Vec::new(),
-        }
+        };
+
+        // Initialize integrity hash and version 1
+        manifold.update_hash("Manifold initialized");
+
+        manifold
     }
 
 

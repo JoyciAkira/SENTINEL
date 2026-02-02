@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SENTINEL // ALIGNMENT DASHBOARD</title>
+    <style>
+        :root {
+            --bg-color: #09090b;
+            --card-bg: #18181b;
+            --text-primary: #e4e4e7;
+            --text-secondary: #a1a1aa;
+            --accent-primary: #22c55e; /* Green */
+            --accent-warning: #eab308; /* Yellow */
+            --accent-danger: #ef4444; /* Red */
+            --accent-info: #3b82f6;   /* Blue */
+            --border: #27272a;
+            --font-mono: 'Menlo', 'Monaco', 'Courier New', monospace;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            padding: 2rem;
+            min-height: 100vh;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 1000px;
+            display: grid;
+            gap: 1.5rem;
+        }
+
+        /* HEADER */
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 1rem;
+        }
+
+        h1 { font-family: var(--font-mono); letter-spacing: -1px; font-size: 1.5rem; }
+        .badge {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            padding: 0.25rem 0.75rem;
+            border-radius: 99px;
+            font-size: 0.875rem;
+            font-family: var(--font-mono);
+        }
+        .badge.active { color: var(--accent-primary); border-color: var(--accent-primary); }
+
+        /* INTENT CARD */
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+        }
+
+        .intent-section h2 {
+            font-size: 0.875rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+        }
+
+        .intent-text {
+            font-size: 1.25rem;
+            font-weight: 500;
+            line-height: 1.4;
+        }
+
+        .meta-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-top: 1.5rem;
+            padding-top: 1rem;
+            border-top: 1px solid var(--border);
+        }
+
+        .meta-item label { display: block; font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.25rem; }
+        .meta-item span { font-family: var(--font-mono); font-size: 0.875rem; }
+
+        /* GOALS LIST */
+        .goals-list { display: grid; gap: 1rem; }
+        
+        .goal-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem;
+            background: rgba(255,255,255,0.02);
+            border: 1px solid var(--border);
+            border-radius: 0.5rem;
+            transition: all 0.2s;
+        }
+
+        .goal-item:hover { border-color: var(--text-secondary); }
+
+        .goal-content h3 { font-size: 1rem; font-weight: 600; margin-bottom: 0.25rem; }
+        .goal-meta { font-size: 0.875rem; color: var(--text-secondary); font-family: var(--font-mono); }
+
+        .status-pill {
+            padding: 0.25rem 0.75rem;
+            border-radius: 99px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .status-Completed { background: rgba(34, 197, 94, 0.1); color: var(--accent-primary); }
+        .status-InProgress { background: rgba(59, 130, 246, 0.1); color: var(--accent-info); }
+        .status-Pending { background: rgba(255,255,255, 0.05); color: var(--text-secondary); }
+        .status-Blocked { background: rgba(239, 68, 68, 0.1); color: var(--accent-danger); }
+
+        /* INVARIANTS */
+        .invariants-section { margin-top: 1rem; }
+        .invariant-item {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.75rem;
+            border-bottom: 1px solid var(--border);
+        }
+        .invariant-item:last-child { border-bottom: none; }
+        .dot { width: 8px; height: 8px; border-radius: 50%; }
+        .dot.Critical { background-color: var(--accent-danger); box-shadow: 0 0 8px var(--accent-danger); }
+        .dot.Warning { background-color: var(--accent-warning); }
+
+        /* HASH */
+        .hash-display {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            text-align: center;
+            margin-top: 2rem;
+            opacity: 0.6;
+        }
+
+    </style>
+</head>
+<body>
+
+<div class="container" id="app">
+    <!-- Header -->
+    <header>
+        <div style="display:flex; align-items:center; gap:10px;">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+            </svg>
+            <h1>SENTINEL OS</h1>
+        </div>
+        <div class="badge active">● SYSTEM ONLINE (OFFLINE MOCK)</div>
+    </header>
+
+    <!-- Main Intent -->
+    <div class="card intent-section">
+        <h2>Primary Intent</h2>
+        <div class="intent-text" id="root-intent">Loading...</div>
+        
+        <div class="meta-grid">
+            <div class="meta-item">
+                <label>Languages</label>
+                <span id="languages">-</span>
+            </div>
+            <div class="meta-item">
+                <label>Platform</label>
+                <span id="platform">-</span>
+            </div>
+            <div class="meta-item">
+                <label>Alignment Sensitivity</label>
+                <span id="sensitivity">-</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Active Goals -->
+    <div>
+        <h2 style="margin-bottom:1rem; font-size:0.875rem; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.05em;">Active Goals</h2>
+        <div class="goals-list" id="goals-list">
+            <!-- Injected via JS -->
+        </div>
+    </div>
+
+    <!-- Invariants -->
+    <div class="card invariants-section">
+        <h2 style="margin-bottom:0.5rem; font-size:0.875rem; color:var(--text-secondary);">SECURITY INVARIANTS</h2>
+        <div id="invariants-list">
+            <!-- Injected via JS -->
+        </div>
+    </div>
+
+    <div class="hash-display">
+        INTEGRITY SEAL: <span id="integrity-hash">...</span>
+    </div>
+</div>
+
+<script>
+    // DATA INJECTED DIRECTLY TO AVOID CORS/SERVER ISSUES
+    const MOCK_DATA = {
+      "manifold": {
+        "root_intent": {
+          "description": "Sviluppare una Piattaforma di Trading AI decentralizzata",
+          "constraints": ["Low Latency", "Rust Core", "Zero Trust Security"],
+          "expected_outcomes": ["Esecuzione ordini <10ms", "Audit Log immutabile"],
+          "target_platform": "Linux/Kubernetes",
+          "languages": ["Rust", "Python", "TypeScript"],
+          "frameworks": ["Tokio", "FastAPI", "React"],
+          "infrastructure_map": {
+            "production": "k8s-cluster-v1"
+          }
+        },
+        "sensitivity": 0.85,
+        "goals": [
+          {
+            "id": "g-001",
+            "description": "Implementare Core Matching Engine (Order Book)",
+            "status": "Completed",
+            "value_to_root": 0.4,
+            "dependencies": [],
+            "success_criteria": [{ "type": "TestsPassing", "params": { "coverage": 0.95 } }]
+          },
+          {
+            "id": "g-002",
+            "description": "Sviluppare API Gateway REST/WebSocket",
+            "status": "InProgress",
+            "value_to_root": 0.3,
+            "dependencies": ["g-001"],
+            "success_criteria": [{ "type": "TestsPassing" }]
+          },
+          {
+            "id": "g-003",
+            "description": "Dashboard Analitica Frontend",
+            "status": "Pending",
+            "value_to_root": 0.2,
+            "dependencies": ["g-002"],
+            "success_criteria": [{ "type": "FileExists", "params": { "path": "dist/index.html" } }]
+          },
+          {
+            "id": "g-004",
+            "description": "Integrazione Blockchain (Solana)",
+            "status": "Blocked",
+            "value_to_root": 0.1,
+            "dependencies": ["g-001"],
+            "success_criteria": []
+          }
+        ],
+        "invariants": [
+          {
+            "id": "inv-001",
+            "description": "Nessuna chiave privata nei log",
+            "severity": "Critical",
+            "predicate": { "type": "AlwaysTrue" }
+          },
+          {
+            "id": "inv-002",
+            "description": "Memory safety garantita (no unsafe block non documentati)",
+            "severity": "Warning",
+            "predicate": { "type": "Custom" }
+          }
+        ],
+        "integrity_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "created_at": "2026-02-01T10:00:00Z",
+        "updated_at": "2026-02-02T15:30:00Z",
+        "version_history": [
+          { "version": 1, "hash": "...", "change_description": "Init", "timestamp": "..." },
+          { "version": 2, "hash": "...", "change_description": "Added Matching Engine", "timestamp": "..." }
+        ]
+      }
+    };
+
+    function initDashboard() {
+        try {
+            const manifold = MOCK_DATA.manifold;
+
+            // Render Root Intent
+            document.getElementById('root-intent').textContent = manifold.root_intent.description;
+            document.getElementById('languages').textContent = manifold.root_intent.languages.join(", ");
+            document.getElementById('platform').textContent = manifold.root_intent.target_platform;
+            document.getElementById('sensitivity').textContent = (manifold.sensitivity * 100) + "%";
+            document.getElementById('integrity-hash').textContent = manifold.integrity_hash;
+
+            // Render Goals
+            const goalsContainer = document.getElementById('goals-list');
+            manifold.goals.forEach(goal => {
+                const el = document.createElement('div');
+                el.className = 'goal-item';
+                el.innerHTML = `
+                    <div class="goal-content">
+                        <h3>${goal.description}</h3>
+                        <div class="goal-meta">ID: ${goal.id} ${goal.dependencies.length ? `• Depends on: ${goal.dependencies.join(', ')}` : ''}</div>
+                    </div>
+                    <span class="status-pill status-${goal.status}">${goal.status}</span>
+                `;
+                goalsContainer.appendChild(el);
+            });
+
+            // Render Invariants
+            const invContainer = document.getElementById('invariants-list');
+            manifold.invariants.forEach(inv => {
+                const el = document.createElement('div');
+                el.className = 'invariant-item';
+                el.innerHTML = `
+                    <div class="dot ${inv.severity}"></div>
+                    <span style="font-size:0.9rem">${inv.description}</span>
+                `;
+                invContainer.appendChild(el);
+            });
+
+        } catch (error) {
+            console.error("Failed to render dashboard:", error);
+            document.getElementById('root-intent').textContent = "ERROR: Failed to render data.";
+            document.getElementById('root-intent').style.color = "var(--accent-danger)";
+        }
+    }
+
+    initDashboard();
+</script>
+
+</body>
+</html>

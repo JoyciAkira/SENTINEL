@@ -1,0 +1,71 @@
+{
+  "manifold": {
+    "root_intent": {
+      "description": "Sviluppare una Piattaforma di Trading AI decentralizzata",
+      "constraints": ["Low Latency", "Rust Core", "Zero Trust Security"],
+      "expected_outcomes": ["Esecuzione ordini <10ms", "Audit Log immutabile"],
+      "target_platform": "Linux/Kubernetes",
+      "languages": ["Rust", "Python", "TypeScript"],
+      "frameworks": ["Tokio", "FastAPI", "React"],
+      "infrastructure_map": {
+        "production": "k8s-cluster-v1"
+      }
+    },
+    "sensitivity": 0.85,
+    "goals": [
+      {
+        "id": "g-001",
+        "description": "Implementare Core Matching Engine (Order Book)",
+        "status": "Completed",
+        "value_to_root": 0.4,
+        "dependencies": [],
+        "success_criteria": [{ "type": "TestsPassing", "params": { "coverage": 0.95 } }]
+      },
+      {
+        "id": "g-002",
+        "description": "Sviluppare API Gateway REST/WebSocket",
+        "status": "InProgress",
+        "value_to_root": 0.3,
+        "dependencies": ["g-001"],
+        "success_criteria": [{ "type": "TestsPassing" }]
+      },
+      {
+        "id": "g-003",
+        "description": "Dashboard Analitica Frontend",
+        "status": "Pending",
+        "value_to_root": 0.2,
+        "dependencies": ["g-002"],
+        "success_criteria": [{ "type": "FileExists", "params": { "path": "dist/index.html" } }]
+      },
+      {
+        "id": "g-004",
+        "description": "Integrazione Blockchain (Solana)",
+        "status": "Blocked",
+        "value_to_root": 0.1,
+        "dependencies": ["g-001"],
+        "success_criteria": []
+      }
+    ],
+    "invariants": [
+      {
+        "id": "inv-001",
+        "description": "Nessuna chiave privata nei log",
+        "severity": "Critical",
+        "predicate": { "type": "AlwaysTrue" }
+      },
+      {
+        "id": "inv-002",
+        "description": "Memory safety garantita (no unsafe block non documentati)",
+        "severity": "Warning",
+        "predicate": { "type": "Custom" }
+      }
+    ],
+    "integrity_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "created_at": "2026-02-01T10:00:00Z",
+    "updated_at": "2026-02-02T15:30:00Z",
+    "version_history": [
+      { "version": 1, "hash": "...", "change_description": "Init", "timestamp": "..." },
+      { "version": 2, "hash": "...", "change_description": "Added Matching Engine", "timestamp": "..." }
+    ]
+  }
+}
