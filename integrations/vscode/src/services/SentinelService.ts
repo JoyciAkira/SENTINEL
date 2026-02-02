@@ -70,7 +70,24 @@ export class SentinelService {
             if (fs.existsSync(devPathShort)) return devPathShort;
         }
 
-        // 3. Fallback to PATH
+        // 3. Check standard user paths (robust discovery)
+        const home = process.env.HOME || process.env.USERPROFILE;
+        if (home) {
+            const locations = [
+                path.join(home, ".local", "bin", "sentinel"),
+                path.join(home, ".cargo", "bin", "sentinel"),
+                path.join("/usr", "local", "bin", "sentinel")
+            ];
+            
+            for (const loc of locations) {
+                if (fs.existsSync(loc)) {
+                    this.log(`Found binary in standard path: ${loc}`);
+                    return loc;
+                }
+            }
+        }
+
+        // 4. Fallback to PATH
         return 'sentinel';
     }
 }

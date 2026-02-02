@@ -30,26 +30,27 @@
 pub mod codegen;
 pub mod consensus;
 pub mod context;
-pub mod planning;
-pub mod reasoning;
-pub mod orchestrator;
-pub mod openrouter;
+pub mod gateway;
 pub mod llm_integration;
+pub mod openrouter;
+pub mod orchestrator;
+pub mod planning;
+pub mod providers;
+pub mod reasoning;
 
 use anyhow::{Context, Result};
 use sentinel_core::{
-    goal_manifold::{GoalManifold, Goal, Intent},
-    cognitive_state::{CognitiveState, Action, ActionDecision, ActionType},
-    learning::{LearningEngine, KnowledgeBase, DeviationPattern},
     alignment::{AlignmentField, ProjectState},
+    cognitive_state::{Action, ActionDecision, ActionType, CognitiveState},
+    federation::{Severity, ThreatAlert, ThreatType},
+    goal_manifold::{Goal, GoalManifold, Intent},
+    learning::{DeviationPattern, KnowledgeBase, LearningEngine},
     memory::MemoryManifold,
-    federation::{ThreatAlert, ThreatType, Severity},
     Uuid,
 };
 use serde_json::Value;
 use std::collections::HashMap;
 use uuid::Uuid as ExternalUuid; // Avoid conflict if needed
-
 
 /// Sentinel Native Agent - The Revolutionary Coding Agent
 ///
@@ -161,7 +162,11 @@ impl SentinelAgent {
 
         let agent_id = Uuid::new_v4();
 
-        tracing::info!("Sentinel Native Agent initialized: {} with authority {:?}", agent_id, authority);
+        tracing::info!(
+            "Sentinel Native Agent initialized: {} with authority {:?}",
+            agent_id,
+            authority
+        );
 
         Ok(Self {
             agent_id,
@@ -203,19 +208,25 @@ impl SentinelAgent {
         let consensus_result = self.query_consensus(&task_analysis).await?;
 
         // Phase 3: Hierarchical Planning - Goal-driven
-        let plan = self.create_hierarchical_plan(&task_analysis, &consensus_result).await?;
+        let plan = self
+            .create_hierarchical_plan(&task_analysis, &consensus_result)
+            .await?;
 
         // Phase 4: Execution with Continuous Alignment
         let execution_result = self.execute_plan(plan).await?;
 
         // Phase 5: Learning and Pattern Extraction
-        self.learn_from_execution(&task_analysis, &execution_result).await?;
+        self.learn_from_execution(&task_analysis, &execution_result)
+            .await?;
 
         // Phase 6: Share Learnings with P2P Network
-        self.share_learnings(&task_analysis, &execution_result).await?;
+        self.share_learnings(&task_analysis, &execution_result)
+            .await?;
 
         let end_time = chrono::Utc::now();
-        let duration = end_time.signed_duration_since(start_time).num_milliseconds();
+        let duration = end_time
+            .signed_duration_since(start_time)
+            .num_milliseconds();
 
         Ok(ExecutionReport {
             task: task.to_string(),
@@ -258,7 +269,9 @@ impl SentinelAgent {
 
         let similar_tasks = consensus.query_similar_tasks(&task_analysis.goals).await?;
 
-        let patterns = consensus.query_successful_patterns(&task_analysis.goals).await?;
+        let patterns = consensus
+            .query_successful_patterns(&task_analysis.goals)
+            .await?;
 
         let threats = consensus.query_threats(&task_analysis.task).await?;
 
@@ -288,7 +301,10 @@ impl SentinelAgent {
         drop(planner); // Release lock
 
         // Order goals topologically (respect dependencies)
-        let ordered_goal_ids: Vec<Uuid> = self.goal_manifold.goal_dag.topological_sort()?
+        let ordered_goal_ids: Vec<Uuid> = self
+            .goal_manifold
+            .goal_dag
+            .topological_sort()?
             .iter()
             .map(|g| g.id)
             .collect();
@@ -296,7 +312,11 @@ impl SentinelAgent {
         // For each goal, create aligned actions
         let mut actions = Vec::new();
         for goal_id in ordered_goal_ids {
-            let goal = self.goal_manifold.get_goal(&goal_id).ok_or_else(|| anyhow::anyhow!("Goal not found"))?.clone();
+            let goal = self
+                .goal_manifold
+                .get_goal(&goal_id)
+                .ok_or_else(|| anyhow::anyhow!("Goal not found"))?
+                .clone();
             let goal_actions = self.plan_goal_actions(&goal, consensus).await?;
             actions.extend(goal_actions);
         }
@@ -316,7 +336,10 @@ impl SentinelAgent {
         let prediction = self.alignment_field.predict_alignment(&state).await?;
 
         if prediction.expected_alignment < 80.0 {
-            tracing::warn!("Plan has low expected alignment score: {}", prediction.expected_alignment);
+            tracing::warn!(
+                "Plan has low expected alignment score: {}",
+                prediction.expected_alignment
+            );
             // Try alternative approaches
             let alignment_vector = sentinel_core::alignment::AlignmentVector {
                 score: prediction.expected_alignment,
@@ -325,7 +348,9 @@ impl SentinelAgent {
                 deviation_magnitude: 100.0 - prediction.expected_alignment,
                 entropy_gradient: 0.0,
             };
-            return self.create_alternative_plan(task_analysis, consensus, &alignment_vector).await;
+            return self
+                .create_alternative_plan(task_analysis, consensus, &alignment_vector)
+                .await;
         }
 
         Ok(plan)
@@ -400,16 +425,19 @@ impl SentinelAgent {
 
         for action in plan.actions {
             let state = ProjectState::new(std::path::PathBuf::from("."));
-            let prediction = self
-                .alignment_field
-                .predict_alignment(&state)
-                .await?;
+            let prediction = self.alignment_field.predict_alignment(&state).await?;
 
             if prediction.deviation_probability > 0.3 {
-                tracing::warn!("Predicted high deviation probability ({}%), skipping action", prediction.deviation_probability * 100.0);
+                tracing::warn!(
+                    "Predicted high deviation probability ({}%), skipping action",
+                    prediction.deviation_probability * 100.0
+                );
                 deviations.push(DeviationDetails {
                     action_id: action.id,
-                    reason: format!("Predicted high deviation: {:.1}%", prediction.deviation_probability * 100.0),
+                    reason: format!(
+                        "Predicted high deviation: {:.1}%",
+                        prediction.deviation_probability * 100.0
+                    ),
                     probability: prediction.deviation_probability,
                 });
                 continue;
@@ -419,7 +447,8 @@ impl SentinelAgent {
             let result = self.execute_action(action.clone()).await?;
 
             // Check alignment AFTER execution (reactive)
-            let alignment = self.alignment_field
+            let alignment = self
+                .alignment_field
                 .compute_alignment(&result.state)
                 .await?;
 
@@ -459,7 +488,9 @@ impl SentinelAgent {
         match action.action_type {
             ActionType::CreateFile { path, content } => {
                 let mut codegen = self.codegen.lock().await;
-                codegen.create_file(&path.to_string_lossy(), &content).await?;
+                codegen
+                    .create_file(&path.to_string_lossy(), &content)
+                    .await?;
             }
             ActionType::EditFile { path, .. } => {
                 // Simplified for now
@@ -508,16 +539,16 @@ impl SentinelAgent {
                 "Action executed successfully".to_string(),
                 action_result.duration_ms as f64 / 1000.0,
             );
-            
-            // We need the original action to call after_action. 
+
+            // We need the original action to call after_action.
             // In a real system, we'd retrieve it from the execution log.
             // For now, we'll use a placeholder or assume it's available.
             let placeholder_action = sentinel_core::cognitive_state::Action::new(
-                sentinel_core::cognitive_state::ActionType::RunCommand { 
+                sentinel_core::cognitive_state::ActionType::RunCommand {
                     command: "true".to_string(),
-                    working_dir: std::path::PathBuf::from(".")
+                    working_dir: std::path::PathBuf::from("."),
                 },
-                "Reconstructed action".to_string()
+                "Reconstructed action".to_string(),
             );
 
             self.cognitive_state
@@ -625,7 +656,10 @@ impl SentinelAgent {
         Ok(vec![])
     }
 
-    fn create_threat_alert(&self, deviation: &DeviationDetails) -> Result<sentinel_core::federation::ThreatAlert> {
+    fn create_threat_alert(
+        &self,
+        deviation: &DeviationDetails,
+    ) -> Result<sentinel_core::federation::ThreatAlert> {
         Ok(sentinel_core::federation::ThreatAlert {
             threat_id: Uuid::new_v4(),
             threat_type: sentinel_core::federation::ThreatType::AlignmentDeviation,
