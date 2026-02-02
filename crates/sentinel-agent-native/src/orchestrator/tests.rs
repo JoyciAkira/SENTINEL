@@ -1,6 +1,9 @@
 #[cfg(test)]
 mod tests {
     use super::*;
+    use sentinel_core::types::ProbabilityDistribution;
+    use sentinel_core::types::GoalStatus;
+    use sentinel_core::goal_manifold::goal::GoalMetadata;
 
     #[tokio::test]
     async fn test_agent_orchestrator_initialization() {
@@ -20,15 +23,18 @@ mod tests {
             success_criteria: vec![],
             dependencies: vec![],
             anti_dependencies: vec![],
-            complexity_estimate: sentinel_core::tests::ProbabilityDistribution {
+            complexity_estimate: ProbabilityDistribution {
                 mean: 75.0,
                 std_dev: 5.0,
+                min: 65.0,
+                max: 85.0,
+                distribution_type: sentinel_core::types::DistributionType::Normal,
             },
             value_to_root: 1.0,
-            status: sentinel_core::goal_manifold::goal::GoalStatus::Pending,
+            status: GoalStatus::Pending,
             parent_id: None,
             validation_tests: vec![],
-            metadata: sentinel_core::goal_manifold::goal::GoalMetadata::default(),
+            metadata: GoalMetadata::default(),
         };
 
         let tasks = orchestrator

@@ -11,19 +11,17 @@ mod tests {
             Ok(super::LLMSuggestion {
                 id: Uuid::new_v4(),
                 suggestion_type: super::LLMSuggestionType::CodeGeneration {
-                    super::LLMCodeGeneration {
-                        file_path: "test.rs".to_string(),
-                        code: "fn test() {}".to_string(),
-                        language: "rust".to_string(),
-                    },
-                    llm_name: "MockLLM".to_string(),
-                    content: "Generated code".to_string(),
-                    estimated_quality: 0.85,
-                    goal_alignment: 0.92,
-                    confidence: 0.95,
-                    token_cost: 150,
-                })
-            }
+                    file_path: "test.rs".to_string(),
+                    code: "fn test() {}".to_string(),
+                    language: "rust".to_string(),
+                },
+                llm_name: "MockLLM".to_string(),
+                content: "Generated code".to_string(),
+                estimated_quality: 0.85,
+                goal_alignment: 0.92,
+                confidence: 0.95,
+                token_cost: 150,
+            })
         }
     }
 
@@ -47,7 +45,7 @@ mod tests {
         .await
         .expect("Failed to initialize LLM Integration Manager");
 
-        assert!(!manager.get_stats().total_suggestions > 0);
+        assert_eq!(manager.get_stats().total_suggestions, 0);
         assert_eq!(manager.get_stats().avg_quality_score, 0.0);
     }
 
@@ -73,11 +71,9 @@ mod tests {
         let suggestion = super::LLMSuggestion {
             id: Uuid::new_v4(),
             suggestion_type: super::LLMSuggestionType::CodeGeneration {
-                super::LLMCodeGeneration {
-                    file_path: "test.rs".to_string(),
-                    code: "fn test() {}".to_string(),
-                    language: "rust".to_string(),
-                },
+                file_path: "test.rs".to_string(),
+                code: "fn test() {}".to_string(),
+                language: "rust".to_string(),
             },
             llm_name: "MockLLM".to_string(),
             content: "Generated code".to_string(),
@@ -119,11 +115,9 @@ mod tests {
         let suggestion = super::LLMSuggestion {
             id: Uuid::new_v4(),
             suggestion_type: super::LLMSuggestionType::CodeGeneration {
-                super::LLMCodeGeneration {
-                    file_path: "test.rs".to_string(),
-                    code: "A".to_string().repeat(5000), // Way too long
-                    language: "rust".to_string(),
-                },
+                file_path: "test.rs".to_string(),
+                code: "A".to_string().repeat(5000), // Way too long
+                language: "rust".to_string(),
             },
             llm_name: "MockLLM".to_string(),
             content: "Generated code".to_string(),
@@ -165,11 +159,9 @@ mod tests {
         let suggestion = super::LLMSuggestion {
             id: Uuid::new_v4(),
             suggestion_type: super::LLMSuggestionType::CodeGeneration {
-                super::LLMCodeGeneration {
-                    file_path: "test.rs".to_string(),
-                    code: "fn test() {}".to_string(),
-                    language: "rust".to_string(),
-                },
+                file_path: "test.rs".to_string(),
+                code: "fn test() {}".to_string(),
+                language: "rust".to_string(),
             },
             llm_name: "MockLLM".to_string(),
             content: "Generated code".to_string(),
@@ -211,11 +203,9 @@ mod tests {
         let suggestion = super::LLMSuggestion {
             id: Uuid::new_v4(),
             suggestion_type: super::LLMSuggestionType::CodeGeneration {
-                super::LLMCodeGeneration {
-                    file_path: "auth.rs".to_string(),
-                    code: "fn auth() {}".to_string(),
-                    language: "rust".to_string(),
-                },
+                file_path: "auth.rs".to_string(),
+                code: "fn auth() {}".to_string(),
+                language: "rust".to_string(),
             },
             llm_name: "MockLLM".to_string(),
             content: "Generated auth function".to_string(),
@@ -232,10 +222,11 @@ mod tests {
         let validated = result.unwrap();
 
         assert!(validated.passed_all_gates);
-        assert!(matches!(
-            validated.validation_results[0].result,
-            super::ValidationStatus::Pass { score: _ } if score >= 85.0
-        ));
+        // Check that validation passed with good score
+        let has_passing_score = validated.validation_results.iter().any(|v| {
+            matches!(&v.result, super::ValidationStatus::Pass { score } if *score >= 85.0)
+        });
+        assert!(has_passing_score);
     }
 
     #[tokio::test]
@@ -260,11 +251,9 @@ mod tests {
         let suggestion = super::LLMSuggestion {
             id: Uuid::new_v4(),
             suggestion_type: super::LLMSuggestionType::CodeGeneration {
-                super::LLMCodeGeneration {
-                    file_path: "valid.rs".to_string(),
-                    code: "fn valid() bool {}".to_string(),
-                    language: "rust".to_string(),
-                },
+                file_path: "valid.rs".to_string(),
+                code: "fn valid() bool {}".to_string(),
+                language: "rust".to_string(),
             },
             llm_name: "MockLLM".to_string(),
             content: "Generated valid function".to_string(),
@@ -312,11 +301,9 @@ mod tests {
         let suggestion = super::LLMSuggestion {
             id: Uuid::new_v4(),
             suggestion_type: super::LLMSuggestionType::CodeGeneration {
-                super::LLMCodeGeneration {
-                    file_path: "code.rs".to_string(),
-                    code: "fn old_code() {}".to_string(),
-                    language: "rust".to_string(),
-                },
+                file_path: "code.rs".to_string(),
+                code: "fn old_code() {}".to_string(),
+                language: "rust".to_string(),
             },
             llm_name: "MockLLM".to_string(),
             content: "Generated old code".to_string(),
@@ -334,18 +321,8 @@ mod tests {
 
         assert!(!validated.passed_all_gates);
 
-        // Check that improvements were suggested
-        let has_improvement = matches!(
-            validated.final_result,
-            super::super::LLMValidatedOutput {
-                original_suggestion: _,
-                approved_content: _,
-                validation_results: results,
-                final_result: super::super::super::ValidationStatus::NeedsImprovement { issues, .. }
-            }
-        );
-
-        assert!(has_improvement);
+        // Check that improvements were suggested - final_quality_score will be low
+        assert!(validated.final_quality_score < 85.0);
     }
 
     #[tokio::test]
