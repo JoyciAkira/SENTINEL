@@ -78,6 +78,16 @@ node_modules/
 package-lock.json
 yarn.lock
 
+# VSCode extension build artifacts
+integrations/vscode/out/
+integrations/vscode/*.vsix
+
+# Local screenshots
+Screenshot *.png
+
+# Local symlink
+SENTINEL\ 
+
 # Python
 __pycache__/
 *.py[cod]

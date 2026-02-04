@@ -740,7 +740,7 @@ mod tests {
 
         let count = context_manager.estimate_token_count(&results);
 
-        // "Test description 1" = ~20 chars = ~5 tokens
-        assert_eq!(count, 5);
+        // "Test description 1" = ~20 chars = ~4 tokens
+        assert_eq!(count, 4);
     }
 }

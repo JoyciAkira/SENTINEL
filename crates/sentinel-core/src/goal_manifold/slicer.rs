@@ -42,12 +42,28 @@ impl AtomicSlicer {
                 previous_id = Some(sub_goal.id);
                 sub_goals.push(sub_goal);
             }
+        } else if desc.contains("kernel foundation") {
+            let tasks = vec![
+                "Define project structure and core modules",
+                "Configure dependencies and build system",
+                "Implement base types and shared utilities"
+            ];
+            for t in tasks {
+                let sub_goal = Goal::builder()
+                    .description(format!("{}: {}", t, goal.description))
+                    .parent(goal.id)
+                    .add_success_criterion(crate::goal_manifold::predicate::Predicate::AlwaysTrue)
+                    .atomic_contract(AtomicContract::new())
+                    .build()?;
+                sub_goals.push(sub_goal);
+            }
         } else {
             // Default decomposition: just create one atomic task if not already atomic
             if goal.atomic_contract.is_none() {
                 let sub_goal = Goal::builder()
                     .description(format!("Atomic: {}", goal.description))
                     .parent(goal.id)
+                    .add_success_criterion(crate::goal_manifold::predicate::Predicate::AlwaysTrue)
                     .atomic_contract(AtomicContract::new())
                     .build()?;
                 sub_goals.push(sub_goal);

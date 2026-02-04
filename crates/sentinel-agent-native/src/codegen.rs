@@ -476,20 +476,19 @@ impl TreeSitterGenerator {
     }
 
     /// Build function AST
-    fn build_function_ast(&self, reqs: &CodeRequirements, parser: &Parser) -> Result<String> {
-        let mut features_ast = String::new();
-
-        for feature in &reqs.features {
-            features_ast.push_str(&format!(" ({})", feature));
+    fn build_function_ast(&self, reqs: &CodeRequirements, _parser: &Parser) -> Result<String> {
+        let mut modifiers = String::new();
+        if reqs.features.contains(&"async".to_string()) {
+            modifiers.push_str("(async) ");
         }
 
         let return_type = if reqs.features.contains(&"error_handling".to_string()) {
-            "Result<T>".to_string()
+            "Result<T>"
         } else {
-            "T".to_string()
+            "T"
         };
 
-        Ok("(function_definition (name: FunctionName) (parameters) (return_type: {}) (body))".to_string())
+        Ok(format!("{}(function_definition (name: FunctionName) (parameters) (return_type: {}) (body))", modifiers, return_type))
     }
 
     /// Build struct AST

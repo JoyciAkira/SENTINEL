@@ -1,58 +1,59 @@
-import React from 'react';
-import { useStore } from '../../state/store';
-import { colors } from '../../utils/theme';
+import React, { useEffect, useRef, useState } from "react";
+import { useStore } from "../../state/store";
 
 export default function AlignmentGauge() {
-    const alignment = useStore((s) => s.alignment);
+  const alignment = useStore((s) => s.alignment);
+  const [pulse, setPulse] = useState(false);
+  const prevScoreRef = useRef<number | null>(null);
+  const score = alignment?.score ?? null;
 
-    if (!alignment) {
-        return (
-            <div style={containerStyle}>
-                <span style={{ color: colors.descriptionFg, fontSize: '12px' }}>
-                    Alignment: --
-                </span>
-            </div>
-        );
+  useEffect(() => {
+    if (score === null) {
+      prevScoreRef.current = null;
+      return;
     }
+    const prev = prevScoreRef.current;
+    prevScoreRef.current = score;
+    if (prev !== null && prev !== score) {
+      setPulse(true);
+      const timeout = window.setTimeout(() => setPulse(false), 600);
+      return () => window.clearTimeout(timeout);
+    }
+    return undefined;
+  }, [score]);
 
-    const score = alignment.score;
-    const trendArrow = alignment.trend > 0 ? '\u25B2' : alignment.trend < 0 ? '\u25BC' : '';
-    const trendText = alignment.trend !== 0 ? ` ${trendArrow} ${Math.abs(alignment.trend).toFixed(1)}` : '';
-
-    const barColor = score >= 75 ? '#4caf50' : score >= 40 ? '#ff9800' : '#f44336';
-    const pct = Math.min(100, Math.max(0, score));
-
+  if (!alignment) {
     return (
-        <div style={containerStyle}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                <span style={{ fontSize: '12px', fontWeight: 600 }}>
-                    Alignment: {score.toFixed(1)}%{trendText}
-                </span>
-                <span style={{ fontSize: '11px', color: colors.descriptionFg }}>
-                    {alignment.status}
-                </span>
-            </div>
-            <div style={{
-                width: '100%',
-                height: '6px',
-                backgroundColor: 'var(--vscode-progressBar-background, #333)',
-                borderRadius: '3px',
-                overflow: 'hidden',
-            }}>
-                <div style={{
-                    width: `${pct}%`,
-                    height: '100%',
-                    backgroundColor: barColor,
-                    borderRadius: '3px',
-                    transition: 'width 0.3s ease',
-                }} />
-            </div>
-        </div>
+      <div className="alignment">
+        <span className="chat-subtitle">Alignment: --</span>
+      </div>
     );
-}
+  }
+  const trendArrow =
+    alignment.trend > 0 ? "\u25B2" : alignment.trend < 0 ? "\u25BC" : "";
+  const trendText =
+    alignment.trend !== 0
+      ? ` ${trendArrow} ${Math.abs(alignment.trend).toFixed(1)}`
+      : "";
 
-const containerStyle: React.CSSProperties = {
-    padding: '8px 12px',
-    borderBottom: `1px solid var(--vscode-panel-border)`,
-    flexShrink: 0,
-};
+  const barColor =
+    score >= 75 ? "#4caf50" : score >= 40 ? "#ff9800" : "#f44336";
+  const pct = Math.min(100, Math.max(0, score));
+
+  return (
+    <div className={`alignment${pulse ? " alignment--pulse" : ""}`}>
+      <div className="section-header" style={{ marginBottom: "6px" }}>
+        <span className="section-title">
+          Alignment {score.toFixed(1)}%{trendText}
+        </span>
+        <span className="chat-subtitle">{alignment.status}</span>
+      </div>
+      <div className="alignment-bar">
+        <div
+          className="alignment-bar__fill"
+          style={{ width: `${pct}%`, backgroundColor: barColor }}
+        />
+      </div>
+    </div>
+  );
+}

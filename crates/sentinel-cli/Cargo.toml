@@ -9,6 +9,7 @@ license.workspace = true
 # Sentinel Core
 sentinel-core = { path = "../sentinel-core" }
 sentinel-agent-native = { path = "../sentinel-agent-native" }
+sentinel-sandbox = { path = "../sentinel-sandbox" }
 
 # CLI Parsing
 clap = { version = "4.4", features = ["derive"] }

@@ -63,7 +63,7 @@
 use anyhow::{Context, Result};
 use sentinel_core::{
     cognitive_state::{Action, ActionType},
-    goal_manifold::Goal,
+    goal_manifold::{Goal, predicate::Predicate},
     Uuid,
 };
 use crate::consensus::ConsensusQueryResult;
@@ -1089,6 +1089,7 @@ mod tests {
 
         let auth_goal = Goal::builder()
             .description("Implement JWT authentication")
+            .success_criteria(vec![Predicate::AlwaysTrue])
             .build()
             .unwrap();
 

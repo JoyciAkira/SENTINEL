@@ -1,13 +1,16 @@
 //! MCP Server - Model Context Protocol Implementation
-//! 
+//!
 //! Permette a Sentinel di comunicare con agenti esterni (Cline, Claude Desktop)
 //! esponendo strumenti di validazione e analisi dell'allineamento.
 
+use sentinel_core::goal_manifold::goal::Goal;
+use sentinel_core::goal_manifold::predicate::Predicate;
+use sentinel_core::types::Comparison;
+use sentinel_core::{security::SecurityScanner, AlignmentField, GoalManifold, ProjectState};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use std::path::PathBuf;
-use sentinel_core::{GoalManifold, ProjectState, AlignmentField, security::SecurityScanner};
+use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 
 #[derive(Debug, Serialize, Deserialize)]
 struct McpRequest {
@@ -35,6 +38,46 @@ struct McpResponse {
     id: Value,
 }
 
+#[derive(Debug, Deserialize)]
+struct GoalInitRequest {
+    description: String,
+    constraints: Option<Vec<String>>,
+    expected_outcomes: Option<Vec<String>>,
+    target_platform: Option<String>,
+    languages: Option<Vec<String>>,
+    frameworks: Option<Vec<String>>,
+    goals: Option<Vec<GoalSpec>>,
+}
+
+#[derive(Debug, Deserialize)]
+struct GoalSpec {
+    description: String,
+    scope_in: Option<Vec<String>>,
+    scope_out: Option<Vec<String>>,
+    deliverables: Option<Vec<String>>,
+    constraints: Option<Vec<String>>,
+    validation_tests: Option<Vec<String>>,
+    success_criteria: Vec<GoalCriteriaSpec>,
+}
+
+#[derive(Debug, Deserialize)]
+struct GoalCriteriaSpec {
+    #[serde(rename = "type")]
+    kind: String,
+    path: Option<String>,
+    command: Option<String>,
+    args: Option<Vec<String>>,
+    expected_exit_code: Option<i32>,
+    suite: Option<String>,
+    min_coverage: Option<f64>,
+    url: Option<String>,
+    expected_status: Option<u16>,
+    expected_body_contains: Option<String>,
+    metric: Option<String>,
+    threshold: Option<f64>,
+    comparison: Option<String>,
+}
+
 /// Avvia il server MCP su stdin/stdout
 pub async fn run_server() -> anyhow::Result<()> {
     let mut stdin = BufReader::new(tokio::io::stdin());
@@ -48,7 +91,7 @@ pub async fn run_server() -> anyhow::Result<()> {
 
         let request: McpRequest = match serde_json::from_str(&line) {
             Ok(req) => req,
-            Err(_) => continue, 
+            Err(_) => continue,
         };
 
         if let Some(id) = request.id.clone() {
@@ -83,6 +126,75 @@ async fn handle_request(req: McpRequest, id: Value) -> McpResponse {
             jsonrpc: "2.0".to_string(),
             result: Some(serde_json::json!({
                 "tools": [
+                    {
+                        "name": "init_project",
+                        "description": "Inizializza un nuovo progetto Sentinel con obiettivi e invarianti (World Class)",
+                        "inputSchema": {
+                            "type": "object",
+                            "properties": {
+                                "description": { "type": "string", "description": "Descrizione dell'intento del progetto" },
+                                "constraints": { "type": "array", "items": { "type": "string" } },
+                                "expected_outcomes": { "type": "array", "items": { "type": "string" } },
+                                "target_platform": { "type": "string" },
+                                "languages": { "type": "array", "items": { "type": "string" } },
+                                "frameworks": { "type": "array", "items": { "type": "string" } },
+                                "goals": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {
+                                            "description": { "type": "string" },
+                                            "scope_in": { "type": "array", "items": { "type": "string" } },
+                                            "scope_out": { "type": "array", "items": { "type": "string" } },
+                                            "deliverables": { "type": "array", "items": { "type": "string" } },
+                                            "constraints": { "type": "array", "items": { "type": "string" } },
+                                            "validation_tests": { "type": "array", "items": { "type": "string" } },
+                                            "success_criteria": {
+                                                "type": "array",
+                                                "items": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "type": { "type": "string" },
+                                                        "path": { "type": "string" },
+                                                        "command": { "type": "string" },
+                                                        "args": { "type": "array", "items": { "type": "string" } },
+                                                        "expected_exit_code": { "type": "integer" },
+                                                        "suite": { "type": "string" },
+                                                        "min_coverage": { "type": "number" },
+                                                        "url": { "type": "string" },
+                                                        "expected_status": { "type": "integer" },
+                                                        "expected_body_contains": { "type": "string" },
+                                                        "metric": { "type": "string" },
+                                                        "threshold": { "type": "number" },
+                                                        "comparison": { "type": "string" }
+                                                    },
+                                                    "required": ["type"]
+                                                }
+                                            }
+                                        },
+                                        "required": ["description", "success_criteria"]
+                                    }
+                                }
+                            },
+                            "required": ["description"]
+                        }
+                    },
+                    {
+                        "name": "suggest_goals",
+                        "description": "Suggerisce una lista di goal atomici sulla base dell'intento e dei vincoli",
+                        "inputSchema": {
+                            "type": "object",
+                            "properties": {
+                                "description": { "type": "string" },
+                                "constraints": { "type": "array", "items": { "type": "string" } },
+                                "expected_outcomes": { "type": "array", "items": { "type": "string" } },
+                                "target_platform": { "type": "string" },
+                                "languages": { "type": "array", "items": { "type": "string" } },
+                                "frameworks": { "type": "array", "items": { "type": "string" } }
+                            },
+                            "required": ["description"]
+                        }
+                    },
                     {
                         "name": "validate_action",
                         "description": "Valida un'azione proposta contro il Goal Manifold usando simulazioni Monte Carlo",
@@ -175,7 +287,7 @@ async fn handle_request(req: McpRequest, id: Value) -> McpResponse {
                 error: None,
                 id,
             }
-        },
+        }
         _ => McpResponse {
             jsonrpc: "2.0".to_string(),
             result: None,
@@ -194,21 +306,28 @@ fn find_manifold_path() -> Option<PathBuf> {
     // 1. Controlla variabile d'ambiente (per override esplicito)
     if let Ok(root) = std::env::var("SENTINEL_ROOT") {
         let path = PathBuf::from(root).join("sentinel.json");
-        if path.exists() { return Some(path); }
+        if path.exists() {
+            return Some(path);
+        }
     }
 
     // 2. Cerca risalendo le directory dalla CWD
     if let Ok(mut current_dir) = std::env::current_dir() {
         loop {
             let path = current_dir.join("sentinel.json");
-            if path.exists() { return Some(path); }
-            if !current_dir.pop() { break; }
+            if path.exists() {
+                return Some(path);
+            }
+            if !current_dir.pop() {
+                break;
+            }
         }
     }
 
     // 3. Fallback hardcoded per questo ambiente (Fix per esecuzione da root /)
     // Nota: Include lo spazio finale nel nome della cartella come da filesystem attuale
-    let fallback_path = PathBuf::from("/Users/danielecorrao/Documents/REPOSITORIES_GITHUB/SENTINEL /sentinel.json");
+    let fallback_path =
+        PathBuf::from("/Users/danielecorrao/Documents/REPOSITORIES_GITHUB/SENTINEL /sentinel.json");
     if fallback_path.exists() {
         return Some(fallback_path);
     }
@@ -222,16 +341,186 @@ fn get_manifold() -> Result<GoalManifold, String> {
         let cwd = std::env::current_dir().unwrap_or_default();
         format!("Manifold file 'sentinel.json' non trovato (Cercato a partire da: {:?}). Inizializza il progetto con 'sentinel init'.", cwd)
     })?;
-    
-    let content = std::fs::read_to_string(&path).map_err(|e| format!("Errore lettura file: {}", e))?;
+
+    let content =
+        std::fs::read_to_string(&path).map_err(|e| format!("Errore lettura file: {}", e))?;
     serde_json::from_str(&content).map_err(|e| format!("Errore parsing manifold: {}", e))
 }
 
 /// Helper per salvare il manifold
 fn save_manifold(manifold: &GoalManifold) -> Result<(), String> {
-    let path = find_manifold_path().ok_or_else(|| "Impossibile salvare: sentinel.json non trovato (necessario per sovrascrittura).".to_string())?;
-    let content = serde_json::to_string_pretty(manifold).map_err(|e| format!("Errore serializzazione: {}", e))?;
+    let path = find_manifold_path().ok_or_else(|| {
+        "Impossibile salvare: sentinel.json non trovato (necessario per sovrascrittura)."
+            .to_string()
+    })?;
+    let content = serde_json::to_string_pretty(manifold)
+        .map_err(|e| format!("Errore serializzazione: {}", e))?;
     std::fs::write(&path, content).map_err(|e| format!("Errore scrittura file: {}", e))
+}
+
+fn parse_comparison(value: Option<&str>) -> Comparison {
+    match value.unwrap_or("<=") {
+        "==" => Comparison::Equal,
+        "!=" => Comparison::NotEqual,
+        "<" => Comparison::LessThan,
+        "<=" => Comparison::LessThanOrEqual,
+        ">" => Comparison::GreaterThan,
+        ">=" => Comparison::GreaterThanOrEqual,
+        _ => Comparison::LessThanOrEqual,
+    }
+}
+
+fn build_predicates(criteria: &[GoalCriteriaSpec]) -> Vec<Predicate> {
+    criteria
+        .iter()
+        .filter_map(|c| match c.kind.as_str() {
+            "file_exists" => c
+                .path
+                .as_ref()
+                .map(|p| Predicate::FileExists(PathBuf::from(p))),
+            "directory_exists" => c
+                .path
+                .as_ref()
+                .map(|p| Predicate::DirectoryExists(PathBuf::from(p))),
+            "command_succeeds" => c.command.as_ref().map(|cmd| Predicate::CommandSucceeds {
+                command: cmd.to_string(),
+                args: c.args.clone().unwrap_or_default(),
+                expected_exit_code: c.expected_exit_code.unwrap_or(0),
+            }),
+            "tests_passing" => c.suite.as_ref().map(|suite| Predicate::TestsPassing {
+                suite: suite.to_string(),
+                min_coverage: c.min_coverage.unwrap_or(0.8),
+            }),
+            "api_endpoint" => c.url.as_ref().map(|url| Predicate::ApiEndpoint {
+                url: url.to_string(),
+                expected_status: c.expected_status.unwrap_or(200),
+                expected_body_contains: c.expected_body_contains.clone(),
+            }),
+            "performance" => c.metric.as_ref().map(|metric| Predicate::Performance {
+                metric: metric.to_string(),
+                threshold: c.threshold.unwrap_or(0.0),
+                comparison: parse_comparison(c.comparison.as_deref()),
+            }),
+            _ => None,
+        })
+        .collect()
+}
+
+fn append_notes(goal: &mut Goal, label: &str, items: &[String]) {
+    if items.is_empty() {
+        return;
+    }
+    let content = format!("{}: {}", label, items.join(", "));
+    goal.metadata.notes.push(content);
+}
+
+fn build_intent(
+    description: String,
+    constraints: Vec<String>,
+    expected_outcomes: Vec<String>,
+    target_platform: Option<String>,
+    languages: Vec<String>,
+    frameworks: Vec<String>,
+) -> sentinel_core::goal_manifold::Intent {
+    let mut intent = sentinel_core::goal_manifold::Intent::new(description, constraints);
+
+    for outcome in expected_outcomes {
+        intent = intent.with_outcome(outcome);
+    }
+
+    if let Some(platform) = target_platform {
+        if !platform.trim().is_empty() {
+            intent = intent.with_platform(platform);
+        }
+    }
+
+    for language in languages {
+        intent = intent.with_language(language);
+    }
+
+    for framework in frameworks {
+        intent = intent.with_framework(framework);
+    }
+
+    intent
+}
+
+fn build_goal_prompt(intent: &sentinel_core::goal_manifold::Intent) -> String {
+    let mut context_lines = Vec::new();
+
+    if !intent.constraints.is_empty() {
+        context_lines.push(format!("Constraints: {}", intent.constraints.join("; ")));
+    }
+    if !intent.expected_outcomes.is_empty() {
+        context_lines.push(format!(
+            "Expected outcomes: {}",
+            intent.expected_outcomes.join("; ")
+        ));
+    }
+    if let Some(platform) = &intent.target_platform {
+        if !platform.trim().is_empty() {
+            context_lines.push(format!("Target platform: {}", platform));
+        }
+    }
+    if !intent.languages.is_empty() {
+        context_lines.push(format!("Languages: {}", intent.languages.join(", ")));
+    }
+    if !intent.frameworks.is_empty() {
+        context_lines.push(format!("Frameworks: {}", intent.frameworks.join(", ")));
+    }
+
+    let context_block = if context_lines.is_empty() {
+        String::new()
+    } else {
+        format!("\n{}", context_lines.join("\n"))
+    };
+
+    format!(
+        "Create 3-6 atomic, deterministic software goals for the following project intent:\n\"{}\"{}\nReturn ONLY a JSON array of strings.",
+        intent.description, context_block
+    )
+}
+
+fn extract_goal_suggestions(content: &str) -> Option<Vec<String>> {
+    let json_start = content.find('[')?;
+    let json_end = content.rfind(']')?;
+    let json_str = &content[json_start..=json_end];
+    serde_json::from_str::<Vec<String>>(json_str).ok()
+}
+
+fn build_system_prompt() -> String {
+    "You are an AI coding assistant integrated with Sentinel Protocol. \
+Your output must be deterministic, concise, and machine-parseable when requested."
+        .to_string()
+}
+
+async fn chat_with_llm(system_prompt: &str, user_prompt: &str) -> Option<String> {
+    use sentinel_agent_native::llm_integration::LLMChatClient;
+    use sentinel_agent_native::providers::ProviderRouter;
+
+    let router = match ProviderRouter::from_env() {
+        Ok(router) => router,
+        Err(err) => {
+            eprintln!("LLM router unavailable: {}", err);
+            return None;
+        }
+    };
+    match router.chat_completion(system_prompt, user_prompt).await {
+        Ok(completion) => Some(completion.content),
+        Err(err) => {
+            eprintln!("LLM completion failed: {}", err);
+            None
+        }
+    }
+}
+
+async fn suggest_goals_with_llm(
+    intent: &sentinel_core::goal_manifold::Intent,
+) -> Option<Vec<String>> {
+    let system_prompt = build_system_prompt();
+    let prompt = build_goal_prompt(intent);
+    let suggestion = chat_with_llm(&system_prompt, &prompt).await?;
+    extract_goal_suggestions(suggestion.trim())
 }
 
 async fn handle_tool_call(params: Option<Value>) -> Option<Value> {
@@ -240,126 +529,436 @@ async fn handle_tool_call(params: Option<Value>) -> Option<Value> {
     let arguments = params.get("arguments");
 
     match name {
+        "init_project" => {
+            let args = match arguments.cloned() {
+                Some(value) => value,
+                None => {
+                    return Some(serde_json::json!({
+                        "isError": true,
+                        "content": [{ "type": "text", "text": "Missing init_project arguments." }]
+                    }))
+                }
+            };
+
+            let request: GoalInitRequest = match serde_json::from_value(args) {
+                Ok(parsed) => parsed,
+                Err(e) => {
+                    return Some(serde_json::json!({
+                        "isError": true,
+                        "content": [{ "type": "text", "text": format!("Invalid init_project payload: {}", e) }]
+                    }))
+                }
+            };
+
+            let GoalInitRequest {
+                description,
+                constraints,
+                expected_outcomes,
+                target_platform,
+                languages,
+                frameworks,
+                goals,
+            } = request;
+
+            let description = description.trim().to_string();
+            if description.is_empty() {
+                return Some(serde_json::json!({
+                    "isError": true,
+                    "content": [{ "type": "text", "text": "Project description cannot be empty." }]
+                }));
+            }
+
+            let constraints = constraints.unwrap_or_default();
+            let expected_outcomes = expected_outcomes.unwrap_or_default();
+            let languages = languages.unwrap_or_default();
+            let frameworks = frameworks.unwrap_or_default();
+
+            let root_intent = build_intent(
+                description.clone(),
+                constraints.clone(),
+                expected_outcomes.clone(),
+                target_platform.clone(),
+                languages.clone(),
+                frameworks.clone(),
+            );
+
+            let mut manifold = sentinel_core::GoalManifold::new(root_intent.clone());
+            let mut sub_goals_added = 0;
+            let mut used_structured = false;
+
+            if let Some(goal_specs) = goals {
+                if !goal_specs.is_empty() {
+                    used_structured = true;
+                    let mut built_goals = Vec::new();
+                    let mut errors = Vec::new();
+
+                    for spec in goal_specs {
+                        let criteria = build_predicates(&spec.success_criteria);
+                        if criteria.is_empty() {
+                            errors.push(format!(
+                                "Goal '{}' missing valid success criteria.",
+                                spec.description
+                            ));
+                            continue;
+                        }
+
+                        let goal = Goal::builder()
+                            .description(spec.description.clone())
+                            .success_criteria(criteria)
+                            .validation_tests(spec.validation_tests.clone().unwrap_or_default())
+                            .build();
+
+                        match goal {
+                            Ok(mut g) => {
+                                append_notes(
+                                    &mut g,
+                                    "Scope In",
+                                    &spec.scope_in.unwrap_or_default(),
+                                );
+                                append_notes(
+                                    &mut g,
+                                    "Scope Out",
+                                    &spec.scope_out.unwrap_or_default(),
+                                );
+                                append_notes(
+                                    &mut g,
+                                    "Deliverables",
+                                    &spec.deliverables.unwrap_or_default(),
+                                );
+                                append_notes(
+                                    &mut g,
+                                    "Constraints",
+                                    &spec.constraints.unwrap_or_default(),
+                                );
+                                built_goals.push(g);
+                            }
+                            Err(e) => {
+                                errors.push(format!("Goal '{}' invalid: {}", spec.description, e));
+                            }
+                        }
+                    }
+
+                    if !errors.is_empty() {
+                        let message = format!("Goal specification errors:\n{}", errors.join("\n"));
+                        return Some(serde_json::json!({
+                            "isError": true,
+                            "content": [{ "type": "text", "text": message }]
+                        }));
+                    }
+
+                    for g in built_goals {
+                        if manifold.add_goal(g).is_ok() {
+                            sub_goals_added += 1;
+                        }
+                    }
+                }
+            }
+
+            if sub_goals_added == 0 {
+                if used_structured {
+                    return Some(serde_json::json!({
+                        "isError": true,
+                        "content": [{ "type": "text", "text": "No valid goals were provided. Please define at least one goal with success criteria." }]
+                    }));
+                }
+
+                if let Some(goal_descriptions) = suggest_goals_with_llm(&root_intent).await {
+                    for desc in goal_descriptions {
+                        if let Ok(g) = sentinel_core::goal_manifold::goal::Goal::builder()
+                            .description(desc)
+                            .add_success_criterion(
+                                sentinel_core::goal_manifold::predicate::Predicate::AlwaysTrue,
+                            )
+                            .build()
+                        {
+                            if manifold.add_goal(g).is_ok() {
+                                sub_goals_added += 1;
+                            }
+                        }
+                    }
+                }
+            }
+
+            if sub_goals_added == 0 {
+                let engine = sentinel_core::architect::ArchitectEngine::new();
+                if let Ok(proposal) = engine.propose_architecture(root_intent) {
+                    for g in proposal.proposed_goals {
+                        if manifold.add_goal(g).is_ok() {
+                            sub_goals_added += 1;
+                        }
+                    }
+                    for inv_desc in proposal.proposed_invariants {
+                        let _ = manifold.add_invariant(sentinel_core::goal_manifold::Invariant {
+                            id: uuid::Uuid::new_v4(),
+                            description: inv_desc,
+                            severity: sentinel_core::goal_manifold::InvariantSeverity::Critical,
+                            predicate:
+                                sentinel_core::goal_manifold::predicate::Predicate::AlwaysTrue,
+                        });
+                    }
+                }
+            }
+
+            let response_text = {
+                let content = serde_json::to_string_pretty(&manifold).unwrap_or_default();
+                match std::fs::write("sentinel.json", content) {
+                    Ok(_) => format!(
+                        "PROJECT INITIALIZED SUCCESS: Creati {} obiettivi per '{}'.",
+                        manifold.goal_dag.goals().count(),
+                        description
+                    ),
+                    Err(e) => format!("Errore scrittura file: {}", e),
+                }
+            };
+            Some(serde_json::json!({ "content": [{ "type": "text", "text": response_text }] }))
+        }
+
+        "suggest_goals" => {
+            let args = match arguments.cloned() {
+                Some(value) => value,
+                None => {
+                    return Some(serde_json::json!({
+                        "isError": true,
+                        "content": [{ "type": "text", "text": "Missing suggest_goals arguments." }]
+                    }))
+                }
+            };
+
+            let request: GoalInitRequest = match serde_json::from_value(args) {
+                Ok(parsed) => parsed,
+                Err(e) => {
+                    return Some(serde_json::json!({
+                        "isError": true,
+                        "content": [{ "type": "text", "text": format!("Invalid suggest_goals payload: {}", e) }]
+                    }))
+                }
+            };
+
+            let GoalInitRequest {
+                description,
+                constraints,
+                expected_outcomes,
+                target_platform,
+                languages,
+                frameworks,
+                ..
+            } = request;
+
+            let description = description.trim().to_string();
+            if description.is_empty() {
+                return Some(serde_json::json!({
+                    "isError": true,
+                    "content": [{ "type": "text", "text": "Project description cannot be empty." }]
+                }));
+            }
+
+            let intent = build_intent(
+                description,
+                constraints.unwrap_or_default(),
+                expected_outcomes.unwrap_or_default(),
+                target_platform,
+                languages.unwrap_or_default(),
+                frameworks.unwrap_or_default(),
+            );
+
+            let mut suggestions = suggest_goals_with_llm(&intent).await.unwrap_or_default();
+
+            if suggestions.is_empty() {
+                let engine = sentinel_core::architect::ArchitectEngine::new();
+                if let Ok(proposal) = engine.propose_architecture(intent) {
+                    suggestions = proposal
+                        .proposed_goals
+                        .into_iter()
+                        .map(|g| g.description)
+                        .collect();
+                }
+            }
+
+            let payload = serde_json::to_string(&suggestions).unwrap_or_else(|_| "[]".to_string());
+            Some(serde_json::json!({ "content": [{ "type": "text", "text": payload }] }))
+        }
+
         "validate_action" => {
-            let desc = arguments.and_then(|a| a.get("description")).and_then(|v| v.as_str()).unwrap_or("");
-            let response_text = match get_manifold() {
+            let desc = arguments
+                .and_then(|a| a.get("description"))
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+            let result_json = match get_manifold() {
                 Ok(manifold) => {
                     let state = ProjectState::new(PathBuf::from("."));
                     let field = AlignmentField::new(manifold);
                     match field.predict_alignment(&state).await {
-                        Ok(res) => format!("SENTINEL ANALYSIS: L'azione '{}' ha una probabilità di successo del {:.1}%. Allineamento atteso: {:.1}%. Risk Level: {:?}", 
-                            desc, (1.0 - res.deviation_probability) * 100.0, res.expected_alignment, res.risk_level()),
-                        Err(e) => format!("SENTINEL ERROR: Simulazione fallita: {}", e),
+                        Ok(res) => serde_json::json!({
+                            "alignment_score": res.expected_alignment,
+                            "deviation_probability": res.deviation_probability,
+                            "risk_level": format!("{:?}", res.risk_level()),
+                            "approved": res.expected_alignment > 70.0,
+                            "rationale": format!("Analisi dell'intento: {}", desc)
+                        }),
+                        Err(e) => {
+                            serde_json::json!({ "error": format!("Simulazione fallita: {}", e) })
+                        }
                     }
-                },
-                Err(e) => format!("SENTINEL PROVISIONAL: {}", e),
+                }
+                Err(e) => serde_json::json!({ "error": e }),
             };
-            Some(serde_json::json!({ "content": [{ "type": "text", "text": response_text }] }))
-        },
+            Some(
+                serde_json::json!({ "content": [{ "type": "text", "text": result_json.to_string() }] }),
+            )
+        }
 
         "get_alignment" => {
-            let response_text = match get_manifold() {
+            let result_json = match get_manifold() {
                 Ok(manifold) => {
                     let state = ProjectState::new(PathBuf::from("."));
                     let field = AlignmentField::new(manifold);
                     match field.compute_alignment(&state).await {
-                        Ok(v) => format!("GOAL ALIGNMENT REPORT:\nPunteggio: {:.1}%\nConfidenza: {:.0}%\nStato: {}", 
-                            v.score, v.confidence * 100.0, if v.score > 70.0 { "OTTIMALE" } else { "DEVIATO" }),
-                        Err(e) => format!("Errore calcolo: {}", e),
+                        Ok(v) => serde_json::json!({
+                            "score": v.score,
+                            "confidence": v.confidence,
+                            "status": if v.score > 70.0 { "OPTIMAL" } else { "DEVIATED" },
+                            "violations": []
+                        }),
+                        Err(e) => serde_json::json!({ "error": format!("Errore calcolo: {}", e) }),
                     }
-                },
-                Err(e) => format!("SENTINEL INFO: {}", e),
+                }
+                Err(e) => serde_json::json!({ "error": e }),
             };
-            Some(serde_json::json!({ "content": [{ "type": "text", "text": response_text }] }))
-        },
+            Some(
+                serde_json::json!({ "content": [{ "type": "text", "text": result_json.to_string() }] }),
+            )
+        }
 
         "safe_write" => {
-            let path = arguments.and_then(|a| a.get("path")).and_then(|v| v.as_str()).unwrap_or("unknown");
-            let content = arguments.and_then(|a| a.get("content")).and_then(|v| v.as_str()).unwrap_or("");
+            let path = arguments
+                .and_then(|a| a.get("path"))
+                .and_then(|v| v.as_str())
+                .unwrap_or("unknown");
+            let content = arguments
+                .and_then(|a| a.get("content"))
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
             let report = SecurityScanner::scan(content);
-            
-            let message = if !report.is_safe {
-                format!("SENTINEL BLOCK: Rilevate {} minacce nel file {}.\nMinacce: {}", report.threats.len(), path, report.threats.join(", "))
-            } else {
-                format!("SAFE WRITE APPROVED: Il file {} ha superato lo scan Layer 7 (Risk Score: {:.2}).", path, report.risk_score)
-            };
+
+            let result_json = serde_json::json!({
+                "is_safe": report.is_safe,
+                "threats": report.threats.iter().map(|t| serde_json::json!({
+                    "description": t,
+                    "severity": 1,
+                    "pattern": "regex_match"
+                })).collect::<Vec<_>>(),
+                "risk_score": report.risk_score
+            });
 
             Some(serde_json::json!({
-                "content": [{ "type": "text", "text": message }]
+                "content": [{ "type": "text", "text": result_json.to_string() }]
             }))
-        },
+        }
 
         "propose_strategy" => {
-            let goal_desc = arguments.and_then(|a| a.get("goal_description")).and_then(|v| v.as_str()).unwrap_or("");
-            let kb = std::sync::Arc::new(sentinel_core::learning::knowledge_base::KnowledgeBase::new());
+            let goal_desc = arguments
+                .and_then(|a| a.get("goal_description"))
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+            let kb =
+                std::sync::Arc::new(sentinel_core::learning::knowledge_base::KnowledgeBase::new());
             let synthesizer = sentinel_core::learning::strategy::StrategySynthesizer::new(kb);
             use sentinel_core::goal_manifold::goal::Goal;
             use sentinel_core::goal_manifold::predicate::Predicate;
-            let temp_goal = Goal::builder()
+
+            let result_json = match Goal::builder()
                 .description(goal_desc)
                 .add_success_criterion(Predicate::AlwaysTrue)
-                .build();
-            let response_text = match temp_goal {
+                .build()
+            {
                 Ok(goal) => match synthesizer.suggest_strategy(&goal).await {
-                    Ok(s) => format!("STRATEGIA SUGGERITA (Layer 5):\n- Confidenza: {:.0}%\n- {} approcci trovati.",
-                        s.confidence * 100.0, s.recommended_approaches.len()),
-                    Err(e) => format!("STRATEGIA (Layer 5): Knowledge base vuota. Nessun pattern disponibile per '{}'. Errore: {}", goal_desc, e),
+                    Ok(s) => serde_json::json!({
+                        "confidence": s.confidence,
+                        "patterns": s.recommended_approaches.iter().map(|p| serde_json::json!({
+                            "id": p.id.to_string(),
+                            "name": p.name,
+                            "description": p.description,
+                            "success_rate": p.success_rate,
+                            "applicable_to_goal_types": vec!["Feature"]
+                        })).collect::<Vec<_>>(),
+                        "pitfalls": s.pitfalls_to_avoid.iter().map(|p| p.name.clone()).collect::<Vec<_>>()
+                    }),
+                    Err(_) => {
+                        serde_json::json!({ "confidence": 0.0, "patterns": [], "pitfalls": [] })
+                    }
                 },
-                Err(e) => format!("STRATEGIA (Layer 5): Impossibile costruire il goal temporaneo: {}", e),
+                Err(_) => serde_json::json!({ "error": "Failed to build goal" }),
             };
-            Some(serde_json::json!({ "content": [{ "type": "text", "text": response_text }] }))
-        },
+
+            Some(
+                serde_json::json!({ "content": [{ "type": "text", "text": result_json.to_string() }] }),
+            )
+        }
 
         "record_handover" => {
-            let gid = arguments.and_then(|a| a.get("goal_id")).and_then(|v| v.as_str()).unwrap_or("");
-            let content = arguments.and_then(|a| a.get("content")).and_then(|v| v.as_str()).unwrap_or("");
+            let gid = arguments
+                .and_then(|a| a.get("goal_id"))
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+            let content = arguments
+                .and_then(|a| a.get("content"))
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
             let response_text = match get_manifold() {
                 Ok(mut manifold) => {
                     let note = sentinel_core::types::HandoverNote {
-                        id: uuid::Uuid::new_v4(), agent_id: uuid::Uuid::new_v4(),
+                        id: uuid::Uuid::new_v4(),
+                        agent_id: uuid::Uuid::new_v4(),
                         goal_id: uuid::Uuid::parse_str(gid).unwrap_or(uuid::Uuid::nil()),
-                        content: content.to_string(), technical_warnings: vec![],
-                        suggested_next_steps: vec![], timestamp: chrono::Utc::now(),
+                        content: content.to_string(),
+                        technical_warnings: vec![],
+                        suggested_next_steps: vec![],
+                        timestamp: chrono::Utc::now(),
                     };
                     manifold.handover_log.push(note);
                     match save_manifold(&manifold) {
-                        Ok(_) => "COGNITIVE HANDOVER SUCCESS: Nota salvata in sentinel.json.".to_string(),
+                        Ok(_) => {
+                            "COGNITIVE HANDOVER SUCCESS: Nota salvata in sentinel.json.".to_string()
+                        }
                         Err(e) => format!("Errore salvataggio: {}", e),
                     }
-                },
+                }
                 Err(e) => e,
             };
             Some(serde_json::json!({ "content": [{ "type": "text", "text": response_text }] }))
-        },
+        }
 
         "get_cognitive_map" => {
             let response_text = match get_manifold() {
-                Ok(manifold) => sentinel_core::architect::distiller::CognitiveDistiller::distill(&manifold).content,
+                Ok(manifold) => {
+                    sentinel_core::architect::distiller::CognitiveDistiller::distill(&manifold)
+                        .content
+                }
                 Err(e) => e,
             };
             Some(serde_json::json!({ "content": [{ "type": "text", "text": response_text }] }))
-        },
+        }
 
         "get_enforcement_rules" => {
             let response_text = match get_manifold() {
                 Ok(manifold) => {
                     let mut rules = vec!["1. Non modificare file bloccati.".to_string()];
-                    for inv in &manifold.invariants { 
-                        rules.push(format!("- [INVARIANTE] {}", inv.description)); 
+                    for inv in &manifold.invariants {
+                        rules.push(format!("- [INVARIANTE] {}", inv.description));
                     }
                     format!("SENTINEL ENFORCEMENT RULES:\n{}", rules.join("\n"))
-                },
+                }
                 Err(e) => e,
             };
             Some(serde_json::json!({ "content": [{ "type": "text", "text": response_text }] }))
-        },
+        }
 
         "get_goal_graph" => {
             let json_graph = match get_manifold() {
                 Ok(manifold) => {
                     let mut nodes = Vec::new();
                     let mut edges = Vec::new();
-                    
+
                     // Root Node
                     nodes.push(serde_json::json!({
                         "id": "root",
@@ -372,10 +971,10 @@ async fn handle_tool_call(params: Option<Value>) -> Option<Value> {
                     for (i, goal) in goals.iter().enumerate() {
                         let y_pos = (i + 1) * 150;
                         let x_pos = 250 + (if i % 2 == 0 { -150 } else { 150 }); // Simple layout
-                        
+
                         nodes.push(serde_json::json!({
                             "id": goal.id.to_string(),
-                            "data": { 
+                            "data": {
                                 "label": goal.description,
                                 "status": format!("{:?}", goal.status)
                             },
@@ -402,67 +1001,62 @@ async fn handle_tool_call(params: Option<Value>) -> Option<Value> {
                     }
 
                     serde_json::json!({ "nodes": nodes, "edges": edges })
-                },
+                }
                 Err(e) => serde_json::json!({ "error": e }),
             };
-            Some(serde_json::json!({ "content": [{ "type": "text", "text": json_graph.to_string() }] }))
-        },
+            Some(
+                serde_json::json!({ "content": [{ "type": "text", "text": json_graph.to_string() }] }),
+            )
+        }
 
         "decompose_goal" => {
-            let gid_str = arguments.and_then(|a| a.get("goal_id")).and_then(|v| v.as_str()).unwrap_or("");
+            let gid_str = arguments
+                .and_then(|a| a.get("goal_id"))
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
             let response_text = match get_manifold() {
                 Ok(mut manifold) => {
                     let gid = match uuid::Uuid::parse_str(gid_str) {
                         Ok(id) => id,
-                        Err(_) => return Some(serde_json::json!({ "isError": true, "content": [{ "type": "text", "text": "UUID goal non valido." }] })),
+                        Err(_) => {
+                            return Some(
+                                serde_json::json!({ "isError": true, "content": [{ "type": "text", "text": "UUID goal non valido." }] }),
+                            )
+                        }
                     };
 
                     let goal = match manifold.get_goal(&gid) {
                         Some(g) => g.clone(),
-                        None => return Some(serde_json::json!({ "isError": true, "content": [{ "type": "text", "text": "Goal non trovato." }] })),
+                        None => {
+                            return Some(
+                                serde_json::json!({ "isError": true, "content": [{ "type": "text", "text": "Goal non trovato." }] }),
+                            )
+                        }
                     };
 
-                    // Tentativo di scomposizione tramite LLM
-                    let api_key = std::env::var("OPENROUTER_API_KEY").ok();
                     let mut sub_goals = Vec::new();
 
-                    if let Some(key) = api_key {
-                        use sentinel_agent_native::openrouter::{OpenRouterClient, OpenRouterModel};
-                        use sentinel_agent_native::llm_integration::{LLMContext, LLMClient};
-                        
-                        let model_id = std::env::var("OPENROUTER_MODEL").unwrap_or_else(|_| "deepseek/deepseek-r1:free".to_string());
-                        let client = OpenRouterClient::new(key, OpenRouterModel::Custom(model_id));
-                        
-                        let prompt = format!(
-                            "Decompose the following software goal into 3-5 atomic, deterministic sub-tasks: '{}'. \
-                            Return ONLY a JSON array of strings representing the sub-task descriptions.", 
-                            goal.description
-                        );
+                    let system_prompt = build_system_prompt();
+                    let prompt = format!(
+                        "Decompose the following software goal into 3-5 atomic, deterministic sub-tasks: '{}'. \
+                        Return ONLY a JSON array of strings representing the sub-task descriptions.",
+                        goal.description
+                    );
 
-                        let context = LLMContext {
-                            goal_description: goal.description.clone(),
-                            context: "Atomic Slicing phase.".to_string(),
-                            p2p_intelligence: "".to_string(),
-                            constraints: vec![],
-                            previous_approaches: vec![],
-                        };
-
-                        if let Ok(suggestion) = client.generate_code(&prompt, &context).await {
-                            // Tenta di parsare il JSON dall'output dell'LLM
-                            if let Ok(tasks) = serde_json::from_str::<Vec<String>>(&suggestion.content) {
-                                for task_desc in tasks {
-                                    if let Ok(sg) = sentinel_core::goal_manifold::goal::Goal::builder()
-                                        .description(task_desc)
-                                        .parent(goal.id)
-                                        .build() {
-                                        sub_goals.push(sg);
-                                    }
+                    if let Some(suggestion) = chat_with_llm(&system_prompt, &prompt).await {
+                        if let Some(tasks) = extract_goal_suggestions(&suggestion) {
+                            for task_desc in tasks {
+                                if let Ok(sg) = sentinel_core::goal_manifold::goal::Goal::builder()
+                                    .description(task_desc)
+                                    .parent(goal.id)
+                                    .add_success_criterion(sentinel_core::goal_manifold::predicate::Predicate::AlwaysTrue)
+                                    .build() {
+                                    sub_goals.push(sg);
                                 }
                             }
                         }
                     }
 
-                    // Fallback su euristica locale se LLM fallisce o non disponibile
                     if sub_goals.is_empty() {
                         use sentinel_core::goal_manifold::slicer::AtomicSlicer;
                         if let Ok(decomposed) = AtomicSlicer::decompose(&goal) {
@@ -476,15 +1070,20 @@ async fn handle_tool_call(params: Option<Value>) -> Option<Value> {
                     }
 
                     match save_manifold(&manifold) {
-                        Ok(_) => format!("ATOMIC DECOMPOSITION SUCCESS: Goal '{}' scomposto in {} task.", goal.description, count),
+                        Ok(_) => format!(
+                            "ATOMIC DECOMPOSITION SUCCESS: Goal '{}' scomposto in {} task.",
+                            goal.description, count
+                        ),
                         Err(e) => format!("Errore salvataggio manifold: {}", e),
                     }
-                },
+                }
                 Err(e) => e,
             };
             Some(serde_json::json!({ "content": [{ "type": "text", "text": response_text }] }))
-        },
+        }
 
-        _ => Some(serde_json::json!({ "isError": true, "content": [{ "type": "text", "text": "Tool non supportato." }] })),
+        _ => Some(
+            serde_json::json!({ "isError": true, "content": [{ "type": "text", "text": "Tool non supportato." }] }),
+        ),
     }
 }

@@ -8,11 +8,6 @@ export default defineConfig({
         outDir: resolve(__dirname, 'out/webview'),
         rollupOptions: {
             input: resolve(__dirname, 'webview-ui/index.html'),
-            output: {
-                entryFileNames: 'assets/[name].js',
-                chunkFileNames: 'assets/[name].js',
-                assetFileNames: 'assets/[name].[ext]',
-            },
         },
         emptyOutDir: true,
     },

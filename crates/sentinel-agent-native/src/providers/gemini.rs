@@ -1,215 +1,105 @@
-//! OpenRouter LLM Client - Real LLM Provider Integration
-//!
-//! Implements the LLMClient trait using OpenRouter's OpenAI-compatible API.
-//! Supports free models for development and testing.
-//!
-//! # Usage
-//!
-//! ```rust
-//! let client = OpenRouterClient::new(
-//!     "your-api-key".to_string(),
-//!     OpenRouterModel::MetaLlama3_3_70B,
-//! );
-//! let suggestion = client.generate_code("Write a hello world", &context).await?;
-//! ```
+use anyhow::{Context, Result};
+use serde::{Deserialize, Serialize};
 
 use crate::llm_integration::{
     DocFormat, ExplanationStyle, ImprovementMetric, LLMChatClient, LLMChatCompletion, LLMClient,
     LLMContext, LLMSuggestion, LLMSuggestionType,
 };
-use anyhow::{Context, Result};
 use sentinel_core::Uuid;
-use serde::{Deserialize, Serialize};
 
-/// OpenRouter API base URL
-const OPENROUTER_API_URL: &str = "https://openrouter.ai/api/v1/chat/completions";
-
-/// Free models available on OpenRouter (no API cost)
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum OpenRouterModel {
-    /// Meta Llama 3.3 70B Instruct (Free)
-    MetaLlama3_3_70B,
-    /// Google Gemini 2.0 Flash Experimental (Free)
-    GoogleGemini2Flash,
-    /// DeepSeek R1 0528 (Free)
-    DeepSeekR1,
-    /// Mistral Devstral Small 2505 (Free)
-    MistralDevstral,
-    /// Custom model ID
-    Custom(String),
-}
-
-impl OpenRouterModel {
-    /// Get the model ID string for the API
-    pub fn model_id(&self) -> &str {
-        match self {
-            Self::MetaLlama3_3_70B => "meta-llama/llama-3.3-70b-instruct:free",
-            Self::GoogleGemini2Flash => "google/gemini-2.0-flash-exp:free",
-            Self::DeepSeekR1 => "deepseek/deepseek-r1-0528:free",
-            Self::MistralDevstral => "mistralai/devstral-small:free",
-            Self::Custom(id) => id,
-        }
-    }
-
-    /// Get human-readable name
-    pub fn display_name(&self) -> &str {
-        match self {
-            Self::MetaLlama3_3_70B => "Meta Llama 3.3 70B",
-            Self::GoogleGemini2Flash => "Google Gemini 2.0 Flash",
-            Self::DeepSeekR1 => "DeepSeek R1",
-            Self::MistralDevstral => "Mistral Devstral",
-            Self::Custom(id) => id,
-        }
-    }
-}
-
-/// OpenRouter API request
-#[derive(Debug, Serialize)]
-struct ChatCompletionRequest {
-    model: String,
-    messages: Vec<ChatMessage>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    max_tokens: Option<u32>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    temperature: Option<f64>,
-}
-
-/// Chat message
-#[derive(Debug, Serialize, Deserialize)]
-struct ChatMessage {
-    role: String,
-    content: String,
-}
-
-/// OpenRouter API response
-#[derive(Debug, Deserialize)]
-struct ChatCompletionResponse {
-    id: Option<String>,
-    choices: Vec<ChatChoice>,
-    usage: Option<UsageInfo>,
-}
-
-/// Chat choice
-#[derive(Debug, Deserialize)]
-struct ChatChoice {
-    message: ChatMessage,
-    finish_reason: Option<String>,
-}
-
-/// Token usage info
-#[derive(Debug, Deserialize)]
-struct UsageInfo {
-    prompt_tokens: Option<u32>,
-    completion_tokens: Option<u32>,
-    total_tokens: Option<u32>,
-}
-
-/// OpenRouter LLM Client
-///
-/// Implements the LLMClient trait using OpenRouter's API.
-/// Supports free models for zero-cost development and testing.
-pub struct OpenRouterClient {
-    /// API key for OpenRouter
+#[derive(Debug, Clone)]
+pub struct GeminiClient {
+    pub name: String,
     api_key: String,
-
-    /// Model to use
-    model: OpenRouterModel,
-
-    /// HTTP client
-    http_client: reqwest::Client,
-
-    /// Temperature (0.0 = deterministic, 1.0 = creative)
+    model: String,
     temperature: f64,
-
-    /// Max tokens per response
     max_tokens: u32,
+    http_client: reqwest::Client,
 }
 
-impl OpenRouterClient {
-    /// Create a new OpenRouter client
-    pub fn new(api_key: String, model: OpenRouterModel) -> Self {
+impl GeminiClient {
+    pub fn new(api_key: String, model: impl Into<String>) -> Self {
+        let model = model.into();
         Self {
+            name: format!("Gemini {}", model),
             api_key,
             model,
-            http_client: reqwest::Client::new(),
-            temperature: 0.3, // Low temperature for code generation
+            temperature: 0.3,
             max_tokens: 2048,
+            http_client: reqwest::Client::new(),
         }
     }
 
-    /// Set temperature
     pub fn with_temperature(mut self, temperature: f64) -> Self {
         self.temperature = temperature;
         self
     }
 
-    /// Set max tokens
     pub fn with_max_tokens(mut self, max_tokens: u32) -> Self {
         self.max_tokens = max_tokens;
         self
     }
 
-    /// Send a chat completion request to OpenRouter
+    fn endpoint(&self) -> String {
+        format!(
+            "https://generativelanguage.googleapis.com/v1beta/models/{}:generateContent?key={}",
+            self.model, self.api_key
+        )
+    }
+
     async fn request_completion(
         &self,
         system_prompt: &str,
         user_prompt: &str,
     ) -> Result<(String, u32)> {
-        let request = ChatCompletionRequest {
-            model: self.model.model_id().to_string(),
-            messages: vec![
-                ChatMessage {
-                    role: "system".to_string(),
-                    content: system_prompt.to_string(),
-                },
-                ChatMessage {
-                    role: "user".to_string(),
-                    content: user_prompt.to_string(),
-                },
-            ],
-            max_tokens: Some(self.max_tokens),
-            temperature: Some(self.temperature),
+        let request = GeminiRequest {
+            system_instruction: Some(GeminiSystemInstruction {
+                parts: vec![GeminiPart {
+                    text: system_prompt.to_string(),
+                }],
+            }),
+            contents: vec![GeminiContent {
+                role: "user".to_string(),
+                parts: vec![GeminiPart {
+                    text: user_prompt.to_string(),
+                }],
+            }],
+            generation_config: Some(GeminiGenerationConfig {
+                temperature: self.temperature,
+                max_output_tokens: self.max_tokens,
+            }),
         };
 
         let response = self
             .http_client
-            .post(OPENROUTER_API_URL)
-            .header("Authorization", format!("Bearer {}", self.api_key))
+            .post(self.endpoint())
             .header("Content-Type", "application/json")
-            .header("HTTP-Referer", "https://github.com/JoyciAkira/SENTINEL")
-            .header("X-Title", "Sentinel Protocol")
             .json(&request)
             .send()
             .await
-            .context("Failed to send request to OpenRouter")?;
+            .context("Failed to send request to Gemini")?;
 
         let status = response.status();
         if !status.is_success() {
             let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("OpenRouter API error ({}): {}", status, error_text);
+            anyhow::bail!("Gemini API error ({}): {}", status, error_text);
         }
 
-        let completion: ChatCompletionResponse = response
+        let completion: GeminiResponse = response
             .json()
             .await
-            .context("Failed to parse OpenRouter response")?;
+            .context("Failed to parse Gemini response")?;
 
         let content = completion
-            .choices
+            .candidates
             .first()
-            .map(|c| c.message.content.clone())
+            .and_then(|c| c.content.parts.first())
+            .map(|p| p.text.clone())
             .unwrap_or_default();
 
-        let tokens = completion
-            .usage
-            .as_ref()
-            .and_then(|u| u.total_tokens)
-            .unwrap_or(0);
-
-        Ok((content, tokens))
+        Ok((content, 0))
     }
 
-    /// Build system prompt with Sentinel context
     fn build_system_prompt(&self, context: &LLMContext) -> String {
         let mut prompt = String::from(
             "You are an AI coding assistant integrated with Sentinel Protocol. \
@@ -236,18 +126,51 @@ impl OpenRouterClient {
     }
 }
 
-impl std::fmt::Debug for OpenRouterClient {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("OpenRouterClient")
-            .field("model", &self.model)
-            .field("temperature", &self.temperature)
-            .field("max_tokens", &self.max_tokens)
-            .finish()
-    }
+#[derive(Debug, Serialize)]
+struct GeminiRequest {
+    #[serde(skip_serializing_if = "Option::is_none", rename = "systemInstruction")]
+    system_instruction: Option<GeminiSystemInstruction>,
+    contents: Vec<GeminiContent>,
+    #[serde(skip_serializing_if = "Option::is_none", rename = "generationConfig")]
+    generation_config: Option<GeminiGenerationConfig>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct GeminiSystemInstruction {
+    parts: Vec<GeminiPart>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct GeminiContent {
+    role: String,
+    parts: Vec<GeminiPart>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct GeminiPart {
+    text: String,
+}
+
+#[derive(Debug, Serialize)]
+struct GeminiGenerationConfig {
+    #[serde(rename = "temperature")]
+    temperature: f64,
+    #[serde(rename = "maxOutputTokens")]
+    max_output_tokens: u32,
+}
+
+#[derive(Debug, Deserialize)]
+struct GeminiResponse {
+    candidates: Vec<GeminiCandidate>,
+}
+
+#[derive(Debug, Deserialize)]
+struct GeminiCandidate {
+    content: GeminiContent,
 }
 
 #[async_trait::async_trait]
-impl LLMChatClient for OpenRouterClient {
+impl LLMChatClient for GeminiClient {
     async fn chat_completion(
         &self,
         system_prompt: &str,
@@ -255,7 +178,7 @@ impl LLMChatClient for OpenRouterClient {
     ) -> Result<LLMChatCompletion> {
         let (content, tokens) = self.request_completion(system_prompt, user_prompt).await?;
         Ok(LLMChatCompletion {
-            llm_name: self.model.display_name().to_string(),
+            llm_name: self.name.clone(),
             content,
             token_cost: tokens,
         })
@@ -263,7 +186,7 @@ impl LLMChatClient for OpenRouterClient {
 }
 
 #[async_trait::async_trait]
-impl LLMClient for OpenRouterClient {
+impl LLMClient for GeminiClient {
     async fn generate_code(&self, prompt: &str, context: &LLMContext) -> Result<LLMSuggestion> {
         let system = self.build_system_prompt(context);
         let user_prompt = format!(
@@ -281,7 +204,7 @@ impl LLMClient for OpenRouterClient {
                 code: content.clone(),
                 language: "rust".to_string(),
             },
-            llm_name: self.model.display_name().to_string(),
+            llm_name: self.name.clone(),
             content,
             estimated_quality: 0.85,
             goal_alignment: 0.90,
@@ -307,7 +230,7 @@ impl LLMClient for OpenRouterClient {
                 description: content.clone(),
                 expected_improvement: ImprovementMetric::CodeQuality,
             },
-            llm_name: self.model.display_name().to_string(),
+            llm_name: self.name.clone(),
             content,
             estimated_quality: 0.80,
             goal_alignment: 0.85,
@@ -335,7 +258,7 @@ impl LLMClient for OpenRouterClient {
                 to_document: code[..code.len().min(100)].to_string(),
                 format: DocFormat::DocComments,
             },
-            llm_name: self.model.display_name().to_string(),
+            llm_name: self.name.clone(),
             content,
             estimated_quality: 0.85,
             goal_alignment: 0.90,
@@ -360,7 +283,7 @@ impl LLMClient for OpenRouterClient {
                 test_target: code[..code.len().min(50)].to_string(),
                 test_type: "unit".to_string(),
             },
-            llm_name: self.model.display_name().to_string(),
+            llm_name: self.name.clone(),
             content,
             estimated_quality: 0.80,
             goal_alignment: 0.85,
@@ -381,7 +304,7 @@ impl LLMClient for OpenRouterClient {
                 concept: concept.to_string(),
                 style: ExplanationStyle::StepByStep,
             },
-            llm_name: self.model.display_name().to_string(),
+            llm_name: self.name.clone(),
             content,
             estimated_quality: 0.85,
             goal_alignment: 0.90,

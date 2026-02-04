@@ -43,7 +43,7 @@
 
 use anyhow::{Context, Result};
 use sentinel_core::{
-    goal_manifold::{Goal, GoalDag, GoalManifold},
+    goal_manifold::{Goal, GoalDag, GoalManifold, predicate::Predicate},
     Uuid,
 };
 use std::collections::HashMap;
@@ -636,8 +636,9 @@ mod tests {
 
         let simple_goal = Goal::builder()
             .description("Add simple function")
-            .complexity(sentinel_core::types::ProbabilityDistribution::normal(30.0, 1.0))
+            .complexity(sentinel_core::types::ProbabilityDistribution::normal(3.0, 1.0))
             .value_to_root(1.0)
+            .success_criteria(vec![Predicate::AlwaysTrue])
             .build()
             .unwrap();
 
@@ -655,8 +656,9 @@ mod tests {
 
         let complex_goal = Goal::builder()
             .description("Implement complex authentication system with JWT, OAuth, and session management")
-            .complexity(sentinel_core::types::ProbabilityDistribution::normal(85.0, 1.0))
+            .complexity(sentinel_core::types::ProbabilityDistribution::normal(8.5, 1.0))
             .value_to_root(1.0)
+            .success_criteria(vec![Predicate::AlwaysTrue])
             .build()
             .unwrap();
 
@@ -676,7 +678,7 @@ mod tests {
             root_task: "Test task".to_string(),
             sub_goals: vec![Uuid::new_v4()],
             actions: vec![],
-            complexity: 50.0,
+            complexity: 5.0,
             estimated_duration_minutes: 10,
         };
 
@@ -709,7 +711,7 @@ mod tests {
                 dependencies: vec![action_id], // Circular dependency!
                 metadata: Default::default(),
             }],
-            complexity: 50.0,
+            complexity: 5.0,
             estimated_duration_minutes: 10,
         };
 

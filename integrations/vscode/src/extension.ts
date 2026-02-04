@@ -71,9 +71,28 @@ export function activate(context: vscode.ExtensionContext) {
 
   const sentinelPath = resolveSentinelPath(rawPath, outputChannel);
 
-  const workspaceRoot = vscode.workspace.workspaceFolders
-    ? vscode.workspace.workspaceFolders[0].uri.fsPath
-    : ".";
+  const resolveWorkspaceRoot = (): string => {
+    if (vscode.workspace.workspaceFolders?.length) {
+      return vscode.workspace.workspaceFolders[0].uri.fsPath;
+    }
+
+    // Fallback: walk up from extension path to find sentinel.json
+    let current = context.extensionPath;
+    while (current && current !== path.dirname(current)) {
+      const candidate = path.join(current, "sentinel.json");
+      if (fs.existsSync(candidate)) {
+        outputChannel.appendLine(
+          `Workspace not set. Using sentinel.json at: ${candidate}`,
+        );
+        return current;
+      }
+      current = path.dirname(current);
+    }
+
+    return ".";
+  };
+
+  const workspaceRoot = resolveWorkspaceRoot();
 
   outputChannel.appendLine(`Activating Sentinel extension...`);
   outputChannel.appendLine(`Workspace: ${workspaceRoot}`);
@@ -235,7 +254,9 @@ export function activate(context: vscode.ExtensionContext) {
     }),
 
     vscode.commands.registerCommand(CMD_REFRESH_GOALS, async () => {
+      outputChannel.appendLine("Refreshing goals...");
       await chatProvider.refreshGoals();
+      vscode.window.showInformationMessage("Goals refreshed");
     }),
 
     vscode.commands.registerCommand(CMD_VALIDATE_ACTION, async () => {

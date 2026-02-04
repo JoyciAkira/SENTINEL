@@ -24,7 +24,7 @@
 use anyhow::{Context, Result};
 use sentinel_core::{
     alignment::AlignmentField,
-    cognitive_state::{Action, ActionDecision, ActionType, ActionResult},
+    cognitive_state::{Action, ActionDecision, ActionResult, ActionType},
     goal_manifold::GoalManifold,
     Uuid,
 };
@@ -72,11 +72,11 @@ pub struct QualityThreshold {
 impl Default for QualityThreshold {
     fn default() -> Self {
         Self {
-            min_alignment: 85.0,      // High alignment required
-            max_complexity: 70.0,       // Moderate complexity max
-            min_test_coverage: 0.80,   // 80% test coverage required
-            max_cyclomatic: 15.0,          // Reasonable cyclomatic max
-            min_documentation: 0.85,         // 85% documentation required
+            min_alignment: 85.0,     // High alignment required
+            max_complexity: 70.0,    // Moderate complexity max
+            min_test_coverage: 0.80, // 80% test coverage required
+            max_cyclomatic: 15.0,    // Reasonable cyclomatic max
+            min_documentation: 0.85, // 85% documentation required
         }
     }
 }
@@ -256,16 +256,10 @@ pub enum ValidationStatus {
     Pass { score: f64 },
 
     /// Failed validation
-    Fail {
-        reason: String,
-        score: f64,
-    },
+    Fail { reason: String, score: f64 },
 
     /// Needs improvement
-    NeedsImprovement {
-        issues: Vec<String>,
-        score: f64,
-    },
+    NeedsImprovement { issues: Vec<String>, score: f64 },
 }
 
 /// LLM Integration Manager - Orchestrates LLM with Sentinel OS
@@ -298,13 +292,35 @@ pub trait LLMClient: Send + Sync + std::fmt::Debug {
     async fn suggest_refactoring(&self, code: &str, context: &LLMContext) -> Result<LLMSuggestion>;
 
     /// Generate documentation
-    async fn generate_documentation(&self, code: &str, context: &LLMContext) -> Result<LLMSuggestion>;
+    async fn generate_documentation(
+        &self,
+        code: &str,
+        context: &LLMContext,
+    ) -> Result<LLMSuggestion>;
 
     /// Generate test cases
     async fn generate_tests(&self, code: &str, context: &LLMContext) -> Result<LLMSuggestion>;
 
     /// Explain concept
     async fn explain_concept(&self, concept: &str, context: &LLMContext) -> Result<LLMSuggestion>;
+}
+
+/// Lightweight chat completion result (provider routing + utilities)
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct LLMChatCompletion {
+    pub llm_name: String,
+    pub content: String,
+    pub token_cost: u32,
+}
+
+/// Minimal chat completion trait for provider routing
+#[async_trait::async_trait]
+pub trait LLMChatClient: Send + Sync + std::fmt::Debug {
+    async fn chat_completion(
+        &self,
+        system_prompt: &str,
+        user_prompt: &str,
+    ) -> Result<LLMChatCompletion>;
 }
 
 /// Context provided to LLM
@@ -364,7 +380,10 @@ impl LLMIntegrationManager {
         &mut self,
         mut current_suggestion: LLMSuggestion,
     ) -> Result<LLMValidatedOutput> {
-        tracing::info!("Processing LLM suggestion: {:?}", current_suggestion.suggestion_type);
+        tracing::info!(
+            "Processing LLM suggestion: {:?}",
+            current_suggestion.suggestion_type
+        );
 
         let start_time = std::time::Instant::now();
         let mut attempts = 0;
@@ -396,39 +415,62 @@ impl LLMIntegrationManager {
             let sentinel_validations = self.validate_with_sentinel_os(&current_suggestion).await?;
 
             // Phase 3: Quality scoring
-            let quality_score = self.calculate_quality_score(&pre_validation, &sentinel_validations);
+            let quality_score =
+                self.calculate_quality_score(&pre_validation, &sentinel_validations);
 
             // Phase 4: Final decision
-            let (approved_content, final_result, improvements) = if quality_score >= self.quality_thresholds.min_alignment {
-                // PASS: Apply suggestion
-                let approved = self.apply_suggestion(&current_suggestion)?;
-                self.stats.approved_suggestions += 1;
+            let (approved_content, final_result, improvements) =
+                if quality_score >= self.quality_thresholds.min_alignment {
+                    // PASS: Apply suggestion
+                    let approved = self.apply_suggestion(&current_suggestion)?;
+                    self.stats.approved_suggestions += 1;
 
-                (approved, ValidationStatus::Pass { score: quality_score }, Vec::new())
-            } else {
-                // FAIL: Suggest improvements
-                let improvements = self.suggest_improvements(&current_suggestion, &sentinel_validations)?;
-                
-                if attempts == MAX_ATTEMPTS - 1 {
-                    self.stats.rejected_suggestions += 1;
-                }
+                    (
+                        approved,
+                        ValidationStatus::Pass {
+                            score: quality_score,
+                        },
+                        Vec::new(),
+                    )
+                } else {
+                    // FAIL: Suggest improvements
+                    let improvements =
+                        self.suggest_improvements(&current_suggestion, &sentinel_validations)?;
 
-                (String::new(), ValidationStatus::NeedsImprovement {
-                    issues: improvements.clone(),
-                    score: quality_score,
-                }, improvements)
-            };
+                    if attempts == MAX_ATTEMPTS - 1 {
+                        self.stats.rejected_suggestions += 1;
+                    }
+
+                    (
+                        String::new(),
+                        ValidationStatus::NeedsImprovement {
+                            issues: improvements.clone(),
+                            score: quality_score,
+                        },
+                        improvements,
+                    )
+                };
 
             // Phase 5: Check loop condition (Improvement Cycle)
-            if matches!(&final_result, ValidationStatus::NeedsImprovement { .. }) && attempts < MAX_ATTEMPTS {
-                tracing::info!("Quality score {:.1} below threshold. Attempting improvement cycle {}/{}", quality_score, attempts + 1, MAX_ATTEMPTS);
+            if matches!(&final_result, ValidationStatus::NeedsImprovement { .. })
+                && attempts < MAX_ATTEMPTS
+            {
+                tracing::info!(
+                    "Quality score {:.1} below threshold. Attempting improvement cycle {}/{}",
+                    quality_score,
+                    attempts + 1,
+                    MAX_ATTEMPTS
+                );
                 attempts += 1;
-                
-                match self.regenerate_suggestion(&current_suggestion, &improvements).await {
+
+                match self
+                    .regenerate_suggestion(&current_suggestion, &improvements)
+                    .await
+                {
                     Ok(new_suggestion) => {
                         current_suggestion = new_suggestion;
                         continue;
-                    },
+                    }
                     Err(e) => {
                         tracing::warn!("Failed to regenerate suggestion: {}", e);
                     }
@@ -438,10 +480,14 @@ impl LLMIntegrationManager {
             let duration = start_time.elapsed().as_millis() as f64;
 
             self.stats.total_suggestions += 1;
-            self.stats.avg_quality_score = (self.stats.avg_quality_score * (self.stats.total_suggestions - 1) as f64
-                + quality_score) / self.stats.total_suggestions as f64;
-            self.stats.avg_validation_time_ms = (self.stats.avg_validation_time_ms * (self.stats.total_suggestions - 1) as f64
-                + duration) / self.stats.total_suggestions as f64;
+            self.stats.avg_quality_score = (self.stats.avg_quality_score
+                * (self.stats.total_suggestions - 1) as f64
+                + quality_score)
+                / self.stats.total_suggestions as f64;
+            self.stats.avg_validation_time_ms = (self.stats.avg_validation_time_ms
+                * (self.stats.total_suggestions - 1) as f64
+                + duration)
+                / self.stats.total_suggestions as f64;
 
             tracing::info!(
                 "LLM suggestion processed - Quality: {:.1}, Result: {:?} in {}ms",
@@ -501,10 +547,7 @@ impl LLMIntegrationManager {
             if content_lower.contains(keyword) {
                 return Ok(PreValidationResult {
                     passed: false,
-                    explanation: format!(
-                        "Potential hallucination detected: keyword '{}'",
-                        keyword
-                    ),
+                    explanation: format!("Potential hallucination detected: keyword '{}'", keyword),
                 });
             }
         }
@@ -540,13 +583,19 @@ impl LLMIntegrationManager {
         validations.push(quality_validation.clone());
 
         // Validation 4: Test Coverage (if code generation)
-        if matches!(&suggestion.suggestion_type, LLMSuggestionType::CodeGeneration { .. }) {
+        if matches!(
+            &suggestion.suggestion_type,
+            LLMSuggestionType::CodeGeneration { .. }
+        ) {
             let test_validation = self.validate_test_coverage(suggestion).await?;
             validations.push(test_validation);
         }
 
         // Validation 5: Documentation (if documentation generation)
-        if matches!(&suggestion.suggestion_type, LLMSuggestionType::Documentation { .. }) {
+        if matches!(
+            &suggestion.suggestion_type,
+            LLMSuggestionType::Documentation { .. }
+        ) {
             let doc_validation = self.validate_documentation(suggestion).await?;
             validations.push(doc_validation);
         }
@@ -560,7 +609,10 @@ impl LLMIntegrationManager {
     }
 
     /// Validate goal alignment
-    async fn validate_goal_alignment(&self, suggestion: &LLMSuggestion) -> Result<ValidationResult> {
+    async fn validate_goal_alignment(
+        &self,
+        suggestion: &LLMSuggestion,
+    ) -> Result<ValidationResult> {
         tracing::debug!("Validating goal alignment");
 
         // Extract intent from suggestion
@@ -572,7 +624,9 @@ impl LLMIntegrationManager {
             .await?;
 
         let result = if alignment_score >= self.quality_thresholds.min_alignment {
-            ValidationStatus::Pass { score: alignment_score }
+            ValidationStatus::Pass {
+                score: alignment_score,
+            }
         } else {
             ValidationStatus::Fail {
                 reason: format!(
@@ -587,15 +641,15 @@ impl LLMIntegrationManager {
             component: ValidationComponent::GoalAlignment,
             result,
             score: alignment_score,
-            explanation: format!(
-                "Goal alignment score: {:.1}",
-                alignment_score
-            ),
+            explanation: format!("Goal alignment score: {:.1}", alignment_score),
         })
     }
 
     /// Validate syntactic correctness with Tree-Sitter
-    async fn validate_syntax_correctness(&self, suggestion: &LLMSuggestion) -> Result<ValidationResult> {
+    async fn validate_syntax_correctness(
+        &self,
+        suggestion: &LLMSuggestion,
+    ) -> Result<ValidationResult> {
         tracing::debug!("Validating syntax correctness");
 
         let code = match &suggestion.suggestion_type {
@@ -639,7 +693,9 @@ impl LLMIntegrationManager {
         let complexity_score = self.estimate_complexity(&suggestion);
 
         let result = if complexity_score <= self.quality_thresholds.max_complexity {
-            ValidationStatus::Pass { score: 1.0 - complexity_score / 100.0 }
+            ValidationStatus::Pass {
+                score: 1.0 - complexity_score / 100.0,
+            }
         } else {
             ValidationStatus::Fail {
                 reason: format!(
@@ -820,7 +876,9 @@ impl LLMIntegrationManager {
     /// Extract intent from suggestion
     fn extract_intent_from_suggestion(&self, suggestion: &LLMSuggestion) -> Result<String> {
         Ok(match &suggestion.suggestion_type {
-            LLMSuggestionType::CodeGeneration { code, .. } => format!("Generate code: {:.50}...", code),
+            LLMSuggestionType::CodeGeneration { code, .. } => {
+                format!("Generate code: {:.50}...", code)
+            }
             LLMSuggestionType::Refactoring { description, .. } => description.clone(),
             LLMSuggestionType::Documentation { to_document, .. } => to_document.clone(),
             LLMSuggestionType::TestCase { test_target, .. } => {

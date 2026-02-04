@@ -2,7 +2,7 @@
   "name": "sentinel-vscode",
   "displayName": "Sentinel AI Alignment",
   "description": "Mathematical alignment and goal drift prevention for AI agents.",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "publisher": "sentinel-team",
   "repository": {
     "type": "git",
@@ -17,16 +17,14 @@
     "Chat"
   ],
   "activationEvents": [
-    "onLanguage:rust",
-    "onLanguage:typescript",
-    "onLanguage:javascript",
-    "onLanguage:python"
+    "*"
   ],
   "main": "./out/extension.js",
   "scripts": {
-    "vscode:prepublish": "npm run compile && npm run build:webview",
+    "vscode:prepublish": "npm run esbuild-base -- --production && npm run build:webview",
+    "esbuild-base": "node esbuild.js",
     "compile": "tsc -p ./",
-    "watch": "tsc -watch -p ./",
+    "watch": "npm run esbuild-base -- --watch",
     "build:webview": "vite build",
     "watch:webview": "vite build --watch",
     "build": "npm run compile && npm run build:webview",
@@ -114,6 +112,7 @@
     "@types/vscode": "^1.75.0",
     "@vitejs/plugin-react": "^4.0.0",
     "concurrently": "^8.0.0",
+    "esbuild": "^0.27.2",
     "highlight.js": "^11.9.0",
     "marked": "^12.0.0",
     "react": "^18.2.0",

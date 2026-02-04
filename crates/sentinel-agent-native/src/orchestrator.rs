@@ -56,7 +56,7 @@
 use anyhow::{Context, Result};
 use sentinel_core::{
     cognitive_state::{Action, ActionDecision, ActionType, ActionResult},
-    goal_manifold::Goal,
+    goal_manifold::{Goal, predicate::Predicate},
     types::Timestamp,
     Uuid,
 };
@@ -1077,6 +1077,7 @@ mod tests {
         // Use builder for robust initialization
         let goal = Goal::builder()
             .description("Implement JWT authentication")
+            .success_criteria(vec![Predicate::AlwaysTrue])
             .build()
             .expect("Failed to build goal");
 
@@ -1115,6 +1116,7 @@ mod tests {
 
         let mut goal = Goal::builder()
             .description("Test goal")
+            .success_criteria(vec![Predicate::AlwaysTrue])
             .build()
             .expect("Failed to build goal");
         
