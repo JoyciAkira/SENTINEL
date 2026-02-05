@@ -27,7 +27,7 @@ tree-sitter = "0.20"
 tree-sitter-rust = "0.20"
 tree-sitter-typescript = "0.20"
 tree-sitter-python = "0.20"
-git2 = { version = "0.18", features = ["vendored-openssl"] }
+git2 = "0.18"
 ignore = "0.4"
 walkdir = "2.4"
 tempfile = "3.8"
