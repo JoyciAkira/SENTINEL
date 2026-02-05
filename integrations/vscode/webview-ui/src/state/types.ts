@@ -1,7 +1,8 @@
 export interface ChatMessage {
     id: string;
     role: 'user' | 'assistant';
-    content: string;
+    content: string; // The visible response
+    thoughtChain?: string[]; // Internal reasoning steps (NEW)
     timestamp: number;
     toolCalls?: ToolCallInfo[];
     fileOperations?: FileOperation[];
@@ -48,7 +49,7 @@ export interface AppState {
     // Actions
     setConnected: (connected: boolean) => void;
     addMessage: (msg: ChatMessage) => void;
-    updateLastAssistant: (content: string) => void;
+    updateLastAssistant: (content: string, thoughts?: string[]) => void;
     appendToolCall: (messageId: string, tool: ToolCallInfo) => void;
     setAlignment: (alignment: AlignmentState) => void;
     setGoals: (goals: GoalNodeState[]) => void;

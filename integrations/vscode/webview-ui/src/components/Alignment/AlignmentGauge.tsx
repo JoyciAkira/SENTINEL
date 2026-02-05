@@ -25,34 +25,66 @@ export default function AlignmentGauge() {
   if (!alignment) {
     return (
       <div className="alignment">
-        <span className="chat-subtitle">Alignment: --</span>
+        <div className="empty-state">No alignment data.</div>
       </div>
     );
   }
-  const trendArrow =
-    alignment.trend > 0 ? "\u25B2" : alignment.trend < 0 ? "\u25BC" : "";
-  const trendText =
-    alignment.trend !== 0
-      ? ` ${trendArrow} ${Math.abs(alignment.trend).toFixed(1)}`
-      : "";
 
-  const barColor =
-    score >= 75 ? "#4caf50" : score >= 40 ? "#ff9800" : "#f44336";
-  const pct = Math.min(100, Math.max(0, score));
+  const scoreValue = score ?? 0;
+  const barColor = scoreValue >= 85 
+    ? "var(--accent)" 
+    : scoreValue >= 60 
+      ? "var(--warning)" 
+      : "var(--danger)";
+
+  const glowStyle = scoreValue >= 85 ? {
+    boxShadow: `0 0 15px rgba(20, 184, 166, 0.4)`
+  } : {};
 
   return (
     <div className={`alignment${pulse ? " alignment--pulse" : ""}`}>
-      <div className="section-header" style={{ marginBottom: "6px" }}>
-        <span className="section-title">
-          Alignment {score.toFixed(1)}%{trendText}
-        </span>
-        <span className="chat-subtitle">{alignment.status}</span>
+      <div className="card-header" style={{ marginBottom: "12px", padding: 0 }}>
+        <div>
+          <h2 style={{ fontSize: "14px", fontWeight: 600 }}>{alignment.status}</h2>
+          <span style={{ fontSize: "11px" }}>Predictive integrity score</span>
+        </div>
+        <div className="chip" style={{ background: barColor, color: "white", border: "none" }}>
+          {scoreValue.toFixed(1)}%
+        </div>
       </div>
-      <div className="alignment-bar">
-        <div
-          className="alignment-bar__fill"
-          style={{ width: `${pct}%`, backgroundColor: barColor }}
+      
+      <div className="meter" style={{ height: "12px", background: "var(--bg-surface-3)" }}>
+        <span
+          style={{
+            width: `${Math.min(100, Math.max(0, scoreValue))}%`,
+            background: `linear-gradient(90deg, var(--accent), var(--accent-2))`,
+            transition: "width 1s cubic-bezier(0.4, 0, 0.2, 1)",
+            ...glowStyle
+          }}
         />
+      </div>
+
+      <div className="mini-grid" style={{ marginTop: "16px" }}>
+        <div className="insight">
+          <strong>Trend</strong>
+          <span style={{ color: alignment.trend >= 0 ? "var(--accent)" : "var(--danger)" }}>
+            {alignment.trend >= 0 ? "↑" : "↓"} {Math.abs(alignment.trend).toFixed(1)}%
+          </span>
+        </div>
+        <div className="insight">
+          <strong>Confidence</strong>
+          <span>{(alignment.confidence * 100).toFixed(0)}%</span>
+        </div>
+        <div className="insight">
+          <strong>Volatility</strong>
+          <span>Low</span>
+        </div>
+        <div className="insight">
+          <strong>Drift Risk</strong>
+          <span style={{ color: scoreValue < 70 ? "var(--warning)" : "inherit" }}>
+            {Math.max(0, 100 - scoreValue).toFixed(0)}%
+          </span>
+        </div>
       </div>
     </div>
   );

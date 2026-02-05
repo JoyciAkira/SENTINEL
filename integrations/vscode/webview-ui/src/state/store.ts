@@ -14,12 +14,17 @@ export const useStore = create<AppState>((set) => ({
     addMessage: (msg: ChatMessage) =>
         set((state) => ({ messages: [...state.messages, msg] })),
 
-    updateLastAssistant: (content: string) =>
+    updateLastAssistant: (content: string, thoughts?: string[]) =>
         set((state) => {
             const msgs = [...state.messages];
             for (let i = msgs.length - 1; i >= 0; i--) {
                 if (msgs[i].role === 'assistant') {
-                    msgs[i] = { ...msgs[i], content, streaming: false };
+                    msgs[i] = { 
+                        ...msgs[i], 
+                        content, 
+                        thoughtChain: thoughts || msgs[i].thoughtChain, // Preserve existing thoughts if not provided
+                        streaming: false 
+                    };
                     break;
                 }
             }
