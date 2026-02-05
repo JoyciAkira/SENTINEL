@@ -1,12 +1,14 @@
 import React from "react";
 import { useStore } from "../../state/store";
 import { useVSCodeAPI } from "../../hooks/useVSCodeAPI";
+import { Sparkles, Terminal, Shield, Target } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 const PROMPTS = [
-  { label: "Init", text: "/init" },
-  { label: "Status", text: "Show alignment status" },
-  { label: "Goals", text: "List current goals" },
-  { label: "Validate", text: "Validate next action" },
+  { label: "Initialize", text: "/init", icon: Sparkles },
+  { label: "Alignment Status", text: "Show current alignment status", icon: Shield },
+  { label: "List Goals", text: "What are the active goals?", icon: Target },
+  { label: "Verify Action", text: "Validate my next changes", icon: Terminal },
 ];
 
 export default function QuickPrompts() {
@@ -31,15 +33,20 @@ export default function QuickPrompts() {
   };
 
   return (
-    <div className="quick-prompts">
+    <div className="flex flex-wrap gap-2 mb-4 animate-in fade-in slide-in-from-bottom-1 duration-500 delay-100 fill-mode-both">
       {PROMPTS.map((prompt) => (
         <button
           key={prompt.label}
           type="button"
-          className="quick-prompt"
           disabled={!connected}
           onClick={() => handleSend(prompt.text)}
+          className={cn(
+            "flex items-center gap-1.5 px-3 py-1.5 rounded-full border bg-card/40 text-[11px] font-medium transition-all shadow-sm",
+            "hover:bg-accent hover:border-primary/20 hover:text-primary hover:-translate-y-0.5",
+            "disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
+          )}
         >
+          <prompt.icon className="size-3" />
           {prompt.label}
         </button>
       ))}

@@ -73,7 +73,13 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
   }
 
   updateGoals(
-    goals: Array<{ id: string; description: string; status: string }>,
+    goals: Array<{ 
+      id: string; 
+      description: string; 
+      status: string; 
+      dependencies?: string[];
+      value_to_root?: number;
+    }>,
   ): void {
     this.postMessage({
       type: "goalsUpdate",
@@ -154,13 +160,16 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
       return;
     }
 
+    // Generate a message ID for streaming/updates
+    const messageId = crypto.randomUUID();
+
     // ── Command Parsing ──────────────────────────────────────
     if (text.startsWith("/init ")) {
       const description = text.replace("/init ", "").trim();
       try {
         this.postMessage({
           type: "chatResponse",
-          id: crypto.randomUUID(),
+          id: messageId,
           content: `🚀 Initializing project: "${description}"...`,
         });
 
@@ -189,80 +198,44 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
     }
 
     try {
-      // Compose response from available MCP tools
-      const parts: string[] = [];
-
-      // First, check alignment
-      try {
-        const alignment = await this.client.getAlignment();
-        parts.push(
-          `**Current Alignment:** ${alignment.score.toFixed(1)}% (${alignment.status})`,
-        );
-      } catch {
-        parts.push("*Could not retrieve alignment status.*");
-      }
-
-      // Validate the user's described action
-      try {
-        const validation = await this.client.validateAction(
-          "user_request",
-          text,
-        );
-        parts.push("");
-        parts.push(`**Action Validation:**`);
-        parts.push(
-          `- Alignment Score: ${validation.alignment_score.toFixed(1)}%`,
-        );
-        parts.push(
-          `- Deviation Probability: ${(validation.deviation_probability * 100).toFixed(0)}%`,
-        );
-        parts.push(`- Risk Level: ${validation.risk_level}`);
-        parts.push(
-          `- ${validation.approved ? "Approved" : "Rejected"}: ${validation.rationale}`,
-        );
-
-        // Send tool call info
-        this.postMessage({
-          type: "toolCall",
-          messageId: "", // will be set by the response
-          name: "validate_action",
-          arguments: { action_type: "user_request", description: text },
-          result: JSON.stringify(validation, null, 2),
-          status: "success",
-        });
-      } catch {
-        parts.push("*Could not validate action.*");
-      }
-
-      // Propose strategy if relevant
-      try {
-        const strategy = await this.client.proposeStrategy(text);
-        if (strategy.patterns.length > 0) {
-          parts.push("");
-          parts.push(
-            `**Recommended Strategy** (${(strategy.confidence * 100).toFixed(0)}% confidence):`,
-          );
-          for (const pattern of strategy.patterns) {
-            parts.push(
-              `- **${pattern.name}**: ${pattern.description} (${(pattern.success_rate * 100).toFixed(0)}% success)`,
-            );
-          }
-        }
-      } catch {
-        // Strategy is optional
-      }
-
-      const responseContent = parts.join("\n");
+      // Send a "thinking" state
       this.postMessage({
         type: "chatResponse",
-        id: crypto.randomUUID(),
-        content: responseContent || "No response from Sentinel tools.",
+        id: messageId,
+        content: "",
+        streaming: true,
       });
-    } catch (err: any) {
+
+      // Use the NEW REAL INFERENCE chat tool
+      const result: any = await this.client.callTool("chat", {
+        message: text
+      });
+
+      let content = "No response from Sentinel.";
+      if (result && result.content && result.content[0] && result.content[0].text) {
+        content = result.content[0].text;
+      } else if (typeof result === 'string') {
+        content = result;
+      }
+
+      // Update with the final response
       this.postMessage({
         type: "chatResponse",
-        id: crypto.randomUUID(),
-        content: `Error: ${err.message}`,
+        id: messageId,
+        content: content,
+        streaming: false,
+      });
+
+      // After chat, refresh goals in background to keep UI synced
+      void this.refreshGoalSnapshot();
+      
+    } catch (err: any) {
+      this.outputChannel.appendLine(`Chat tool error: ${err.message}`);
+      this.postMessage({
+        type: "chatResponse",
+        id: messageId,
+        content: `Error: ${err.message}. Ensure LLM API keys are configured.`,
+        streaming: false,
       });
     }
   }
@@ -276,13 +249,24 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
     try {
       const graph: any = await this.client.callTool("get_goal_graph", {});
       const nodes = Array.isArray(graph?.nodes) ? graph.nodes : [];
+      const edges = Array.isArray(graph?.edges) ? graph.edges : [];
+
       const goals = nodes
         .filter((node: any) => node?.id && node.id !== "root")
-        .map((node: any) => ({
-          id: String(node.id),
-          description: String(node.data?.label ?? ""),
-          status: String(node.data?.status ?? "Unknown"),
-        }))
+        .map((node: any) => {
+          // Find dependencies where this node is the target (source -> target)
+          const nodeDependencies = edges
+            .filter((e: any) => e.target === node.id)
+            .map((e: any) => e.source);
+
+          return {
+            id: String(node.id),
+            description: String(node.data?.label ?? ""),
+            status: String(node.data?.status ?? "Unknown"),
+            dependencies: nodeDependencies,
+            value_to_root: node.data?.value ?? 0,
+          };
+        })
         .filter((goal: any) => goal.description.trim().length > 0);
 
       this.updateGoals(goals);

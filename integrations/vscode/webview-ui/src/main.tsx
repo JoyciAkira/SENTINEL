@@ -2,6 +2,8 @@ import React from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App";
 import "./styles.css";
+// Import Highlight.js theme
+import "highlight.js/styles/github-dark-dimmed.css";
 
 const container = document.getElementById("root");
 if (container) {

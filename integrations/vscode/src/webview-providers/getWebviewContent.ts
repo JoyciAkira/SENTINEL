@@ -34,16 +34,35 @@ function getProductionHtml(
         vscode.Uri.joinPath(extensionUri, 'out', 'webview')
     );
 
-    // Rewrite asset paths to use webview URIs
+    // Rewrite asset paths to use webview URIs (support /assets/ and assets/)
+    const webviewUriStr = webviewUri.toString();
     html = html.replace(
-        /(href|src)="(\/assets\/[^"]+)"/g,
+        /(href|src)="(\/?(?:assets\/)[^"]+)"/g,
         (_match, attr, assetPath) => {
-            return `${attr}="${webviewUri}${assetPath}"`;
+            const path = assetPath.startsWith('/') ? assetPath : `/${assetPath}`;
+            return `${attr}="${webviewUriStr}${path}"`;
         }
     );
 
-    // Add CSP meta tag
     const nonce = getNonce();
+
+    // Trusted Types: default policy so bundled code (e.g. new Function) is allowed in strict environments (Cursor)
+    const trustedTypesScript = [
+        `<script nonce="${nonce}">`,
+        "(function(){",
+        "if (typeof window.trustedTypes !== 'undefined' && window.trustedTypes.createPolicy) {",
+        "  try {",
+        "    window.trustedTypes.createPolicy('default', {",
+        "      createScript: function(s) { return s; },",
+        "      createScriptURL: function(s) { return s; }",
+        "    });",
+        "  } catch(e) {}",
+        "}",
+        "})();",
+        "</script>",
+    ].join('');
+
+    // CSP: allow nonced scripts; no require-trusted-types-for so our default policy can be used
     const csp = [
         `default-src 'none'`,
         `img-src ${webview.cspSource} data:`,
@@ -54,11 +73,11 @@ function getProductionHtml(
 
     html = html.replace(
         '<head>',
-        `<head>\n<meta http-equiv="Content-Security-Policy" content="${csp}">`
+        `<head>\n<meta http-equiv="Content-Security-Policy" content="${csp}">\n${trustedTypesScript}`
     );
 
-    // Add nonce to script tags
-    html = html.replace(/<script /g, `<script nonce="${nonce}" `);
+    // Add nonce to script tags that don't already have it (e.g. module bundle)
+    html = html.replace(/<script (?![^>]*\bnonce=)/g, `<script nonce="${nonce}" `);
 
     return html;
 }

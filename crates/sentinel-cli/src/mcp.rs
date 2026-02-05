@@ -273,6 +273,17 @@ async fn handle_request(req: McpRequest, id: Value) -> McpResponse {
                             },
                             "required": ["goal_id"]
                         }
+                    },
+                    {
+                        "name": "chat",
+                        "description": "Invia un messaggio all'agente Sentinel per ragionamento, pianificazione o esecuzione (Real Inference)",
+                        "inputSchema": {
+                            "type": "object",
+                            "properties": {
+                                "message": { "type": "string", "description": "Il messaggio dell'utente" }
+                            },
+                            "required": ["message"]
+                        }
                     }
                 ]
             })),
@@ -1080,6 +1091,33 @@ async fn handle_tool_call(params: Option<Value>) -> Option<Value> {
                 Err(e) => e,
             };
             Some(serde_json::json!({ "content": [{ "type": "text", "text": response_text }] }))
+        }
+
+        "chat" => {
+            let message = arguments
+                .and_then(|a| a.get("message"))
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+
+            if message.is_empty() {
+                return Some(serde_json::json!({
+                    "isError": true,
+                    "content": [{ "type": "text", "text": "Messaggio vuoto." }]
+                }));
+            }
+
+            let system_prompt = build_system_prompt() + 
+                "\nSei un agente Sentinel. Il tuo compito è aiutare l'utente con l'allineamento degli obiettivi. \
+                Usa un tono professionale, tecnico e deterministico. Rispondi in italiano.";
+
+            let response_text = match chat_with_llm(&system_prompt, message).await {
+                Some(content) => content,
+                None => "Errore durante l'inferenza dell'agente. Verifica le API key.".to_string(),
+            };
+
+            Some(serde_json::json!({
+                "content": [{ "type": "text", "text": response_text }]
+            }))
         }
 
         _ => Some(

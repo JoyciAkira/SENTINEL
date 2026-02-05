@@ -1,6 +1,9 @@
 import React, { useRef, useCallback } from "react";
 import { useStore } from "../../state/store";
 import { useVSCodeAPI } from "../../hooks/useVSCodeAPI";
+import { Send, Command, CornerDownLeft } from "lucide-react";
+import { Button } from "../ui/button";
+import { cn } from "@/lib/utils";
 
 export default function ChatInput() {
   const inputText = useStore((s) => s.inputText);
@@ -43,33 +46,57 @@ export default function ChatInput() {
 
   const handleInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setInputText(e.target.value);
-    // Auto-grow up to 5 lines
     const el = e.target;
     el.style.height = "auto";
-    el.style.height = Math.min(el.scrollHeight, 100) + "px";
+    el.style.height = Math.min(el.scrollHeight, 150) + "px";
   };
 
   return (
-    <div className="chat-input">
-      <div className="chat-input__row">
+    <div className="relative group animate-in slide-in-from-bottom-2 duration-500 delay-150 fill-mode-both">
+      <div className={cn(
+        "relative flex flex-col rounded-xl border bg-card/50 shadow-sm transition-all overflow-hidden",
+        "focus-within:border-primary/30 focus-within:ring-2 focus-within:ring-primary/10",
+        !connected && "opacity-50 cursor-not-allowed"
+      )}>
         <textarea
           ref={textareaRef}
           value={inputText}
           onChange={handleInput}
           onKeyDown={handleKeyDown}
-          placeholder={connected ? "Ask Sentinel..." : "Not connected"}
+          placeholder={connected ? "Ask Sentinel anything..." : "Establishing connection..."}
           disabled={!connected}
           rows={1}
-          className="chat-textarea"
+          className="w-full bg-transparent border-none focus:ring-0 text-sm px-4 pt-4 pb-12 resize-none min-h-[56px] placeholder:text-muted-foreground outline-none"
         />
-        <button
-          onClick={send}
-          disabled={!connected || !inputText.trim()}
-          className="btn"
-        >
-          Send
-        </button>
+        
+        <div className="absolute left-3 bottom-3 flex items-center gap-2">
+           <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-accent/30 border border-border text-[10px] text-muted-foreground font-medium">
+              <Command className="size-2.5" />
+              <span>Context Active</span>
+           </div>
+        </div>
+
+        <div className="absolute right-3 bottom-3 flex items-center gap-3">
+          <div className="hidden sm:flex items-center gap-1 text-[10px] text-muted-foreground font-medium mr-1 opacity-50">
+            <CornerDownLeft className="size-2.5" />
+            <span>Send</span>
+          </div>
+          <Button 
+            size="icon-xs" 
+            onClick={send}
+            disabled={!connected || !inputText.trim()}
+            className={cn(
+              "rounded-lg transition-all",
+              inputText.trim() ? "bg-primary scale-100" : "bg-muted scale-95"
+            )}
+          >
+            <Send className="size-3" />
+          </Button>
+        </div>
       </div>
+      
+      {/* Decorative gradient border */}
+      <div className="absolute -inset-px rounded-xl border-primary/20 pointer-events-none opacity-0 group-focus-within:opacity-100 transition-opacity" />
     </div>
   );
 }
