@@ -43,14 +43,11 @@ use sentinel_core::{
     alignment::{AlignmentField, ProjectState},
     cognitive_state::{Action, ActionDecision, ActionType, CognitiveState},
     federation::{Severity, ThreatAlert, ThreatType},
-    goal_manifold::{Goal, GoalManifold, Intent},
+    goal_manifold::{predicate::Predicate, Goal, GoalManifold, Intent},
     learning::{DeviationPattern, KnowledgeBase, LearningEngine},
     memory::MemoryManifold,
     Uuid,
 };
-use serde_json::Value;
-use std::collections::HashMap;
-use uuid::Uuid as ExternalUuid; // Avoid conflict if needed
 
 /// Sentinel Native Agent - The Revolutionary Coding Agent
 ///
@@ -211,6 +208,7 @@ impl SentinelAgent {
         let plan = self
             .create_hierarchical_plan(&task_analysis, &consensus_result)
             .await?;
+        let execution_compass = self.build_execution_compass(&task_analysis, &plan);
 
         // Phase 4: Execution with Continuous Alignment
         let execution_result = self.execute_plan(plan).await?;
@@ -236,6 +234,7 @@ impl SentinelAgent {
             actions_taken: execution_result.actions.len(),
             deviations_detected: execution_result.deviations.len(),
             success: execution_result.success,
+            execution_compass,
         })
     }
 
@@ -294,6 +293,14 @@ impl SentinelAgent {
         consensus: &ConsensusQueryResult,
     ) -> Result<planning::ExecutionPlan> {
         tracing::debug!("Creating hierarchical plan");
+
+        // Ensure analyzed goals are registered in the manifold, so planning is grounded
+        // in the same source of truth used by alignment and execution.
+        for goal in &task_analysis.goals {
+            if self.goal_manifold.get_goal(&goal.id).is_none() {
+                let _ = self.goal_manifold.add_goal(goal.clone());
+            }
+        }
 
         // Decompose task into sub-goals using Goal DAG
         let mut planner = self.planner.lock().await;
@@ -483,9 +490,10 @@ impl SentinelAgent {
 
     /// Execute a single action
     async fn execute_action(&mut self, action: Action) -> Result<NativeActionResult> {
-        tracing::debug!("Executing action: {:?}", action.action_type);
+        let action_type = action.action_type.clone();
+        tracing::debug!("Executing action: {:?}", action_type);
 
-        match action.action_type {
+        match action_type {
             ActionType::CreateFile { path, content } => {
                 let mut codegen = self.codegen.lock().await;
                 codegen
@@ -518,6 +526,7 @@ impl SentinelAgent {
 
         Ok(NativeActionResult {
             action_id: action.id,
+            action,
             state,
             duration_ms: 1000, // Placeholder
         })
@@ -540,19 +549,8 @@ impl SentinelAgent {
                 action_result.duration_ms as f64 / 1000.0,
             );
 
-            // We need the original action to call after_action.
-            // In a real system, we'd retrieve it from the execution log.
-            // For now, we'll use a placeholder or assume it's available.
-            let placeholder_action = sentinel_core::cognitive_state::Action::new(
-                sentinel_core::cognitive_state::ActionType::RunCommand {
-                    command: "true".to_string(),
-                    working_dir: std::path::PathBuf::from("."),
-                },
-                "Reconstructed action".to_string(),
-            );
-
             self.cognitive_state
-                .after_action(placeholder_action, core_result)
+                .after_action(action_result.action.clone(), core_result)
                 .await?;
         }
 
@@ -613,25 +611,80 @@ impl SentinelAgent {
     // Helper methods
 
     fn extract_goals_from_task(&self, task: &str) -> Result<Vec<Goal>> {
-        // Use NLP to extract goals from natural language task
-        // This is a placeholder - in production, use proper NLP
-        // For now, use simple heuristic extraction
+        let sanitized = task.trim();
+        if sanitized.is_empty() {
+            return Ok(Vec::new());
+        }
 
-        let goals = vec![];
+        let clauses: Vec<String> = sanitized
+            .split(&['.', ';'][..])
+            .flat_map(|segment| segment.split(" and "))
+            .map(str::trim)
+            .filter(|segment| !segment.is_empty())
+            .map(ToString::to_string)
+            .collect();
+
+        let mut goals = Vec::new();
+        for clause in clauses.iter().take(6) {
+            if let Ok(goal) = Goal::builder()
+                .description(clause.clone())
+                .add_success_criterion(Predicate::DirectoryExists(std::path::PathBuf::from(".")))
+                .value_to_root((1.0 / clauses.len().max(1) as f64).clamp(0.05, 0.5))
+                .build()
+            {
+                goals.push(goal);
+            }
+        }
+
+        if goals.is_empty() {
+            if let Ok(goal) = Goal::builder()
+                .description(sanitized.to_string())
+                .add_success_criterion(Predicate::DirectoryExists(std::path::PathBuf::from(".")))
+                .value_to_root(1.0)
+                .build()
+            {
+                goals.push(goal);
+            }
+        }
 
         Ok(goals)
     }
 
     fn extract_constraints(&self, task: &str) -> Result<Vec<String>> {
-        // Extract constraints from task
-        let constraints = vec![];
+        let lower = task.to_lowercase();
+        let mut constraints = Vec::new();
+
+        for token in [
+            "must", "without", "do not", "don't", "never", "only", "strictly",
+        ] {
+            if lower.contains(token) {
+                constraints.push(format!("Constraint signaled by '{}'", token));
+            }
+        }
 
         Ok(constraints)
     }
 
     fn estimate_complexity(&self, task: &str) -> f64 {
-        // Estimate task complexity
-        7.5 // Placeholder - should be dynamic
+        let words = task.split_whitespace().count() as f64;
+        let mut score = 2.0 + (words / 8.0);
+        let lower = task.to_lowercase();
+
+        for hard_signal in [
+            "refactor",
+            "migrate",
+            "distributed",
+            "security",
+            "consensus",
+            "orchestrator",
+            "production",
+        ] {
+            if lower.contains(hard_signal) {
+                score += 0.8;
+            }
+        }
+
+        score.clamp(1.0, 10.0)
     }
 
     async fn get_project_state(&self) -> Result<ProjectState> {
@@ -676,8 +729,85 @@ impl SentinelAgent {
         consensus: &ConsensusQueryResult,
         current_alignment: &sentinel_core::alignment::AlignmentVector,
     ) -> Result<planning::ExecutionPlan> {
-        // Try alternative approaches based on P2P network suggestions
-        todo!("Implement alternative plan generation")
+        // Conservative fallback: prefer proven network patterns and lightweight
+        // validation actions to recover alignment before high-risk operations.
+        let mut actions = Vec::new();
+
+        for goal in &task_analysis.goals {
+            if let Some(pattern) = consensus
+                .patterns
+                .iter()
+                .filter(|pattern| pattern.applicable_to_goal(goal))
+                .max_by(|a, b| a.success_rate.total_cmp(&b.success_rate))
+            {
+                actions.push(Action {
+                    id: Uuid::new_v4(),
+                    action_type: ActionType::ApplyPattern {
+                        pattern_id: pattern.id,
+                    },
+                    description: format!(
+                        "Fallback alignment recovery using proven pattern '{}'",
+                        pattern.name
+                    ),
+                    goal_id: Some(goal.id),
+                    expected_value: (pattern.alignment_impact + pattern.success_rate)
+                        .clamp(0.0, 1.0)
+                        / 2.0,
+                    created_at: chrono::Utc::now(),
+                    dependencies: Vec::new(),
+                    metadata: sentinel_core::cognitive_state::action::ActionMetadata::default(),
+                });
+            } else {
+                actions.push(Action::new(
+                    ActionType::RunTests {
+                        suite: "smoke".to_string(),
+                    },
+                    format!("Fallback verification for goal '{}'", goal.description),
+                ));
+            }
+        }
+
+        if actions.is_empty() {
+            actions.push(Action::new(
+                ActionType::RunTests {
+                    suite: "smoke".to_string(),
+                },
+                "Fallback verification without explicit goals".to_string(),
+            ));
+        }
+
+        Ok(planning::ExecutionPlan {
+            root_task: format!("{} [alternative-plan]", task_analysis.task),
+            sub_goals: task_analysis.goals.iter().map(|goal| goal.id).collect(),
+            actions,
+            complexity: (task_analysis.complexity * 0.8).max(1.0),
+            estimated_duration_minutes: ((task_analysis.complexity * 1.5)
+                + (100.0 - current_alignment.score) / 10.0)
+                as u32,
+        })
+    }
+
+    fn build_execution_compass(
+        &self,
+        task_analysis: &TaskAnalysis,
+        plan: &planning::ExecutionPlan,
+    ) -> ExecutionCompass {
+        ExecutionCompass {
+            where_we_are: format!(
+                "Task analyzed with {} goals and {} constraints",
+                task_analysis.goals.len(),
+                task_analysis.constraints.len()
+            ),
+            where_we_must_go: task_analysis.task.clone(),
+            how: format!(
+                "Plan with {} actions and estimated {} minutes",
+                plan.actions.len(),
+                plan.estimated_duration_minutes
+            ),
+            why: "Every action must increase goal alignment while respecting invariants"
+                .to_string(),
+            constraints: task_analysis.constraints.clone(),
+        }
     }
 }
 
@@ -703,6 +833,16 @@ pub struct ExecutionReport {
     pub actions_taken: usize,
     pub deviations_detected: usize,
     pub success: bool,
+    pub execution_compass: ExecutionCompass,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct ExecutionCompass {
+    pub where_we_are: String,
+    pub where_we_must_go: String,
+    pub how: String,
+    pub why: String,
+    pub constraints: Vec<String>,
 }
 
 /// Deviation details
@@ -717,6 +857,7 @@ struct DeviationDetails {
 #[derive(Debug, Clone)]
 struct NativeActionResult {
     action_id: Uuid,
+    action: Action,
     state: ProjectState,
     duration_ms: i64,
 }

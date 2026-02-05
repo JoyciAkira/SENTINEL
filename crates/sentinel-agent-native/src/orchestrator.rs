@@ -55,8 +55,8 @@
 
 use anyhow::{Context, Result};
 use sentinel_core::{
-    cognitive_state::{Action, ActionDecision, ActionType, ActionResult},
-    goal_manifold::{Goal, predicate::Predicate},
+    cognitive_state::{Action, ActionDecision, ActionResult, ActionType},
+    goal_manifold::{predicate::Predicate, Goal},
     types::Timestamp,
     Uuid,
 };
@@ -267,9 +267,7 @@ pub enum TaskStatus {
     Pending,
     Running,
     Completed,
-    Failed {
-        reason: String,
-    },
+    Failed { reason: String },
 }
 
 impl AgentOrchestrator {
@@ -358,10 +356,7 @@ impl AgentOrchestrator {
     /// - Manages dependencies and parallelism
     /// - Detects and resolves conflicts
     /// - Provides unified execution report
-    pub async fn execute_goal(
-        &mut self,
-        goal: &Goal,
-    ) -> Result<Vec<OrchestrationResult>> {
+    pub async fn execute_goal(&mut self, goal: &Goal) -> Result<Vec<OrchestrationResult>> {
         tracing::info!("Orchestrating execution for goal: {}", goal.description);
 
         // Step 1: Decompose goal into tasks
@@ -374,7 +369,9 @@ impl AgentOrchestrator {
         self.build_dependency_graph(&tasks)?;
 
         // Step 2: Detect conflicts
-        let conflicts = self.conflict_detector.detect_conflicts(&assignments, &self.task_queue.pending);
+        let conflicts = self
+            .conflict_detector
+            .detect_conflicts(&assignments, &self.task_queue.pending);
 
         // Step 3: Resolve conflicts
         let resolutions = self.conflict_detector.resolve_conflicts(&conflicts);
@@ -408,13 +405,10 @@ impl AgentOrchestrator {
         // Task 1: Create structure/design task
         tasks.push(Task {
             id: Uuid::new_v4(),
-            description: format!(
-                "Design and plan implementation for: {}",
-                goal.description
-            ),
+            description: format!("Design and plan implementation for: {}", goal.description),
             parent_id: Some(goal.id),
             required_agent: AgentType::Refactoring,
-            priority: 1.0, // Highest priority
+            priority: 1.0,                // Highest priority
             estimated_duration_ms: 60000, // 1 minute
             dependencies: vec![],
             anti_dependencies: vec![],
@@ -433,10 +427,7 @@ impl AgentOrchestrator {
 
         tasks.push(Task {
             id: Uuid::new_v4(),
-            description: format!(
-                "Core implementation: {}",
-                goal.description
-            ),
+            description: format!("Core implementation: {}", goal.description),
             parent_id: Some(goal.id),
             required_agent: agent_type,
             priority: 0.9,
@@ -449,10 +440,7 @@ impl AgentOrchestrator {
         if !desc_lower.contains("test") {
             tasks.push(Task {
                 id: Uuid::new_v4(),
-                description: format!(
-                    "Write and run tests for: {}",
-                    goal.description
-                ),
+                description: format!("Write and run tests for: {}", goal.description),
                 parent_id: Some(goal.id),
                 required_agent: AgentType::Testing,
                 priority: 0.7,
@@ -465,10 +453,7 @@ impl AgentOrchestrator {
         // Task 4: Documentation task
         tasks.push(Task {
             id: Uuid::new_v4(),
-            description: format!(
-                "Write documentation for: {}",
-                goal.description
-            ),
+            description: format!("Write documentation for: {}", goal.description),
             parent_id: Some(goal.id),
             required_agent: AgentType::Documentation,
             priority: 0.5,
@@ -501,10 +486,9 @@ impl AgentOrchestrator {
 
         for task in &sorted_tasks {
             // Find available agents of required type
-            let available_agents = self
-                .agents
-                .get(&task.required_agent)
-                .ok_or_else(|| anyhow::anyhow!("No agents available for type: {:?}", task.required_agent))?;
+            let available_agents = self.agents.get(&task.required_agent).ok_or_else(|| {
+                anyhow::anyhow!("No agents available for type: {:?}", task.required_agent)
+            })?;
 
             // Select least loaded agent (load balancing)
             let selected_agent = available_agents
@@ -538,9 +522,7 @@ impl AgentOrchestrator {
 
         // Add nodes
         for task in tasks {
-            self.dependency_graph
-                .nodes
-                .insert(task.id, task.clone());
+            self.dependency_graph.nodes.insert(task.id, task.clone());
 
             self.dependency_graph
                 .edges
@@ -549,10 +531,7 @@ impl AgentOrchestrator {
 
         // Validate no cycles
         if let Some(cycle) = self.detect_dependency_cycle() {
-            return Err(anyhow::anyhow!(
-                "Dependency cycle detected: {:?}",
-                cycle
-            ));
+            return Err(anyhow::anyhow!("Dependency cycle detected: {:?}", cycle));
         }
 
         // Validate no anti-dependency violations
@@ -662,9 +641,8 @@ impl AgentOrchestrator {
             let agent_id = assignment.agent_id;
 
             // Spawn task execution
-            let result = join_set.spawn(async move {
-                Self::execute_single_task(task_clone, agent_id).await
-            });
+            let result = join_set
+                .spawn(async move { Self::execute_single_task(task_clone, agent_id).await });
         }
 
         // Wait for all parallel tasks
@@ -706,33 +684,44 @@ impl AgentOrchestrator {
     async fn execute_single_task(task: Task, agent_id: Uuid) -> Result<OrchestrationResult> {
         let start_time = std::time::Instant::now();
 
-        tracing::info!(
-            "Agent {:?} executing task: {}",
-            agent_id,
-            task.description
-        );
+        tracing::info!("Agent {:?} executing task: {}", agent_id, task.description);
 
         // Simulate task execution
         // In production, this would delegate to the actual specialized agent
         let (status, execution_time_ms) = match task.required_agent {
             AgentType::Testing => {
-                tokio::time::sleep(tokio::time::Duration::from_millis(task.estimated_duration_ms.into())).await;
+                tokio::time::sleep(tokio::time::Duration::from_millis(
+                    task.estimated_duration_ms.into(),
+                ))
+                .await;
                 (TaskStatus::Completed, task.estimated_duration_ms)
             }
             AgentType::CodeGeneration => {
-                tokio::time::sleep(tokio::time::Duration::from_millis(task.estimated_duration_ms.into())).await;
+                tokio::time::sleep(tokio::time::Duration::from_millis(
+                    task.estimated_duration_ms.into(),
+                ))
+                .await;
                 (TaskStatus::Completed, task.estimated_duration_ms)
             }
             AgentType::Refactoring => {
-                tokio::time::sleep(tokio::time::Duration::from_millis(task.estimated_duration_ms.into())).await;
+                tokio::time::sleep(tokio::time::Duration::from_millis(
+                    task.estimated_duration_ms.into(),
+                ))
+                .await;
                 (TaskStatus::Completed, task.estimated_duration_ms)
             }
             AgentType::Documentation => {
-                tokio::time::sleep(tokio::time::Duration::from_millis(task.estimated_duration_ms.into())).await;
+                tokio::time::sleep(tokio::time::Duration::from_millis(
+                    task.estimated_duration_ms.into(),
+                ))
+                .await;
                 (TaskStatus::Completed, task.estimated_duration_ms)
             }
             AgentType::Deployment => {
-                tokio::time::sleep(tokio::time::Duration::from_millis(task.estimated_duration_ms.into())).await;
+                tokio::time::sleep(tokio::time::Duration::from_millis(
+                    task.estimated_duration_ms.into(),
+                ))
+                .await;
                 (TaskStatus::Completed, task.estimated_duration_ms)
             }
         };
@@ -779,7 +768,10 @@ impl AgentOrchestrator {
     /// - Authority-based: Higher authority wins
     /// - Serialization: Run tasks sequentially
     /// - Deferral: Defer conflicting task
-    fn resolve_conflicts(&mut self, conflicts: &[ConflictDetectionResult]) -> Vec<ConflictResolution> {
+    fn resolve_conflicts(
+        &mut self,
+        conflicts: &[ConflictDetectionResult],
+    ) -> Vec<ConflictResolution> {
         tracing::debug!("Resolving {} conflicts", conflicts.len());
 
         let mut resolutions = Vec::new();
@@ -798,8 +790,8 @@ impl AgentOrchestrator {
                 }
                 ConflictType::GoalConflict { .. } => {
                     // Goal conflicts: higher authority wins
-                    let higher_authority = self
-                        .find_higher_authority_agent(&conflict.involved_agents);
+                    let higher_authority =
+                        self.find_higher_authority_agent(&conflict.involved_agents);
 
                     ConflictResolution {
                         conflict_id: Uuid::new_v4(),
@@ -888,10 +880,7 @@ impl AgentOrchestrator {
             self.stats.parallel_tasks += completed_count as u64;
         }
 
-        let total_time: u64 = results
-            .iter()
-            .map(|r| r.execution_time_ms)
-            .sum();
+        let total_time: u64 = results.iter().map(|r| r.execution_time_ms).sum();
 
         if completed_count > 0 {
             self.stats.avg_parallelism = self.stats.parallel_tasks as f64 / completed_count as f64;
@@ -949,17 +938,17 @@ impl ConflictDetector {
     }
 
     /// Detect conflicts between assignments
-    pub fn detect_conflicts(&self, assignments: &[TaskAssignment], tasks: &[Task]) -> Vec<ConflictDetectionResult> {
+    pub fn detect_conflicts(
+        &self,
+        assignments: &[TaskAssignment],
+        tasks: &[Task],
+    ) -> Vec<ConflictDetectionResult> {
         let mut conflicts = Vec::new();
 
         // Check for resource contention
         for (i, assignment_a) in assignments.iter().enumerate() {
             for assignment_b in assignments.iter().skip(i + 1) {
-                if self.tasks_share_resource(
-                    tasks,
-                    &assignment_a.task_id,
-                    &assignment_b.task_id,
-                ) {
+                if self.tasks_share_resource(tasks, &assignment_a.task_id, &assignment_b.task_id) {
                     let conflict_id = Uuid::new_v4();
 
                     conflicts.push(ConflictDetectionResult {
@@ -983,9 +972,12 @@ impl ConflictDetector {
     }
 
     /// Resolve detected conflicts
-    pub fn resolve_conflicts(&mut self, conflicts: &[ConflictDetectionResult]) -> Vec<ConflictResolution> {
+    pub fn resolve_conflicts(
+        &mut self,
+        conflicts: &[ConflictDetectionResult],
+    ) -> Vec<ConflictResolution> {
         let mut resolutions = Vec::new();
-        
+
         for conflict in conflicts {
             // Simple resolution: serialize execution
             let resolution = ConflictResolution {
@@ -995,21 +987,16 @@ impl ConflictDetector {
                 resolved_at: chrono::Utc::now(),
                 involved_agents: conflict.involved_agents.clone(),
             };
-            
+
             resolutions.push(resolution.clone());
             self.resolved_conflicts.push(resolution);
         }
-        
+
         resolutions
     }
 
     /// Check if two tasks share a resource
-    fn tasks_share_resource(
-        &self,
-        tasks: &[Task],
-        task_a_id: &Uuid,
-        task_b_id: &Uuid,
-    ) -> bool {
+    fn tasks_share_resource(&self, tasks: &[Task], task_a_id: &Uuid, task_b_id: &Uuid) -> bool {
         // Find tasks
         let task_a = tasks.iter().find(|t| t.id == *task_a_id);
         let task_b = tasks.iter().find(|t| t.id == *task_b_id);
@@ -1050,16 +1037,35 @@ impl ConflictDetector {
     }
 
     /// Check for goal conflicts
-    fn check_goal_conflicts(&self, conflicts: &mut Vec<ConflictDetectionResult>, assignments: &[TaskAssignment]) {
-        // This is simplified - in production, would check actual goal IDs
-        todo!("Implement goal conflict detection");
+    fn check_goal_conflicts(
+        &self,
+        conflicts: &mut Vec<ConflictDetectionResult>,
+        assignments: &[TaskAssignment],
+    ) {
+        let mut task_to_agents: HashMap<Uuid, Vec<Uuid>> = HashMap::new();
+        for assignment in assignments {
+            task_to_agents
+                .entry(assignment.task_id)
+                .or_default()
+                .push(assignment.agent_id);
+        }
+
+        for (task_id, agents) in task_to_agents {
+            if agents.len() > 1 {
+                conflicts.push(ConflictDetectionResult {
+                    conflict_id: Uuid::new_v4(),
+                    conflict_type: ConflictType::GoalConflict { goal_id: task_id },
+                    involved_agents: agents,
+                });
+            }
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use sentinel_core::types::{ProbabilityDistribution, GoalStatus};
+    use sentinel_core::types::{GoalStatus, ProbabilityDistribution};
 
     #[test]
     fn test_agent_orchestrator_initialization() {
@@ -1093,17 +1099,16 @@ mod tests {
     fn test_separate_conflicted_and_parallel_tasks() {
         let orchestrator = AgentOrchestrator::new();
 
-        let assignments = vec![
-            TaskAssignment {
-                task_id: Uuid::new_v4(),
-                agent_id: Uuid::new_v4(),
-                assigned_at: chrono::Utc::now(),
-            },
-        ];
+        let assignments = vec![TaskAssignment {
+            task_id: Uuid::new_v4(),
+            agent_id: Uuid::new_v4(),
+            assigned_at: chrono::Utc::now(),
+        }];
 
         let resolutions = vec![];
 
-        let (conflicted, parallel) = orchestrator.separate_conflicted_and_parallel_tasks(&assignments, &resolutions);
+        let (conflicted, parallel) =
+            orchestrator.separate_conflicted_and_parallel_tasks(&assignments, &resolutions);
 
         // No conflicts, all parallel
         assert_eq!(conflicted.len(), 0);
@@ -1119,7 +1124,7 @@ mod tests {
             .success_criteria(vec![Predicate::AlwaysTrue])
             .build()
             .expect("Failed to build goal");
-        
+
         // Manually set complexity for deterministic test
         goal.complexity_estimate = ProbabilityDistribution::normal(50.0, 5.0);
 

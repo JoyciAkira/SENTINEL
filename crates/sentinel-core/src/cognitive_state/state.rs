@@ -9,13 +9,13 @@ use super::decision::Decision;
 use super::meta_state::MetaCognitiveState;
 use crate::alignment::AlignmentField;
 use crate::error::Result;
+use crate::external::DependencyWatcher;
 use crate::goal_manifold::goal::Goal;
 use crate::goal_manifold::GoalManifold;
 use crate::learning::{
-    LearningEngine, CompletedProject, RecordedAction, ActionContext, 
-    ProjectSnapshot, TestResults, ProjectMetadata, AlignmentTrend
+    ActionContext, AlignmentTrend, CompletedProject, LearningEngine, ProjectMetadata,
+    ProjectSnapshot, RecordedAction, TestResults,
 };
-use crate::external::DependencyWatcher;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use uuid::Uuid;
@@ -106,7 +106,7 @@ impl CognitiveState {
     /// Focus on a goal and automatically retrieve a strategy if available
     pub async fn focus_on(&mut self, goal_id: Uuid) -> Result<Option<crate::learning::Strategy>> {
         self.current_focus = Some(goal_id);
-        
+
         if let Some(goal) = self.goal_manifold.get_goal(&goal_id) {
             let strategy = self.learning_engine.suggest_strategy(goal).await?;
             Ok(Some(strategy))
@@ -116,30 +116,44 @@ impl CognitiveState {
     }
 
     /// Complete a goal and trigger automatic learning
-    pub async fn complete_goal(&mut self, goal_id: Uuid) -> Result<crate::learning::LearningReport> {
+    pub async fn complete_goal(
+        &mut self,
+        goal_id: Uuid,
+    ) -> Result<crate::learning::LearningReport> {
         // 1. Mark goal as completed in manifold
-        let goal = self.goal_manifold.get_goal_mut(&goal_id)
+        let goal = self
+            .goal_manifold
+            .get_goal_mut(&goal_id)
             .ok_or_else(|| crate::error::GoalError::NotFound(goal_id))?;
-        
+
         goal.mark_ready().ok(); // Ensure proper state transitions
         goal.start().ok();
         goal.begin_validation().ok();
         goal.complete().map_err(crate::error::SentinelError::from)?;
 
         // 2. Prepare CompletedProject for learning
-        let relevant_actions: Vec<RecordedAction> = self.execution_trace.iter()
+        let relevant_actions: Vec<RecordedAction> = self
+            .execution_trace
+            .iter()
             .filter(|a| a.goal_id == Some(goal_id))
             .map(|a| RecordedAction {
                 action: a.clone(),
                 timestamp: a.created_at,
-                alignment_score: 90.0, 
+                alignment_score: 90.0,
                 goal_id,
-                outcome: crate::learning::ActionResult::Success { alignment_improved: true },
+                outcome: crate::learning::ActionResult::Success {
+                    alignment_improved: true,
+                },
                 context: ActionContext {
                     current_goal: goal_id,
                     state_snapshot: ProjectSnapshot {
                         files: vec![],
-                        test_results: TestResults { passed: 0, failed: 0, skipped: 0, coverage: 0.0 },
+                        test_results: TestResults {
+                            passed: 0,
+                            failed: 0,
+                            skipped: 0,
+                            coverage: 0.0,
+                        },
                         goal_status: vec![],
                         timestamp: crate::types::now(),
                     },
@@ -170,7 +184,10 @@ impl CognitiveState {
 
         // 3. Trigger learning
         self.cognitive_mode = CognitiveMode::Learning;
-        let report = self.learning_engine.learn_from_completion(&completed_project).await?;
+        let report = self
+            .learning_engine
+            .learn_from_completion(&completed_project)
+            .await?;
         self.cognitive_mode = CognitiveMode::Planning;
 
         Ok(report)
@@ -331,16 +348,57 @@ impl CognitiveState {
             .collect()
     }
 
-    async fn satisfies_invariants(&self, _action: &Action) -> bool {
-        true
+    async fn satisfies_invariants(&self, action: &Action) -> bool {
+        self.find_invariant_violations(action).await.is_empty()
     }
 
-    async fn find_invariant_violations(&self, _action: &Action) -> Vec<String> {
-        Vec::new()
+    async fn find_invariant_violations(&self, action: &Action) -> Vec<String> {
+        let state = self.get_current_state();
+        let predicate_state = state.to_predicate_state();
+        let mut violations: Vec<String> = self
+            .goal_manifold
+            .validate_invariants(&predicate_state)
+            .await
+            .into_iter()
+            .map(|violation| format!("{:?}: {}", violation.severity, violation.description))
+            .collect();
+
+        if let super::action::ActionType::DeleteFile { path, .. } = &action.action_type {
+            let path_str = path.to_string_lossy();
+            if self.goal_manifold.invariants.iter().any(|inv| {
+                inv.description
+                    .to_lowercase()
+                    .contains(&path_str.to_lowercase())
+            }) {
+                violations.push(format!(
+                    "Action deletes '{}', which is explicitly referenced by an invariant",
+                    path_str
+                ));
+            }
+        }
+
+        violations
     }
 
-    fn find_better_alternatives(&self, _action: &Action) -> Vec<Action> {
-        Vec::new()
+    fn find_better_alternatives(&self, action: &Action) -> Vec<Action> {
+        match &action.action_type {
+            super::action::ActionType::DeleteFile { path, .. } => vec![Action::new(
+                super::action::ActionType::RunTests {
+                    suite: "regression".to_string(),
+                },
+                format!(
+                    "Validate necessity before deleting '{}'",
+                    path.to_string_lossy()
+                ),
+            )],
+            super::action::ActionType::RunCommand { .. } => vec![Action::new(
+                super::action::ActionType::RunTests {
+                    suite: "smoke".to_string(),
+                },
+                "Run low-risk smoke tests before command execution".to_string(),
+            )],
+            _ => Vec::new(),
+        }
     }
 
     fn compute_value_of_information(&self, action: &Action) -> f64 {
@@ -354,8 +412,7 @@ impl CognitiveState {
         0.5
     }
 
-    fn update_beliefs(&mut self, _action: &Action, _result: &ActionResult) {
-    }
+    fn update_beliefs(&mut self, _action: &Action, _result: &ActionResult) {}
 
     async fn handle_unexpected_deviation(
         &mut self,
@@ -375,19 +432,18 @@ impl CognitiveState {
         Ok(())
     }
 
-    fn resolve_uncertainties(&mut self, _action: &Action, _result: &ActionResult) {
-    }
+    fn resolve_uncertainties(&mut self, _action: &Action, _result: &ActionResult) {}
 
     /// Get the current status of mapped infrastructure endpoints
     pub async fn check_infrastructure_health(&self) -> HashMap<String, bool> {
         let mut health_map = HashMap::new();
-        
+
         for (name, url) in &self.goal_manifold.root_intent.infrastructure_map {
             // Simplified health check: try to parse as URL or just assume true for mock
             // In a real implementation, this would be a network ping/request
-            health_map.insert(name.clone(), true); 
+            health_map.insert(name.clone(), true);
         }
-        
+
         health_map
     }
 
@@ -554,7 +610,9 @@ mod tests {
         // 1. Take some actions (identical actions to trigger frequent pattern mining)
         for i in 0..4 {
             let mut action = Action::new(
-                ActionType::RunTests { suite: "unit".to_string() },
+                ActionType::RunTests {
+                    suite: "unit".to_string(),
+                },
                 format!("Run tests {}", i),
             );
             action.goal_id = Some(goal_id);
@@ -565,9 +623,14 @@ mod tests {
         // 2. Complete goal and trigger learning
         let report = state.complete_goal(goal_id).await.unwrap();
         assert!(report.success_patterns_extracted > 0);
-        
+
         // 3. Verify knowledge base has been updated
-        let stats = state.learning_engine.knowledge_base().get_statistics().await.unwrap();
+        let stats = state
+            .learning_engine
+            .knowledge_base()
+            .get_statistics()
+            .await
+            .unwrap();
         assert!(stats.total_patterns > 0);
 
         // 4. Start new similar goal and verify strategy suggestion
@@ -576,10 +639,10 @@ mod tests {
             .add_success_criterion(crate::goal_manifold::predicate::Predicate::AlwaysTrue)
             .build()
             .unwrap();
-        
+
         let new_id = new_goal.id;
         state.goal_manifold.add_goal(new_goal).unwrap();
-        
+
         let strategy = state.focus_on(new_id).await.unwrap();
         assert!(strategy.is_some());
         assert!(!strategy.unwrap().recommended_approaches.is_empty());

@@ -314,6 +314,14 @@ async fn handle_request(req: McpRequest, id: Value) -> McpResponse {
 
 /// Trova il percorso del file sentinel.json risalendo le directory
 fn find_manifold_path() -> Option<PathBuf> {
+    // 0. Explicit manifold file override
+    if let Ok(manifold_path) = std::env::var("SENTINEL_MANIFOLD") {
+        let path = PathBuf::from(manifold_path);
+        if path.exists() {
+            return Some(path);
+        }
+    }
+
     // 1. Controlla variabile d'ambiente (per override esplicito)
     if let Ok(root) = std::env::var("SENTINEL_ROOT") {
         let path = PathBuf::from(root).join("sentinel.json");
@@ -333,14 +341,6 @@ fn find_manifold_path() -> Option<PathBuf> {
                 break;
             }
         }
-    }
-
-    // 3. Fallback hardcoded per questo ambiente (Fix per esecuzione da root /)
-    // Nota: Include lo spazio finale nel nome della cartella come da filesystem attuale
-    let fallback_path =
-        PathBuf::from("/Users/danielecorrao/Documents/REPOSITORIES_GITHUB/SENTINEL /sentinel.json");
-    if fallback_path.exists() {
-        return Some(fallback_path);
     }
 
     None
@@ -1106,7 +1106,7 @@ async fn handle_tool_call(params: Option<Value>) -> Option<Value> {
                 }));
             }
 
-            let system_prompt = build_system_prompt() + 
+            let system_prompt = build_system_prompt() +
                 "\nSei un agente Sentinel. Il tuo compito è aiutare l'utente con l'allineamento degli obiettivi. \
                 Usa un tono professionale, tecnico e deterministico. Rispondi in italiano.";
 
