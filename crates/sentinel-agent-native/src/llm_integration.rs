@@ -1030,3 +1030,146 @@ struct PreValidationResult {
     pub passed: bool,
     pub explanation: String,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use anyhow::Result;
+    use sentinel_core::goal_manifold::Intent;
+
+    #[derive(Debug)]
+    struct DummyClient;
+
+    #[async_trait::async_trait]
+    impl LLMClient for DummyClient {
+        async fn generate_code(
+            &self,
+            _prompt: &str,
+            _context: &LLMContext,
+        ) -> Result<LLMSuggestion> {
+            Err(anyhow::anyhow!("not used in tests"))
+        }
+
+        async fn suggest_refactoring(
+            &self,
+            _code: &str,
+            _context: &LLMContext,
+        ) -> Result<LLMSuggestion> {
+            Err(anyhow::anyhow!("not used in tests"))
+        }
+
+        async fn generate_documentation(
+            &self,
+            _code: &str,
+            _context: &LLMContext,
+        ) -> Result<LLMSuggestion> {
+            Err(anyhow::anyhow!("not used in tests"))
+        }
+
+        async fn generate_tests(
+            &self,
+            _code: &str,
+            _context: &LLMContext,
+        ) -> Result<LLMSuggestion> {
+            Err(anyhow::anyhow!("not used in tests"))
+        }
+
+        async fn explain_concept(
+            &self,
+            _concept: &str,
+            _context: &LLMContext,
+        ) -> Result<LLMSuggestion> {
+            Err(anyhow::anyhow!("not used in tests"))
+        }
+    }
+
+    fn test_manager() -> LLMIntegrationManager {
+        let intent = Intent::new(
+            "Build authentication service with JWT validation and secure secret handling",
+            vec!["Use Rust", "Add tests", "Avoid hardcoded secrets"],
+        )
+        .with_outcome("Reliable auth pipeline");
+        let manifold = Arc::new(GoalManifold::new(intent));
+        let alignment_field = Arc::new(AlignmentField::new(manifold.as_ref().clone()));
+        LLMIntegrationManager {
+            goal_manifold: manifold,
+            alignment_field,
+            llm_client: Arc::new(DummyClient),
+            quality_thresholds: QualityThreshold::default(),
+            stats: LLMIntegrationStats::default(),
+            suggestion_semaphore: Arc::new(Semaphore::new(1)),
+        }
+    }
+
+    #[test]
+    fn tokenize_text_filters_stop_words_and_short_tokens() {
+        let manager = test_manager();
+        let tokens = manager.tokenize_text("Build the auth service in Rust and add tests");
+        assert!(tokens.contains("auth"));
+        assert!(tokens.contains("service"));
+        assert!(tokens.contains("rust"));
+        assert!(!tokens.contains("the"));
+        assert!(!tokens.contains("in"));
+    }
+
+    #[tokio::test]
+    async fn compute_alignment_rewards_relevant_suggestion() {
+        let manager = test_manager();
+        let relevant = manager
+            .compute_alignment_for_suggestion(
+                "implement jwt auth with secure token verification",
+                "Implement JWT auth validation, add tests, avoid hardcoded secrets.",
+            )
+            .await
+            .unwrap();
+        let irrelevant = manager
+            .compute_alignment_for_suggestion(
+                "implement jwt auth with secure token verification",
+                "Refactor UI theme and update CSS animations for dashboard colors.",
+            )
+            .await
+            .unwrap();
+        assert!(relevant >= 50.0, "relevant score too low: {}", relevant);
+        assert!(
+            relevant > irrelevant + 15.0,
+            "relevant={} should exceed irrelevant={} by >= 15",
+            relevant,
+            irrelevant
+        );
+    }
+
+    #[tokio::test]
+    async fn compute_alignment_penalizes_anti_goal_markers() {
+        let manager = test_manager();
+        let clean = manager
+            .compute_alignment_for_suggestion(
+                "secure auth",
+                "Implement secure auth and add tests for token validation.",
+            )
+            .await
+            .unwrap();
+        let penalized = manager
+            .compute_alignment_for_suggestion(
+                "secure auth",
+                "Implement secure auth but skip tests and hardcode secret.",
+            )
+            .await
+            .unwrap();
+        assert!(
+            penalized + 20.0 < clean,
+            "penalized={} clean={} expected strong penalty",
+            penalized,
+            clean
+        );
+    }
+
+    #[tokio::test]
+    async fn compute_alignment_returns_zero_for_empty_suggestion() {
+        let manager = test_manager();
+        let score = manager
+            .compute_alignment_for_suggestion("any intent", "   ")
+            .await
+            .unwrap();
+        assert_eq!(score, 0.0);
+    }
+}
