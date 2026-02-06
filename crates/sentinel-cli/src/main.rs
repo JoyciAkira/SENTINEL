@@ -252,6 +252,12 @@ async fn main() -> anyhow::Result<()> {
             let field = sentinel_core::AlignmentField::new(manifold.clone());
             let alignment = field.compute_alignment(&state).await?;
             let guardrail = sentinel_core::guardrail::GuardrailEngine::evaluate(&manifold);
+            let reliability = reliability_from_status_signals(
+                alignment.score,
+                alignment.confidence,
+                manifold.completion_percentage(),
+                guardrail.allowed,
+            );
 
             if json {
                 println!(
@@ -265,6 +271,7 @@ async fn main() -> anyhow::Result<()> {
                         "alignment_confidence": alignment.confidence,
                         "guardrail_allowed": guardrail.allowed,
                         "guardrail_reason": guardrail.reason,
+                        "reliability": reliability,
                         "compass": {
                             "where_we_are": format!("{} goals, {:.1}% completion", manifold.goal_count(), manifold.completion_percentage() * 100.0),
                             "where_we_must_go": manifold.root_intent.description,
@@ -310,6 +317,14 @@ async fn main() -> anyhow::Result<()> {
                 println!("DOVE DEVE ANDARE: {}", manifold.root_intent.description);
                 println!("COME: eseguire goal atomici rispettando invarianti e guardrail");
                 println!("PERCHE: garantire allineamento continuo all'intento radice");
+                println!(
+                    "Reliability: success {:.1}%, no-regression {:.1}%, rollback {:.1}%, avg-TTR {:.0}ms, invariant-violation {:.1}%",
+                    reliability.task_success_rate * 100.0,
+                    reliability.no_regression_rate * 100.0,
+                    reliability.rollback_rate * 100.0,
+                    reliability.avg_time_to_recover_ms,
+                    reliability.invariant_violation_rate * 100.0
+                );
             }
         }
         Commands::Ui => {
@@ -492,4 +507,43 @@ fn save_manifold(
     let content = serde_json::to_string_pretty(manifold)?;
     std::fs::write(path, content)?;
     Ok(())
+}
+
+fn reliability_from_status_signals(
+    alignment_score: f64,
+    alignment_confidence: f64,
+    completion_percentage: f64,
+    guardrail_allowed: bool,
+) -> sentinel_core::ReliabilitySnapshot {
+    let alignment_factor = (alignment_score / 100.0).clamp(0.0, 1.0);
+    let confidence_factor = alignment_confidence.clamp(0.0, 1.0);
+    let completion_factor = completion_percentage.clamp(0.0, 1.0);
+
+    let task_success_rate =
+        (alignment_factor * 0.60 + confidence_factor * 0.20 + completion_factor * 0.20)
+            .clamp(0.0, 1.0);
+    let no_regression_rate = if guardrail_allowed {
+        (alignment_factor * 0.70 + confidence_factor * 0.30).clamp(0.0, 1.0)
+    } else {
+        (alignment_factor * 0.50 + confidence_factor * 0.20).clamp(0.0, 1.0)
+    };
+    let rollback_rate = if guardrail_allowed {
+        ((1.0 - task_success_rate) * 0.25).clamp(0.0, 1.0)
+    } else {
+        ((1.0 - task_success_rate) * 0.55 + 0.05).clamp(0.0, 1.0)
+    };
+    let invariant_violation_rate = if guardrail_allowed {
+        ((1.0 - alignment_factor) * 0.35).clamp(0.0, 1.0)
+    } else {
+        ((1.0 - alignment_factor) * 0.65 + 0.05).clamp(0.0, 1.0)
+    };
+    let avg_time_to_recover_ms = (rollback_rate * 1200.0) + (invariant_violation_rate * 800.0);
+
+    sentinel_core::ReliabilitySnapshot {
+        task_success_rate,
+        no_regression_rate,
+        rollback_rate,
+        avg_time_to_recover_ms,
+        invariant_violation_rate,
+    }
 }

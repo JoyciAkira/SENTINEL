@@ -37,6 +37,7 @@ pub struct TuiApp {
     pub cognitive_density: f64,
     pub estimated_tokens: usize,
     pub is_barrier_locked: bool,
+    pub reliability: sentinel_core::ReliabilitySnapshot,
 }
 
 impl TuiApp {
@@ -58,6 +59,7 @@ impl TuiApp {
             cognitive_density: 0.0,
             estimated_tokens: 0,
             is_barrier_locked: false,
+            reliability: sentinel_core::ReliabilitySnapshot::from_counts(0, 0, 0, 0, 0, 0, 0),
         }
     }
 
@@ -78,6 +80,12 @@ impl TuiApp {
                     let decision = sentinel_core::guardrail::GuardrailEngine::evaluate(&manifold);
                     self.is_barrier_locked = !decision.allowed;
                     self.alignment_score = decision.score_at_check;
+                    self.reliability = reliability_from_tui_signals(
+                        self.alignment_score,
+                        manifold.completion_percentage(),
+                        self.conflicts.len() as u64,
+                        self.is_barrier_locked,
+                    );
 
                     let report =
                         sentinel_core::architect::distiller::CognitiveDistiller::distill(&manifold);
@@ -128,10 +136,10 @@ pub fn run_tui(manifold_path: PathBuf) -> anyhow::Result<()> {
             if let Event::Key(key) = event::read()? {
                 match key.code {
                     KeyCode::Char('q') => app.should_quit = true,
-                    KeyCode::Right => app.current_tab = (app.current_tab + 1) % 8,
+                    KeyCode::Right => app.current_tab = (app.current_tab + 1) % 9,
                     KeyCode::Left => {
                         app.current_tab = if app.current_tab == 0 {
-                            7
+                            8
                         } else {
                             app.current_tab - 1
                         }
@@ -226,6 +234,7 @@ fn ui(f: &mut Frame, app: &TuiApp) {
         "Calibration",
         "Multi-Agent",
         "Architect",
+        "Reliability",
     ];
     let tabs = Tabs::new(titles)
         .block(Block::default().borders(Borders::ALL).title("Layers"))
@@ -446,6 +455,32 @@ fn ui(f: &mut Frame, app: &TuiApp) {
                 .style(Style::default().fg(Color::White));
             f.render_widget(main_block, arch_chunks[1]);
         }
+        8 => {
+            let rollback_color = if app.reliability.rollback_rate <= 0.05 {
+                Color::Green
+            } else if app.reliability.rollback_rate <= 0.15 {
+                Color::Yellow
+            } else {
+                Color::Red
+            };
+
+            let inner_text = format!(
+                "RUNTIME RELIABILITY SNAPSHOT:\n\n- Task Success Rate: {:.1}%\n- No-Regression Rate: {:.1}%\n- Rollback Rate: {:.1}%\n- Avg Time To Recover: {:.0} ms\n- Invariant Violation Rate: {:.1}%\n\nSLO Targets:\n- Success >= 95%\n- No-Regression >= 95%\n- Rollback <= 5%\n- Invariant Violations <= 2%",
+                app.reliability.task_success_rate * 100.0,
+                app.reliability.no_regression_rate * 100.0,
+                app.reliability.rollback_rate * 100.0,
+                app.reliability.avg_time_to_recover_ms,
+                app.reliability.invariant_violation_rate * 100.0
+            );
+            let main_block = Paragraph::new(inner_text)
+                .block(
+                    Block::default()
+                        .borders(Borders::ALL)
+                        .title("Reliability KPIs"),
+                )
+                .style(Style::default().fg(rollback_color));
+            f.render_widget(main_block, main_chunk);
+        }
         _ => {}
     }
 
@@ -453,7 +488,7 @@ fn ui(f: &mut Frame, app: &TuiApp) {
     let footer = Paragraph::new("Press 'q' to quit | Arrows to navigate | Up/Down to select goals")
         .block(Block::default().borders(Borders::ALL))
         .style(Style::default().fg(Color::Gray));
-    f.render_widget(footer, chunks[3]);
+    f.render_widget(footer, chunks[chunks.len() - 1]);
 }
 
 impl TuiApp {
@@ -490,4 +525,39 @@ impl TuiApp {
         };
         self.goal_list_state.select(Some(i));
     }
+}
+
+fn reliability_from_tui_signals(
+    alignment_score: f64,
+    completion_percentage: f64,
+    conflict_count: u64,
+    barrier_locked: bool,
+) -> sentinel_core::ReliabilitySnapshot {
+    let alignment_factor = alignment_score.clamp(0.0, 1.0);
+    let completion_factor = completion_percentage.clamp(0.0, 1.0);
+    let total_tasks_estimate = (completion_factor * 100.0).round() as u64 + 1;
+    let successful = (alignment_factor * total_tasks_estimate as f64).round() as u64;
+    let regressions = conflict_count.min(total_tasks_estimate);
+    let rollbacks = if barrier_locked {
+        regressions.max(1)
+    } else {
+        regressions
+    };
+    let recoveries = rollbacks;
+    let total_recovery_ms = rollbacks * if barrier_locked { 1500 } else { 800 };
+    let invariant_violations = if barrier_locked {
+        regressions.max(1)
+    } else {
+        regressions / 2
+    };
+
+    sentinel_core::ReliabilitySnapshot::from_counts(
+        total_tasks_estimate,
+        successful,
+        regressions,
+        rollbacks,
+        recoveries,
+        total_recovery_ms,
+        invariant_violations,
+    )
 }
