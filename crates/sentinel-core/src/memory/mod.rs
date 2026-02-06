@@ -57,7 +57,7 @@ pub use manifold::MemoryManifold;
 pub use semantic::{ConceptNode, ConceptRelation, SemanticMemory};
 pub use working::WorkingMemory;
 
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -84,6 +84,18 @@ pub struct MemoryItem {
 
     /// Importance score (0.0-1.0)
     pub importance: f64,
+
+    /// Confidence score for factual reliability (0.0-1.0)
+    pub confidence: f64,
+
+    /// Provenance of this memory
+    pub origin: MemoryOrigin,
+
+    /// Expiration timestamp for stale memory control
+    pub expires_at: Option<DateTime<Utc>>,
+
+    /// Last explicit verification timestamp
+    pub last_verified_at: Option<DateTime<Utc>>,
 
     /// Associated goal IDs
     pub goal_ids: Vec<Uuid>,
@@ -123,6 +135,21 @@ pub enum MemoryType {
     Code,
 }
 
+/// Provenance of a memory entry
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum MemoryOrigin {
+    /// User-provided information
+    UserInput,
+    /// Derived from agent execution
+    AgentExecution,
+    /// Derived from tool output
+    ToolOutput,
+    /// Imported from external synchronization
+    ExternalSync,
+    /// Internally inferred or synthesized
+    SystemDerived,
+}
+
 impl MemoryItem {
     /// Create a new memory item
     pub fn new(content: String, memory_type: MemoryType) -> Self {
@@ -135,6 +162,10 @@ impl MemoryItem {
             last_accessed: now,
             access_count: 0,
             importance: 0.5, // Default medium importance
+            confidence: 0.5,
+            origin: MemoryOrigin::SystemDerived,
+            expires_at: None,
+            last_verified_at: Some(now),
             goal_ids: Vec::new(),
             tags: Vec::new(),
             metadata: serde_json::Value::Null,
@@ -152,6 +183,42 @@ impl MemoryItem {
         self.access_count += 1;
     }
 
+    /// Mark memory as verified now and optionally adjust confidence.
+    pub fn mark_verified(&mut self, confidence: Option<f64>) {
+        self.last_verified_at = Some(Utc::now());
+        if let Some(value) = confidence {
+            self.confidence = value.clamp(0.0, 1.0);
+        }
+    }
+
+    /// Check if memory is expired.
+    pub fn is_expired(&self) -> bool {
+        self.expires_at
+            .map(|expiry| Utc::now() > expiry)
+            .unwrap_or(false)
+    }
+
+    /// Memory can be used in retrieval and decision support.
+    pub fn is_active(&self) -> bool {
+        !self.is_expired()
+    }
+
+    /// Score freshness from verification recency.
+    pub fn verification_freshness_score(&self) -> f64 {
+        let Some(last_verified) = self.last_verified_at else {
+            return 0.3;
+        };
+        let age_seconds = (Utc::now() - last_verified).num_seconds() as f64;
+        let half_life = 7.0 * 86400.0; // 7 days
+        (-age_seconds / half_life).exp().clamp(0.0, 1.0)
+    }
+
+    /// Trust score combines confidence and verification freshness.
+    pub fn trust_score(&self) -> f64 {
+        let freshness = self.verification_freshness_score();
+        (0.7 * self.confidence + 0.3 * freshness).clamp(0.0, 1.0)
+    }
+
     /// Calculate recency score (0.0-1.0, higher = more recent)
     pub fn recency_score(&self) -> f64 {
         let age_seconds = (Utc::now() - self.last_accessed).num_seconds() as f64;
@@ -167,8 +234,14 @@ impl MemoryItem {
 
     /// Calculate overall relevance score
     pub fn relevance_score(&self) -> f64 {
+        if self.is_expired() {
+            return 0.0;
+        }
         // Weighted combination of importance, recency, and frequency
-        0.5 * self.importance + 0.3 * self.recency_score() + 0.2 * self.frequency_score()
+        let base =
+            0.4 * self.importance + 0.25 * self.recency_score() + 0.15 * self.frequency_score();
+        let trust = 0.2 * self.trust_score();
+        (base + trust).clamp(0.0, 1.0)
     }
 }
 
@@ -178,6 +251,10 @@ pub struct MemoryItemBuilder {
     content: Option<String>,
     memory_type: Option<MemoryType>,
     importance: Option<f64>,
+    confidence: Option<f64>,
+    origin: Option<MemoryOrigin>,
+    expires_at: Option<DateTime<Utc>>,
+    last_verified_at: Option<DateTime<Utc>>,
     goal_ids: Vec<Uuid>,
     tags: Vec<String>,
     metadata: Option<serde_json::Value>,
@@ -199,6 +276,36 @@ impl MemoryItemBuilder {
     /// Set the importance
     pub fn importance(mut self, importance: f64) -> Self {
         self.importance = Some(importance.clamp(0.0, 1.0));
+        self
+    }
+
+    /// Set confidence
+    pub fn confidence(mut self, confidence: f64) -> Self {
+        self.confidence = Some(confidence.clamp(0.0, 1.0));
+        self
+    }
+
+    /// Set memory origin
+    pub fn origin(mut self, origin: MemoryOrigin) -> Self {
+        self.origin = Some(origin);
+        self
+    }
+
+    /// Set expiration absolute timestamp
+    pub fn expires_at(mut self, expires_at: DateTime<Utc>) -> Self {
+        self.expires_at = Some(expires_at);
+        self
+    }
+
+    /// Set expiration duration from now
+    pub fn expires_in(mut self, ttl: Duration) -> Self {
+        self.expires_at = Some(Utc::now() + ttl);
+        self
+    }
+
+    /// Set last verified timestamp
+    pub fn last_verified_at(mut self, verified_at: DateTime<Utc>) -> Self {
+        self.last_verified_at = Some(verified_at);
         self
     }
 
@@ -234,6 +341,10 @@ impl MemoryItemBuilder {
             last_accessed: now,
             access_count: 0,
             importance: self.importance.unwrap_or(0.5),
+            confidence: self.confidence.unwrap_or(0.5),
+            origin: self.origin.unwrap_or(MemoryOrigin::SystemDerived),
+            expires_at: self.expires_at,
+            last_verified_at: self.last_verified_at.or(Some(now)),
             goal_ids: self.goal_ids,
             tags: self.tags,
             metadata: self.metadata.unwrap_or(serde_json::Value::Null),
@@ -278,6 +389,26 @@ mod tests {
         assert_eq!(item.memory_type, MemoryType::Action);
         assert_eq!(item.access_count, 0);
         assert_eq!(item.importance, 0.5);
+        assert_eq!(item.confidence, 0.5);
+        assert_eq!(item.origin, MemoryOrigin::SystemDerived);
+        assert!(item.is_active());
+    }
+
+    #[test]
+    fn test_memory_item_expiration() {
+        let mut item = MemoryItem::new("Expiring memory".to_string(), MemoryType::Observation);
+        item.expires_at = Some(Utc::now() - Duration::seconds(1));
+        assert!(item.is_expired());
+        assert!(!item.is_active());
+        assert_eq!(item.relevance_score(), 0.0);
+    }
+
+    #[test]
+    fn test_memory_item_trust_score() {
+        let mut item = MemoryItem::new("Trusted memory".to_string(), MemoryType::Insight);
+        item.confidence = 0.9;
+        item.last_verified_at = Some(Utc::now());
+        assert!(item.trust_score() > 0.8);
     }
 
     #[test]

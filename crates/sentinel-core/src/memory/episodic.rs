@@ -64,6 +64,9 @@ impl EpisodicMemory {
 
     /// Store a memory
     pub fn store(&mut self, item: MemoryItem) {
+        if !item.is_active() {
+            return;
+        }
         let embedding = MemoryEmbedding::new(item, &self.embedder);
         let id = embedding.item.id;
         self.memories.insert(id, embedding);
@@ -71,6 +74,15 @@ impl EpisodicMemory {
 
     /// Get a memory by ID
     pub fn get(&mut self, id: &Uuid) -> Option<&mut MemoryItem> {
+        let expired = self
+            .memories
+            .get(id)
+            .is_some_and(|emb| !emb.item.is_active());
+        if expired {
+            self.memories.remove(id);
+            return None;
+        }
+
         self.memories.get_mut(id).map(|emb| {
             emb.item.access();
             &mut emb.item
@@ -87,13 +99,14 @@ impl EpisodicMemory {
         let mut results: Vec<_> = self
             .memories
             .values_mut()
+            .filter(|emb| emb.item.is_active())
             .map(|emb| {
                 let similarity = query_embedding.similarity(emb);
                 emb.item.access();
 
                 MemoryQueryResult {
                     item: emb.item.clone(),
-                    score: similarity as f64 * emb.item.relevance_score(),
+                    score: similarity as f64 * emb.item.relevance_score() * emb.item.trust_score(),
                     source: MemorySource::Episodic,
                 }
             })
@@ -111,10 +124,10 @@ impl EpisodicMemory {
         let mut results: Vec<_> = self
             .memories
             .values()
-            .filter(|emb| emb.item.goal_ids.contains(goal_id))
+            .filter(|emb| emb.item.is_active() && emb.item.goal_ids.contains(goal_id))
             .map(|emb| MemoryQueryResult {
                 item: emb.item.clone(),
-                score: emb.item.relevance_score(),
+                score: emb.item.relevance_score() * emb.item.trust_score(),
                 source: MemorySource::Episodic,
             })
             .collect();
@@ -130,10 +143,12 @@ impl EpisodicMemory {
         let mut results: Vec<_> = self
             .memories
             .values()
-            .filter(|emb| tags.iter().any(|tag| emb.item.tags.contains(tag)))
+            .filter(|emb| {
+                emb.item.is_active() && tags.iter().any(|tag| emb.item.tags.contains(tag))
+            })
             .map(|emb| MemoryQueryResult {
                 item: emb.item.clone(),
-                score: emb.item.relevance_score(),
+                score: emb.item.relevance_score() * emb.item.trust_score(),
                 source: MemorySource::Episodic,
             })
             .collect();

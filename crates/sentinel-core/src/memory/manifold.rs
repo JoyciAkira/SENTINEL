@@ -100,9 +100,14 @@ impl MemoryManifold {
                 if let Some(concept) = self.semantic.get_concept(&concept_id) {
                     for memory_id in &concept.memory_ids {
                         if let Some(memory) = self.episodic.get(memory_id) {
+                            if !memory.is_active() {
+                                continue;
+                            }
                             all_results.push(MemoryQueryResult {
                                 item: memory.clone(),
-                                score: concept.activation * memory.relevance_score(),
+                                score: concept.activation
+                                    * memory.relevance_score()
+                                    * memory.trust_score(),
                                 source: MemorySource::Semantic,
                             });
                         }

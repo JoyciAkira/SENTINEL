@@ -36,6 +36,10 @@ impl WorkingMemory {
 
     /// Store a memory item (may evict LRU item if full)
     pub fn store(&mut self, mut item: MemoryItem) -> Option<MemoryItem> {
+        if !item.is_active() {
+            return None;
+        }
+
         let id = item.id;
 
         // If already exists, update and move to back
@@ -66,6 +70,11 @@ impl WorkingMemory {
     /// Get a memory item by ID (marks as accessed)
     pub fn get(&mut self, id: &Uuid) -> Option<&mut MemoryItem> {
         if self.items.contains_key(id) {
+            if self.items.get(id).is_some_and(|item| !item.is_active()) {
+                self.items.remove(id);
+                self.lru_queue.retain(|x| x != id);
+                return None;
+            }
             // Move to back of queue
             self.lru_queue.retain(|&x| x != *id);
             self.lru_queue.push_back(*id);
@@ -86,11 +95,12 @@ impl WorkingMemory {
             .items
             .values_mut()
             .filter(|item| {
-                item.content.to_lowercase().contains(&query_lower)
-                    || item
-                        .tags
-                        .iter()
-                        .any(|tag| tag.to_lowercase().contains(&query_lower))
+                item.is_active()
+                    && (item.content.to_lowercase().contains(&query_lower)
+                        || item
+                            .tags
+                            .iter()
+                            .any(|tag| tag.to_lowercase().contains(&query_lower)))
             })
             .map(|item| {
                 item.access();
@@ -107,7 +117,7 @@ impl WorkingMemory {
 
                 MemoryQueryResult {
                     item: item.clone(),
-                    score: match_score * item.relevance_score(),
+                    score: match_score * item.relevance_score() * item.trust_score(),
                     source: MemorySource::Working,
                 }
             })
