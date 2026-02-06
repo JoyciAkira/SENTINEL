@@ -5,7 +5,7 @@
 //!
 //! # Usage
 //!
-//! ```rust
+//! ```text
 //! let client = OpenRouterClient::new(
 //!     "your-api-key".to_string(),
 //!     OpenRouterModel::MetaLlama3_3_70B,

@@ -22,7 +22,7 @@
 //!
 //! # Context Access Strategy
 //!
-//! ```
+//! ```text
 //! Query: "How was authentication implemented?"
 //!         │
 //!         v

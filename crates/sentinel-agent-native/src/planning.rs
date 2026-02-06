@@ -20,7 +20,7 @@
 //!
 //! # Planning Process
 //!
-//! ```
+//! ```text
 //! Task: "Build authentication system"
 //!          │
 //!          v

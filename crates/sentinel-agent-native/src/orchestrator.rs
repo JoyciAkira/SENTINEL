@@ -23,7 +23,7 @@
 //!
 //! # Orchestration Architecture
 //!
-//! ```
+//! ```text
 //! Task: "Build authentication system"
 //!          │
 //!          v

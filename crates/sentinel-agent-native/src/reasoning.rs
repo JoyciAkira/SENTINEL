@@ -24,7 +24,7 @@
 //!
 //! # Reasoning Process
 //!
-//! ```
+//! ```text
 //! Input: "Implement JWT authentication"
 //!         │
 //!         v

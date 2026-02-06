@@ -23,7 +23,7 @@
 //!
 //! # Code Generation Process
 //!
-//! ```
+//! ```text
 //! Task: "Create JWT authentication module"
 //!          │
 //!          v
