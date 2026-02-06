@@ -163,7 +163,8 @@ impl SentinelAgent {
         let context_manager = context::ContextManager::new(memory_manifold.clone());
 
         // Create Agent Orchestrator - Multi-agent coordination
-        let orchestrator = orchestrator::AgentOrchestrator::new();
+        let mut orchestrator = orchestrator::AgentOrchestrator::new();
+        orchestrator.set_reliability_thresholds(goal_manifold.reliability.thresholds.clone());
 
         let agent_id = Uuid::new_v4();
 
@@ -221,6 +222,11 @@ impl SentinelAgent {
         // Phase 4: Execution with Continuous Alignment
         let execution_result = self.execute_plan(plan).await?;
 
+        let reliability = self
+            .build_reliability_snapshot(&execution_result, &consensus_result)
+            .await;
+        self.enforce_runtime_reliability(&reliability)?;
+
         // Phase 5: Learning and Pattern Extraction
         self.learn_from_execution(&task_analysis, &execution_result)
             .await?;
@@ -233,10 +239,6 @@ impl SentinelAgent {
         let duration = end_time
             .signed_duration_since(start_time)
             .num_milliseconds();
-
-        let reliability = self
-            .build_reliability_snapshot(&execution_result, &consensus_result)
-            .await;
 
         Ok(ExecutionReport {
             task: task.to_string(),
@@ -899,6 +901,19 @@ impl SentinelAgent {
             total_recovery_ms,
             invariant_violations,
         )
+    }
+
+    fn enforce_runtime_reliability(&self, reliability: &ReliabilitySnapshot) -> Result<()> {
+        let thresholds = &self.goal_manifold.reliability.thresholds;
+        let evaluation = reliability.evaluate(thresholds);
+        if evaluation.healthy {
+            return Ok(());
+        }
+
+        Err(anyhow::anyhow!(
+            "Runtime reliability SLO violated: {}",
+            evaluation.violations.join(" | ")
+        ))
     }
 }
 

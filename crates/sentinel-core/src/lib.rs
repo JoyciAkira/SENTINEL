@@ -94,7 +94,9 @@ pub use alignment::{
 };
 pub use cognitive_state::{Action, ActionDecision, CognitiveMode, CognitiveState};
 pub use error::{Result, SentinelError};
-pub use execution::{ExecutionNorthStar, ReliabilitySnapshot};
+pub use execution::{
+    ExecutionNorthStar, ReliabilityEvaluation, ReliabilitySnapshot, ReliabilityThresholds,
+};
 pub use goal_manifold::{GoalManifold, Intent};
 pub use learning::{
     CompletedProject, DeviationPattern, DeviationRisk, KnowledgeBase, LearningReport,

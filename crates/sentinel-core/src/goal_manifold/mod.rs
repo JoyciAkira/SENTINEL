@@ -73,6 +73,10 @@ pub struct GoalManifold {
     /// Configuration for alignment sensitivity
     pub sensitivity: f64, // 0.0 (Flexible) to 1.0 (Rigid)
 
+    /// Runtime reliability policy used for hard enforcement during execution.
+    #[serde(default)]
+    pub reliability: ReliabilityPolicy,
+
     /// History of human overrides (for learning)
     pub overrides: Vec<HumanOverride>,
 
@@ -102,6 +106,12 @@ pub struct GoalManifold {
 
     /// Version history (append-only log)
     pub version_history: Vec<ManifoldVersion>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(default)]
+pub struct ReliabilityPolicy {
+    pub thresholds: crate::execution::ReliabilityThresholds,
 }
 
 /// The original user intent
@@ -262,6 +272,7 @@ impl GoalManifold {
         let mut manifold = Self {
             root_intent,
             sensitivity: 0.5,
+            reliability: ReliabilityPolicy::default(),
             overrides: Vec::new(),
             handover_log: Vec::new(),
             file_locks: std::collections::HashMap::new(),
@@ -290,6 +301,28 @@ impl GoalManifold {
         for constraint in &self.root_intent.constraints {
             hasher.update(constraint.as_bytes());
         }
+        hasher.update(
+            &self
+                .reliability
+                .thresholds
+                .min_task_success_rate
+                .to_le_bytes(),
+        );
+        hasher.update(
+            &self
+                .reliability
+                .thresholds
+                .min_no_regression_rate
+                .to_le_bytes(),
+        );
+        hasher.update(&self.reliability.thresholds.max_rollback_rate.to_le_bytes());
+        hasher.update(
+            &self
+                .reliability
+                .thresholds
+                .max_invariant_violation_rate
+                .to_le_bytes(),
+        );
 
         // Hash all goals (in sorted order for determinism)
         let mut goal_ids: Vec<_> = self.goal_dag.goals().map(|g| g.id).collect();

@@ -42,6 +42,31 @@ pub struct ReliabilitySnapshot {
     pub invariant_violation_rate: f64,
 }
 
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct ReliabilityThresholds {
+    pub min_task_success_rate: f64,
+    pub min_no_regression_rate: f64,
+    pub max_rollback_rate: f64,
+    pub max_invariant_violation_rate: f64,
+}
+
+impl Default for ReliabilityThresholds {
+    fn default() -> Self {
+        Self {
+            min_task_success_rate: 0.95,
+            min_no_regression_rate: 0.95,
+            max_rollback_rate: 0.05,
+            max_invariant_violation_rate: 0.02,
+        }
+    }
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct ReliabilityEvaluation {
+    pub healthy: bool,
+    pub violations: Vec<String>,
+}
+
 impl ReliabilitySnapshot {
     pub fn from_counts(
         total_tasks: u64,
@@ -73,6 +98,44 @@ impl ReliabilitySnapshot {
             invariant_violation_rate,
         }
     }
+
+    pub fn evaluate(&self, thresholds: &ReliabilityThresholds) -> ReliabilityEvaluation {
+        let mut violations = Vec::new();
+
+        if self.task_success_rate < thresholds.min_task_success_rate {
+            violations.push(format!(
+                "task_success_rate {:.1}% < {:.1}%",
+                self.task_success_rate * 100.0,
+                thresholds.min_task_success_rate * 100.0
+            ));
+        }
+        if self.no_regression_rate < thresholds.min_no_regression_rate {
+            violations.push(format!(
+                "no_regression_rate {:.1}% < {:.1}%",
+                self.no_regression_rate * 100.0,
+                thresholds.min_no_regression_rate * 100.0
+            ));
+        }
+        if self.rollback_rate > thresholds.max_rollback_rate {
+            violations.push(format!(
+                "rollback_rate {:.1}% > {:.1}%",
+                self.rollback_rate * 100.0,
+                thresholds.max_rollback_rate * 100.0
+            ));
+        }
+        if self.invariant_violation_rate > thresholds.max_invariant_violation_rate {
+            violations.push(format!(
+                "invariant_violation_rate {:.1}% > {:.1}%",
+                self.invariant_violation_rate * 100.0,
+                thresholds.max_invariant_violation_rate * 100.0
+            ));
+        }
+
+        ReliabilityEvaluation {
+            healthy: violations.is_empty(),
+            violations,
+        }
+    }
 }
 
 fn ratio(numerator: u64, denominator: u64) -> f64 {
@@ -85,7 +148,7 @@ fn ratio(numerator: u64, denominator: u64) -> f64 {
 
 #[cfg(test)]
 mod tests {
-    use super::{ExecutionNorthStar, ReliabilitySnapshot};
+    use super::{ExecutionNorthStar, ReliabilitySnapshot, ReliabilityThresholds};
 
     #[test]
     fn north_star_validation_requires_all_axes() {
@@ -113,5 +176,13 @@ mod tests {
         assert!((snapshot.rollback_rate - 0.1).abs() < f64::EPSILON);
         assert!((snapshot.avg_time_to_recover_ms - 300.0).abs() < f64::EPSILON);
         assert!((snapshot.invariant_violation_rate - 0.1).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn reliability_evaluation_detects_violations() {
+        let snapshot = ReliabilitySnapshot::from_counts(10, 8, 2, 2, 1, 1000, 1);
+        let evaluation = snapshot.evaluate(&ReliabilityThresholds::default());
+        assert!(!evaluation.healthy);
+        assert!(!evaluation.violations.is_empty());
     }
 }

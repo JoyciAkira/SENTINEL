@@ -151,6 +151,9 @@ pub struct AgentOrchestrator {
 
     /// Statistics
     pub stats: OrchestrationStats,
+
+    /// Hard runtime reliability thresholds for orchestration outcomes.
+    pub reliability_thresholds: sentinel_core::ReliabilityThresholds,
 }
 
 /// Task queue with priority scheduling
@@ -346,7 +349,12 @@ impl AgentOrchestrator {
             },
             conflict_detector: ConflictDetector::new(),
             stats: OrchestrationStats::default(),
+            reliability_thresholds: sentinel_core::ReliabilityThresholds::default(),
         }
+    }
+
+    pub fn set_reliability_thresholds(&mut self, thresholds: sentinel_core::ReliabilityThresholds) {
+        self.reliability_thresholds = thresholds;
     }
 
     /// Execute a goal using multi-agent orchestration
@@ -382,6 +390,15 @@ impl AgentOrchestrator {
 
         // Step 7: Update statistics
         self.update_orchestration_stats(&results, &conflicts, &resolutions);
+        if let Some(snapshot) = &self.stats.last_reliability {
+            let evaluation = snapshot.evaluate(&self.reliability_thresholds);
+            if !evaluation.healthy {
+                return Err(anyhow::anyhow!(
+                    "Orchestration reliability SLO violated: {}",
+                    evaluation.violations.join(" | ")
+                ));
+            }
+        }
 
         tracing::info!(
             "Goal orchestration complete: {} tasks, {} conflicts resolved",
