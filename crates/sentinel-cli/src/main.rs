@@ -100,6 +100,33 @@ enum Commands {
         /// ID del goal da scomporre
         goal_id: String,
     },
+
+    /// Gestione contratto governance (dependencies/frameworks/endpoints)
+    Governance {
+        #[command(subcommand)]
+        action: GovernanceAction,
+    },
+}
+
+#[derive(Subcommand)]
+enum GovernanceAction {
+    /// Mostra baseline, proposta pending e stato approvazione
+    Status {
+        /// Output in formato JSON
+        #[arg(long)]
+        json: bool,
+    },
+    /// Approva la proposta pending e aggiorna la baseline
+    Approve {
+        /// Nota opzionale di approvazione utente
+        #[arg(long)]
+        note: Option<String>,
+    },
+    /// Rifiuta la proposta pending
+    Reject {
+        /// Motivazione del rifiuto
+        reason: String,
+    },
 }
 
 #[tokio::main]
@@ -498,6 +525,66 @@ async fn main() -> anyhow::Result<()> {
             println!("Overrides: {}", manifold.overrides.len());
             println!("Handover notes: {}", manifold.handover_log.len());
             println!("Version history: {}", manifold.version_history.len());
+        }
+        Commands::Governance { action } => {
+            let mut manifold = load_manifold(&cli.manifold)?;
+            match action {
+                GovernanceAction::Status { json } => {
+                    let pending = manifold.governance.pending_proposal.clone();
+                    if json {
+                        println!(
+                            "{}",
+                            serde_json::json!({
+                                "required_dependencies": manifold.governance.required_dependencies,
+                                "allowed_dependencies": manifold.governance.allowed_dependencies,
+                                "required_frameworks": manifold.governance.required_frameworks,
+                                "allowed_frameworks": manifold.governance.allowed_frameworks,
+                                "allowed_endpoints": manifold.governance.allowed_endpoints,
+                                "allowed_ports": manifold.governance.allowed_ports,
+                                "pending_proposal": pending,
+                                "history_size": manifold.governance.history.len()
+                            })
+                        );
+                    } else {
+                        println!("SENTINEL GOVERNANCE STATUS");
+                        println!(
+                            "Allowed Dependencies: {}",
+                            manifold.governance.allowed_dependencies.join(", ")
+                        );
+                        println!(
+                            "Allowed Frameworks: {}",
+                            manifold.governance.allowed_frameworks.join(", ")
+                        );
+                        println!(
+                            "Allowed Ports: {}",
+                            manifold
+                                .governance
+                                .allowed_ports
+                                .iter()
+                                .map(|p| p.to_string())
+                                .collect::<Vec<_>>()
+                                .join(", ")
+                        );
+                        if let Some(p) = pending {
+                            println!("Pending Proposal: {}", p.id);
+                            println!("Rationale: {}", p.rationale);
+                        } else {
+                            println!("Pending Proposal: none");
+                        }
+                    }
+                }
+                GovernanceAction::Approve { note } => {
+                    let proposal_id = manifold.approve_pending_governance_proposal(note)?;
+                    save_manifold(&cli.manifold, &manifold)?;
+                    println!("Governance proposal approved: {}", proposal_id);
+                }
+                GovernanceAction::Reject { reason } => {
+                    let proposal_id =
+                        manifold.reject_pending_governance_proposal(Some(reason.clone()))?;
+                    save_manifold(&cli.manifold, &manifold)?;
+                    println!("Governance proposal rejected: {} ({})", proposal_id, reason);
+                }
+            }
         }
         Commands::Sync => {
             println!(

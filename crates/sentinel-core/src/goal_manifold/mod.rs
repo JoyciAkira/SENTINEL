@@ -77,6 +77,10 @@ pub struct GoalManifold {
     #[serde(default)]
     pub reliability: ReliabilityPolicy,
 
+    /// Runtime governance contract for dependencies/frameworks/endpoints.
+    #[serde(default)]
+    pub governance: GovernancePolicy,
+
     /// History of human overrides (for learning)
     pub overrides: Vec<HumanOverride>,
 
@@ -112,6 +116,40 @@ pub struct GoalManifold {
 #[serde(default)]
 pub struct ReliabilityPolicy {
     pub thresholds: crate::execution::ReliabilityThresholds,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(default)]
+pub struct GovernancePolicy {
+    pub required_dependencies: Vec<String>,
+    pub allowed_dependencies: Vec<String>,
+    pub required_frameworks: Vec<String>,
+    pub allowed_frameworks: Vec<String>,
+    pub allowed_endpoints: std::collections::HashMap<String, String>,
+    pub allowed_ports: Vec<u16>,
+    pub pending_proposal: Option<GovernanceChangeProposal>,
+    pub history: Vec<GovernanceChangeProposal>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GovernanceChangeProposal {
+    pub id: Uuid,
+    pub created_at: Timestamp,
+    pub rationale: String,
+    pub proposed_dependencies: Vec<String>,
+    pub proposed_frameworks: Vec<String>,
+    pub proposed_endpoints: std::collections::HashMap<String, String>,
+    pub proposed_ports: Vec<u16>,
+    pub status: GovernanceProposalStatus,
+    pub user_note: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum GovernanceProposalStatus {
+    PendingUserApproval,
+    ApprovedByUser,
+    RejectedByUser,
 }
 
 /// The original user intent
@@ -184,6 +222,23 @@ impl Intent {
     pub fn with_framework(mut self, framework: impl Into<String>) -> Self {
         self.frameworks.push(framework.into());
         self
+    }
+}
+
+impl GovernancePolicy {
+    pub fn from_intent(intent: &Intent) -> Self {
+        let mut policy = Self::default();
+        policy.allowed_frameworks = dedup_sorted(intent.frameworks.clone());
+        policy.required_frameworks = policy.allowed_frameworks.clone();
+        policy.allowed_endpoints = intent.infrastructure_map.clone();
+        let mut ports = Vec::new();
+        for value in intent.infrastructure_map.values() {
+            if let Some(port) = extract_port(value) {
+                ports.push(port);
+            }
+        }
+        policy.allowed_ports = dedup_sorted(ports);
+        policy
     }
 }
 
@@ -273,6 +328,7 @@ impl GoalManifold {
             root_intent,
             sensitivity: 0.5,
             reliability: ReliabilityPolicy::default(),
+            governance: GovernancePolicy::default(),
             overrides: Vec::new(),
             handover_log: Vec::new(),
             file_locks: std::collections::HashMap::new(),
@@ -283,6 +339,7 @@ impl GoalManifold {
             integrity_hash: Blake3Hash::empty(),
             version_history: Vec::new(),
         };
+        manifold.governance = GovernancePolicy::from_intent(&manifold.root_intent);
 
         // Initialize integrity hash and version 1
         manifold.update_hash("Manifold initialized");
@@ -323,6 +380,29 @@ impl GoalManifold {
                 .max_invariant_violation_rate
                 .to_le_bytes(),
         );
+        for dep in sorted_strings(&self.governance.required_dependencies) {
+            hasher.update(dep.as_bytes());
+        }
+        for dep in sorted_strings(&self.governance.allowed_dependencies) {
+            hasher.update(dep.as_bytes());
+        }
+        for framework in sorted_strings(&self.governance.required_frameworks) {
+            hasher.update(framework.as_bytes());
+        }
+        for framework in sorted_strings(&self.governance.allowed_frameworks) {
+            hasher.update(framework.as_bytes());
+        }
+        let mut endpoints: Vec<_> = self.governance.allowed_endpoints.iter().collect();
+        endpoints.sort_by(|a, b| a.0.cmp(b.0));
+        for (name, value) in endpoints {
+            hasher.update(name.as_bytes());
+            hasher.update(value.as_bytes());
+        }
+        let mut ports = self.governance.allowed_ports.clone();
+        ports.sort_unstable();
+        for port in ports {
+            hasher.update(&port.to_le_bytes());
+        }
 
         // Hash all goals (in sorted order for determinism)
         let mut goal_ids: Vec<_> = self.goal_dag.goals().map(|g| g.id).collect();
@@ -402,6 +482,86 @@ impl GoalManifold {
         self.invariants.push(invariant);
         self.update_hash(description);
         Ok(())
+    }
+
+    /// Record a governance proposal that requires explicit user approval.
+    pub fn record_governance_proposal(&mut self, proposal: GovernanceChangeProposal) {
+        self.governance.pending_proposal = Some(proposal.clone());
+        self.governance.history.push(proposal);
+        self.update_hash("Governance proposal recorded");
+    }
+
+    /// Approve the currently pending governance proposal and apply it to runtime policy.
+    pub fn approve_pending_governance_proposal(
+        &mut self,
+        user_note: Option<String>,
+    ) -> Result<Uuid> {
+        let pending = self.governance.pending_proposal.clone().ok_or_else(|| {
+            crate::error::SentinelError::InvariantViolation(
+                "No pending governance proposal".to_string(),
+            )
+        })?;
+        let proposal_id = pending.id;
+
+        for dep in pending.proposed_dependencies {
+            self.governance.allowed_dependencies.push(dep);
+        }
+        for framework in pending.proposed_frameworks {
+            self.governance.allowed_frameworks.push(framework);
+        }
+        for (name, endpoint) in pending.proposed_endpoints {
+            self.governance.allowed_endpoints.insert(name, endpoint);
+        }
+        self.governance
+            .allowed_ports
+            .extend(pending.proposed_ports);
+
+        self.governance.allowed_dependencies =
+            dedup_sorted(self.governance.allowed_dependencies.clone());
+        self.governance.allowed_frameworks =
+            dedup_sorted(self.governance.allowed_frameworks.clone());
+        self.governance.allowed_ports = dedup_sorted(self.governance.allowed_ports.clone());
+
+        if let Some(history_entry) = self
+            .governance
+            .history
+            .iter_mut()
+            .rev()
+            .find(|proposal| proposal.id == proposal_id)
+        {
+            history_entry.status = GovernanceProposalStatus::ApprovedByUser;
+            history_entry.user_note = user_note.clone();
+        }
+        self.governance.pending_proposal = None;
+        self.update_hash("Governance proposal approved");
+        Ok(proposal_id)
+    }
+
+    /// Reject the currently pending governance proposal.
+    pub fn reject_pending_governance_proposal(
+        &mut self,
+        user_note: Option<String>,
+    ) -> Result<Uuid> {
+        let pending = self.governance.pending_proposal.clone().ok_or_else(|| {
+            crate::error::SentinelError::InvariantViolation(
+                "No pending governance proposal".to_string(),
+            )
+        })?;
+        let proposal_id = pending.id;
+
+        if let Some(history_entry) = self
+            .governance
+            .history
+            .iter_mut()
+            .rev()
+            .find(|proposal| proposal.id == proposal_id)
+        {
+            history_entry.status = GovernanceProposalStatus::RejectedByUser;
+            history_entry.user_note = user_note;
+        }
+        self.governance.pending_proposal = None;
+        self.update_hash("Governance proposal rejected");
+        Ok(proposal_id)
     }
 
     /// Get a goal by ID
@@ -508,6 +668,32 @@ pub struct InvariantViolation {
     pub invariant_id: Uuid,
     pub description: String,
     pub severity: InvariantSeverity,
+}
+
+fn sorted_strings(values: &[String]) -> Vec<String> {
+    let mut items = values.to_vec();
+    items.sort();
+    items.dedup();
+    items
+}
+
+fn dedup_sorted<T>(mut values: Vec<T>) -> Vec<T>
+where
+    T: Ord,
+{
+    values.sort();
+    values.dedup();
+    values
+}
+
+fn extract_port(endpoint: &str) -> Option<u16> {
+    let after_scheme = endpoint
+        .split_once("://")
+        .map(|(_, value)| value)
+        .unwrap_or(endpoint);
+    let host_port = after_scheme.split('/').next().unwrap_or(after_scheme);
+    let port_candidate = host_port.rsplit_once(':').map(|(_, port)| port)?;
+    port_candidate.parse::<u16>().ok()
 }
 
 #[cfg(test)]

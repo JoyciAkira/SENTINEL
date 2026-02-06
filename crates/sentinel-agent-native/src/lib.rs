@@ -56,6 +56,8 @@ use sentinel_core::{
     memory::MemoryManifold,
     Uuid,
 };
+use std::collections::{BTreeMap, BTreeSet};
+use std::path::{Path, PathBuf};
 
 /// Sentinel Native Agent - The Revolutionary Coding Agent
 ///
@@ -130,7 +132,8 @@ impl SentinelAgent {
         tracing::info!("Initializing Sentinel Native Agent");
 
         // Create Goal Manifold (Layer 1) - The immutable truth
-        let goal_manifold = GoalManifold::new(intent.clone());
+        let mut goal_manifold = GoalManifold::new(intent.clone());
+        bootstrap_governance_contract_from_workspace(&mut goal_manifold)?;
 
         // Create Knowledge Base (Layer 5)
         let knowledge_base = std::sync::Arc::new(KnowledgeBase::new());
@@ -165,6 +168,7 @@ impl SentinelAgent {
         // Create Agent Orchestrator - Multi-agent coordination
         let mut orchestrator = orchestrator::AgentOrchestrator::new();
         orchestrator.set_reliability_thresholds(goal_manifold.reliability.thresholds.clone());
+        orchestrator.set_governance_policy(goal_manifold.governance.clone());
 
         let agent_id = Uuid::new_v4();
 
@@ -204,6 +208,7 @@ impl SentinelAgent {
     /// 5. Learn from outcomes
     pub async fn execute_task(&mut self, task: &str) -> Result<ExecutionReport> {
         tracing::info!("Executing task: {}", task);
+        self.enforce_dependency_governance()?;
 
         let start_time = chrono::Utc::now();
 
@@ -221,6 +226,7 @@ impl SentinelAgent {
 
         // Phase 4: Execution with Continuous Alignment
         let execution_result = self.execute_plan(plan).await?;
+        self.enforce_dependency_governance()?;
 
         let reliability = self
             .build_reliability_snapshot(&execution_result, &consensus_result)
@@ -915,6 +921,390 @@ impl SentinelAgent {
             evaluation.violations.join(" | ")
         ))
     }
+
+    fn enforce_dependency_governance(&mut self) -> Result<()> {
+        if let Some(pending) = &self.goal_manifold.governance.pending_proposal {
+            return Err(anyhow::anyhow!(
+                "Governance change pending user approval (proposal {}): {}",
+                pending.id,
+                pending.rationale
+            ));
+        }
+
+        let observed = observe_workspace_contract(
+            &std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
+        )?;
+        let drift = compute_contract_drift(&self.goal_manifold.governance, &observed);
+        if !drift.has_blocking_violation() {
+            return Ok(());
+        }
+
+        let proposal = build_governance_proposal(&drift);
+        let proposal_id = proposal.id;
+        self.goal_manifold.record_governance_proposal(proposal);
+        Err(anyhow::anyhow!(
+            "Dependency/framework/endpoint governance violation detected. Proposal {} created and waiting for user approval.",
+            proposal_id
+        ))
+    }
+}
+
+#[derive(Debug, Default)]
+struct ObservedWorkspaceContract {
+    dependencies: BTreeSet<String>,
+    frameworks: BTreeSet<String>,
+    endpoints: BTreeSet<String>,
+    ports: BTreeSet<u16>,
+}
+
+#[derive(Debug, Default)]
+struct GovernanceDrift {
+    unexpected_dependencies: Vec<String>,
+    unexpected_frameworks: Vec<String>,
+    unexpected_endpoints: Vec<String>,
+    unexpected_ports: Vec<u16>,
+    missing_required_dependencies: Vec<String>,
+    missing_required_frameworks: Vec<String>,
+}
+
+impl GovernanceDrift {
+    fn has_blocking_violation(&self) -> bool {
+        !self.unexpected_dependencies.is_empty()
+            || !self.unexpected_frameworks.is_empty()
+            || !self.unexpected_endpoints.is_empty()
+            || !self.unexpected_ports.is_empty()
+    }
+}
+
+fn bootstrap_governance_contract_from_workspace(manifold: &mut GoalManifold) -> Result<()> {
+    let observed = observe_workspace_contract(
+        &std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
+    )?;
+
+    if manifold.governance.allowed_dependencies.is_empty() {
+        manifold.governance.allowed_dependencies = observed.dependencies.iter().cloned().collect();
+    }
+    if manifold.governance.required_dependencies.is_empty() {
+        manifold.governance.required_dependencies =
+            manifold.governance.allowed_dependencies.clone();
+    }
+    if manifold.governance.allowed_frameworks.is_empty() {
+        manifold.governance.allowed_frameworks = observed.frameworks.iter().cloned().collect();
+    }
+    if manifold.governance.allowed_endpoints.is_empty() {
+        let mut endpoints = BTreeMap::new();
+        for (idx, endpoint) in observed.endpoints.iter().enumerate() {
+            endpoints.insert(format!("observed_{}", idx + 1), endpoint.clone());
+        }
+        manifold.governance.allowed_endpoints = endpoints.into_iter().collect();
+    }
+    if manifold.governance.allowed_ports.is_empty() {
+        manifold.governance.allowed_ports = observed.ports.iter().copied().collect();
+    }
+    Ok(())
+}
+
+fn compute_contract_drift(
+    policy: &sentinel_core::goal_manifold::GovernancePolicy,
+    observed: &ObservedWorkspaceContract,
+) -> GovernanceDrift {
+    let allowed_dependencies: BTreeSet<_> = policy.allowed_dependencies.iter().cloned().collect();
+    let required_dependencies: BTreeSet<_> = policy.required_dependencies.iter().cloned().collect();
+    let allowed_frameworks: BTreeSet<_> = policy.allowed_frameworks.iter().cloned().collect();
+    let required_frameworks: BTreeSet<_> = policy.required_frameworks.iter().cloned().collect();
+    let allowed_endpoints: BTreeSet<_> = policy.allowed_endpoints.values().cloned().collect();
+    let allowed_ports: BTreeSet<_> = policy.allowed_ports.iter().copied().collect();
+
+    GovernanceDrift {
+        unexpected_dependencies: observed
+            .dependencies
+            .difference(&allowed_dependencies)
+            .cloned()
+            .collect(),
+        unexpected_frameworks: observed
+            .frameworks
+            .difference(&allowed_frameworks)
+            .cloned()
+            .collect(),
+        unexpected_endpoints: observed
+            .endpoints
+            .difference(&allowed_endpoints)
+            .cloned()
+            .collect(),
+        unexpected_ports: observed.ports.difference(&allowed_ports).copied().collect(),
+        missing_required_dependencies: required_dependencies
+            .difference(&observed.dependencies)
+            .cloned()
+            .collect(),
+        missing_required_frameworks: required_frameworks
+            .difference(&observed.frameworks)
+            .cloned()
+            .collect(),
+    }
+}
+
+fn build_governance_proposal(
+    drift: &GovernanceDrift,
+) -> sentinel_core::goal_manifold::GovernanceChangeProposal {
+    let mut proposed_endpoints = std::collections::HashMap::new();
+    for (index, endpoint) in drift.unexpected_endpoints.iter().enumerate() {
+        proposed_endpoints.insert(format!("proposed_{}", index + 1), endpoint.clone());
+    }
+
+    let rationale = format!(
+        "Observed deterministic drift: deps={} frameworks={} endpoints={} ports={}. Missing required deps={} frameworks={}.",
+        drift.unexpected_dependencies.len(),
+        drift.unexpected_frameworks.len(),
+        drift.unexpected_endpoints.len(),
+        drift.unexpected_ports.len(),
+        drift.missing_required_dependencies.len(),
+        drift.missing_required_frameworks.len()
+    );
+
+    sentinel_core::goal_manifold::GovernanceChangeProposal {
+        id: Uuid::new_v4(),
+        created_at: chrono::Utc::now(),
+        rationale,
+        proposed_dependencies: drift.unexpected_dependencies.clone(),
+        proposed_frameworks: drift.unexpected_frameworks.clone(),
+        proposed_endpoints,
+        proposed_ports: drift.unexpected_ports.clone(),
+        status: sentinel_core::goal_manifold::GovernanceProposalStatus::PendingUserApproval,
+        user_note: None,
+    }
+}
+
+fn observe_workspace_contract(root: &Path) -> Result<ObservedWorkspaceContract> {
+    let mut observed = ObservedWorkspaceContract::default();
+    collect_from_cargo_toml(root.join("Cargo.toml"), &mut observed)?;
+    collect_from_package_json(root.join("package.json"), &mut observed)?;
+    collect_from_pyproject(root.join("pyproject.toml"), &mut observed)?;
+    collect_from_requirements(root.join("requirements.txt"), &mut observed)?;
+    collect_from_composer(root.join("composer.json"), &mut observed)?;
+    collect_endpoints_and_ports(root, &mut observed)?;
+    Ok(observed)
+}
+
+fn collect_from_cargo_toml(path: PathBuf, observed: &mut ObservedWorkspaceContract) -> Result<()> {
+    if !path.exists() {
+        return Ok(());
+    }
+    let content = std::fs::read_to_string(path)?;
+    let value: toml::Value = toml::from_str(&content)?;
+    for section in ["dependencies", "dev-dependencies", "workspace.dependencies"] {
+        if let Some(table) = get_toml_table(&value, section) {
+            for key in table.keys() {
+                register_dependency(observed, &format!("cargo:{}", key.to_lowercase()));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn get_toml_table<'a>(
+    value: &'a toml::Value,
+    dotted_path: &str,
+) -> Option<&'a toml::map::Map<String, toml::Value>> {
+    let mut cursor = value;
+    for part in dotted_path.split('.') {
+        cursor = cursor.get(part)?;
+    }
+    cursor.as_table()
+}
+
+fn collect_from_package_json(
+    path: PathBuf,
+    observed: &mut ObservedWorkspaceContract,
+) -> Result<()> {
+    if !path.exists() {
+        return Ok(());
+    }
+    let content = std::fs::read_to_string(path)?;
+    let value: serde_json::Value = serde_json::from_str(&content)?;
+    for section in [
+        "dependencies",
+        "devDependencies",
+        "peerDependencies",
+        "optionalDependencies",
+    ] {
+        if let Some(map) = value.get(section).and_then(|entry| entry.as_object()) {
+            for key in map.keys() {
+                register_dependency(observed, &format!("npm:{}", key.to_lowercase()));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn collect_from_pyproject(path: PathBuf, observed: &mut ObservedWorkspaceContract) -> Result<()> {
+    if !path.exists() {
+        return Ok(());
+    }
+    let content = std::fs::read_to_string(path)?;
+    let value: toml::Value = toml::from_str(&content)?;
+    if let Some(project_deps) = value
+        .get("project")
+        .and_then(|p| p.get("dependencies"))
+        .and_then(|deps| deps.as_array())
+    {
+        for dep in project_deps {
+            if let Some(raw) = dep.as_str() {
+                let name = extract_python_dep_name(raw);
+                register_dependency(observed, &format!("pip:{}", name));
+            }
+        }
+    }
+    if let Some(poetry_deps) = value
+        .get("tool")
+        .and_then(|v| v.get("poetry"))
+        .and_then(|v| v.get("dependencies"))
+        .and_then(|deps| deps.as_table())
+    {
+        for key in poetry_deps.keys() {
+            if key != "python" {
+                register_dependency(observed, &format!("pip:{}", key.to_lowercase()));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn collect_from_requirements(
+    path: PathBuf,
+    observed: &mut ObservedWorkspaceContract,
+) -> Result<()> {
+    if !path.exists() {
+        return Ok(());
+    }
+    let content = std::fs::read_to_string(path)?;
+    for line in content.lines() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() || trimmed.starts_with('#') {
+            continue;
+        }
+        let name = extract_python_dep_name(trimmed);
+        register_dependency(observed, &format!("pip:{}", name));
+    }
+    Ok(())
+}
+
+fn collect_from_composer(path: PathBuf, observed: &mut ObservedWorkspaceContract) -> Result<()> {
+    if !path.exists() {
+        return Ok(());
+    }
+    let content = std::fs::read_to_string(path)?;
+    let value: serde_json::Value = serde_json::from_str(&content)?;
+    for section in ["require", "require-dev"] {
+        if let Some(map) = value.get(section).and_then(|entry| entry.as_object()) {
+            for key in map.keys() {
+                if key != "php" {
+                    register_dependency(observed, &format!("composer:{}", key.to_lowercase()));
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+fn collect_endpoints_and_ports(
+    root: &Path,
+    observed: &mut ObservedWorkspaceContract,
+) -> Result<()> {
+    use regex::Regex;
+    let url_re = Regex::new(r"https?://[A-Za-z0-9\.\-_:]+(?:/[A-Za-z0-9\.\-_/]*)?")?;
+    let host_port_re = Regex::new(r"(?:localhost|127\.0\.0\.1|0\.0\.0\.0):([0-9]{2,5})")?;
+    let env_port_re = Regex::new(r"\bPORT\s*=?\s*([0-9]{2,5})\b")?;
+    let arg_port_re = Regex::new(r"--port\s+([0-9]{2,5})")?;
+
+    let walker = walkdir::WalkDir::new(root)
+        .follow_links(false)
+        .into_iter()
+        .filter_entry(|entry| {
+            let name = entry.file_name().to_string_lossy();
+            !matches!(
+                name.as_ref(),
+                ".git" | "node_modules" | "target" | "dist" | "build" | ".next"
+            )
+        });
+
+    for entry in walker.filter_map(std::result::Result::ok) {
+        if !entry.file_type().is_file() {
+            continue;
+        }
+        if entry
+            .metadata()
+            .map(|m| m.len() > 1_000_000)
+            .unwrap_or(true)
+        {
+            continue;
+        }
+        let path = entry.path();
+        if let Ok(content) = std::fs::read_to_string(path) {
+            for m in url_re.find_iter(&content) {
+                observed.endpoints.insert(m.as_str().to_string());
+            }
+            for caps in host_port_re.captures_iter(&content) {
+                if let Some(port) = caps.get(1).and_then(|m| m.as_str().parse::<u16>().ok()) {
+                    observed.ports.insert(port);
+                }
+            }
+            for caps in env_port_re.captures_iter(&content) {
+                if let Some(port) = caps.get(1).and_then(|m| m.as_str().parse::<u16>().ok()) {
+                    observed.ports.insert(port);
+                }
+            }
+            for caps in arg_port_re.captures_iter(&content) {
+                if let Some(port) = caps.get(1).and_then(|m| m.as_str().parse::<u16>().ok()) {
+                    observed.ports.insert(port);
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+fn extract_python_dep_name(raw: &str) -> String {
+    raw.chars()
+        .take_while(|ch| ch.is_ascii_alphanumeric() || *ch == '-' || *ch == '_')
+        .collect::<String>()
+        .to_lowercase()
+}
+
+fn register_dependency(observed: &mut ObservedWorkspaceContract, dependency: &str) {
+    let normalized = dependency.trim().to_lowercase();
+    if normalized.is_empty() {
+        return;
+    }
+    observed.dependencies.insert(normalized.clone());
+    if let Some(framework) = infer_framework(&normalized) {
+        observed.frameworks.insert(framework);
+    }
+}
+
+fn infer_framework(dependency: &str) -> Option<String> {
+    const FRAMEWORK_MARKERS: &[(&str, &str)] = &[
+        ("react", "react"),
+        ("next", "nextjs"),
+        ("vue", "vue"),
+        ("nuxt", "nuxt"),
+        ("svelte", "svelte"),
+        ("angular", "angular"),
+        ("express", "express"),
+        ("nestjs", "nestjs"),
+        ("fastapi", "fastapi"),
+        ("django", "django"),
+        ("flask", "flask"),
+        ("laravel", "laravel"),
+        ("symfony", "symfony"),
+        ("rails", "rails"),
+        ("spring", "spring"),
+        ("actix-web", "actix"),
+        ("axum", "axum"),
+    ];
+    FRAMEWORK_MARKERS
+        .iter()
+        .find(|(needle, _)| dependency.contains(needle))
+        .map(|(_, framework)| framework.to_string())
 }
 
 /// Task analysis result

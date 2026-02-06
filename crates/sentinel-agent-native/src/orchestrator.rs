@@ -154,6 +154,9 @@ pub struct AgentOrchestrator {
 
     /// Hard runtime reliability thresholds for orchestration outcomes.
     pub reliability_thresholds: sentinel_core::ReliabilityThresholds,
+
+    /// Optional governance policy for dependency/framework/endpoint checks.
+    pub governance_policy: Option<sentinel_core::goal_manifold::GovernancePolicy>,
 }
 
 /// Task queue with priority scheduling
@@ -350,11 +353,19 @@ impl AgentOrchestrator {
             conflict_detector: ConflictDetector::new(),
             stats: OrchestrationStats::default(),
             reliability_thresholds: sentinel_core::ReliabilityThresholds::default(),
+            governance_policy: None,
         }
     }
 
     pub fn set_reliability_thresholds(&mut self, thresholds: sentinel_core::ReliabilityThresholds) {
         self.reliability_thresholds = thresholds;
+    }
+
+    pub fn set_governance_policy(
+        &mut self,
+        policy: sentinel_core::goal_manifold::GovernancePolicy,
+    ) {
+        self.governance_policy = Some(policy);
     }
 
     /// Execute a goal using multi-agent orchestration
@@ -370,6 +381,7 @@ impl AgentOrchestrator {
 
         // Step 1: Decompose goal into tasks
         let tasks = self.decompose_goal_into_tasks(goal)?;
+        self.enforce_governance_for_tasks(&tasks)?;
 
         // Step 2: Assign tasks to agents
         let assignments = self.assign_tasks_to_agents(&tasks)?;
@@ -407,6 +419,75 @@ impl AgentOrchestrator {
         );
 
         Ok(results)
+    }
+
+    fn enforce_governance_for_tasks(&self, tasks: &[Task]) -> Result<()> {
+        let Some(policy) = &self.governance_policy else {
+            return Ok(());
+        };
+
+        let allowed_ports: std::collections::HashSet<String> = policy
+            .allowed_ports
+            .iter()
+            .map(|port| port.to_string())
+            .collect();
+        let allowed_frameworks: std::collections::HashSet<String> = policy
+            .allowed_frameworks
+            .iter()
+            .map(|framework| framework.to_lowercase())
+            .collect();
+        let allowed_dependencies: std::collections::HashSet<String> = policy
+            .allowed_dependencies
+            .iter()
+            .map(|dependency| dependency.to_lowercase())
+            .collect();
+        let port_regex = regex::Regex::new(r":([0-9]{2,5})").expect("valid regex");
+
+        for task in tasks {
+            let lower = task.description.to_lowercase();
+            for captures in port_regex.captures_iter(&lower) {
+                if let Some(port) = captures.get(1).map(|m| m.as_str().to_string()) {
+                    if !allowed_ports.is_empty() && !allowed_ports.contains(&port) {
+                        return Err(anyhow::anyhow!(
+                            "Task governance violation: unexpected port {} in task '{}'",
+                            port,
+                            task.description
+                        ));
+                    }
+                }
+            }
+
+            for token in extract_word_tokens(&lower) {
+                if (token.starts_with("npm:")
+                    || token.starts_with("cargo:")
+                    || token.starts_with("pip:")
+                    || token.starts_with("composer:"))
+                    && !allowed_dependencies.is_empty()
+                    && !allowed_dependencies.contains(&token)
+                {
+                    return Err(anyhow::anyhow!(
+                        "Task governance violation: dependency '{}' not allowed",
+                        token
+                    ));
+                }
+
+                if [
+                    "react", "vue", "angular", "nextjs", "django", "laravel", "spring",
+                ]
+                .iter()
+                .any(|framework| token.contains(framework))
+                    && !allowed_frameworks.is_empty()
+                    && !allowed_frameworks.contains(&token)
+                {
+                    return Err(anyhow::anyhow!(
+                        "Task governance violation: framework '{}' not allowed",
+                        token
+                    ));
+                }
+            }
+        }
+
+        Ok(())
     }
 
     /// Decompose goal into specialized tasks
@@ -1094,6 +1175,14 @@ impl Default for ConflictDetector {
     fn default() -> Self {
         Self::new()
     }
+}
+
+fn extract_word_tokens(input: &str) -> Vec<String> {
+    input
+        .split(|c: char| !c.is_ascii_alphanumeric() && c != ':' && c != '-' && c != '_')
+        .filter(|token| !token.trim().is_empty())
+        .map(|token| token.trim().to_string())
+        .collect()
 }
 
 #[cfg(test)]
