@@ -213,6 +213,11 @@ async fn handle_request(req: McpRequest, id: Value) -> McpResponse {
                         "inputSchema": { "type": "object", "properties": {} }
                     },
                     {
+                        "name": "get_reliability",
+                        "description": "Restituisce KPI di affidabilità runtime derivati da alignment/guardrail/progresso",
+                        "inputSchema": { "type": "object", "properties": {} }
+                    },
+                    {
                         "name": "safe_write",
                         "description": "Esegue uno scan di sicurezza Layer 7 e valida l'allineamento prima di procedere",
                         "inputSchema": {
@@ -534,6 +539,45 @@ async fn suggest_goals_with_llm(
     extract_goal_suggestions(suggestion.trim())
 }
 
+fn reliability_from_signals(
+    alignment_score: f64,
+    alignment_confidence: f64,
+    completion_percentage: f64,
+    guardrail_allowed: bool,
+) -> sentinel_core::ReliabilitySnapshot {
+    let alignment_factor = (alignment_score / 100.0).clamp(0.0, 1.0);
+    let confidence_factor = alignment_confidence.clamp(0.0, 1.0);
+    let completion_factor = completion_percentage.clamp(0.0, 1.0);
+
+    let task_success_rate =
+        (alignment_factor * 0.60 + confidence_factor * 0.20 + completion_factor * 0.20)
+            .clamp(0.0, 1.0);
+    let no_regression_rate = if guardrail_allowed {
+        (alignment_factor * 0.70 + confidence_factor * 0.30).clamp(0.0, 1.0)
+    } else {
+        (alignment_factor * 0.50 + confidence_factor * 0.20).clamp(0.0, 1.0)
+    };
+    let rollback_rate = if guardrail_allowed {
+        ((1.0 - task_success_rate) * 0.25).clamp(0.0, 1.0)
+    } else {
+        ((1.0 - task_success_rate) * 0.55 + 0.05).clamp(0.0, 1.0)
+    };
+    let invariant_violation_rate = if guardrail_allowed {
+        ((1.0 - alignment_factor) * 0.35).clamp(0.0, 1.0)
+    } else {
+        ((1.0 - alignment_factor) * 0.65 + 0.05).clamp(0.0, 1.0)
+    };
+    let avg_time_to_recover_ms = (rollback_rate * 1200.0) + (invariant_violation_rate * 800.0);
+
+    sentinel_core::ReliabilitySnapshot {
+        task_success_rate,
+        no_regression_rate,
+        rollback_rate,
+        avg_time_to_recover_ms,
+        invariant_violation_rate,
+    }
+}
+
 async fn handle_tool_call(params: Option<Value>) -> Option<Value> {
     let params = params?;
     let name = params.get("name")?.as_str()?;
@@ -796,16 +840,27 @@ async fn handle_tool_call(params: Option<Value>) -> Option<Value> {
                 .unwrap_or("");
             let result_json = match get_manifold() {
                 Ok(manifold) => {
+                    let guardrail = sentinel_core::guardrail::GuardrailEngine::evaluate(&manifold);
+                    let completion = manifold.completion_percentage();
                     let state = ProjectState::new(PathBuf::from("."));
                     let field = AlignmentField::new(manifold);
                     match field.predict_alignment(&state).await {
-                        Ok(res) => serde_json::json!({
-                            "alignment_score": res.expected_alignment,
-                            "deviation_probability": res.deviation_probability,
-                            "risk_level": format!("{:?}", res.risk_level()),
-                            "approved": res.expected_alignment > 70.0,
-                            "rationale": format!("Analisi dell'intento: {}", desc)
-                        }),
+                        Ok(res) => {
+                            let reliability = reliability_from_signals(
+                                res.expected_alignment,
+                                res.confidence,
+                                completion,
+                                guardrail.allowed,
+                            );
+                            serde_json::json!({
+                                "alignment_score": res.expected_alignment,
+                                "deviation_probability": res.deviation_probability,
+                                "risk_level": format!("{:?}", res.risk_level()),
+                                "approved": res.expected_alignment > 70.0,
+                                "rationale": format!("Analisi dell'intento: {}", desc),
+                                "reliability": reliability
+                            })
+                        }
                         Err(e) => {
                             serde_json::json!({ "error": format!("Simulazione fallita: {}", e) })
                         }
@@ -821,15 +876,61 @@ async fn handle_tool_call(params: Option<Value>) -> Option<Value> {
         "get_alignment" => {
             let result_json = match get_manifold() {
                 Ok(manifold) => {
+                    let completion = manifold.completion_percentage();
+                    let guardrail = sentinel_core::guardrail::GuardrailEngine::evaluate(&manifold);
                     let state = ProjectState::new(PathBuf::from("."));
                     let field = AlignmentField::new(manifold);
                     match field.compute_alignment(&state).await {
-                        Ok(v) => serde_json::json!({
-                            "score": v.score,
-                            "confidence": v.confidence,
-                            "status": if v.score > 70.0 { "OPTIMAL" } else { "DEVIATED" },
-                            "violations": []
-                        }),
+                        Ok(v) => {
+                            let reliability = reliability_from_signals(
+                                v.score,
+                                v.confidence,
+                                completion,
+                                guardrail.allowed,
+                            );
+                            serde_json::json!({
+                                "score": v.score,
+                                "confidence": v.confidence,
+                                "status": if v.score > 70.0 { "OPTIMAL" } else { "DEVIATED" },
+                                "violations": [],
+                                "reliability": reliability
+                            })
+                        }
+                        Err(e) => serde_json::json!({ "error": format!("Errore calcolo: {}", e) }),
+                    }
+                }
+                Err(e) => serde_json::json!({ "error": e }),
+            };
+            Some(
+                serde_json::json!({ "content": [{ "type": "text", "text": result_json.to_string() }] }),
+            )
+        }
+
+        "get_reliability" => {
+            let result_json = match get_manifold() {
+                Ok(manifold) => {
+                    let completion = manifold.completion_percentage();
+                    let guardrail = sentinel_core::guardrail::GuardrailEngine::evaluate(&manifold);
+                    let state = ProjectState::new(PathBuf::from("."));
+                    let field = AlignmentField::new(manifold);
+                    match field.compute_alignment(&state).await {
+                        Ok(alignment) => {
+                            let reliability = reliability_from_signals(
+                                alignment.score,
+                                alignment.confidence,
+                                completion,
+                                guardrail.allowed,
+                            );
+                            serde_json::json!({
+                                "reliability": reliability,
+                                "inputs": {
+                                    "alignment_score": alignment.score,
+                                    "alignment_confidence": alignment.confidence,
+                                    "completion_percentage": completion,
+                                    "guardrail_allowed": guardrail.allowed
+                                }
+                            })
+                        }
                         Err(e) => serde_json::json!({ "error": format!("Errore calcolo: {}", e) }),
                     }
                 }
