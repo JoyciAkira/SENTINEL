@@ -46,10 +46,7 @@ use serde::{Deserialize, Serialize};
 /// # }
 /// ```
 #[derive(Debug)]
-pub struct MonteCarloSimulator {
-    /// Random number generator
-    rng: rand::rngs::ThreadRng,
-}
+pub struct MonteCarloSimulator;
 
 impl Clone for MonteCarloSimulator {
     fn clone(&self) -> Self {
@@ -60,9 +57,7 @@ impl Clone for MonteCarloSimulator {
 impl MonteCarloSimulator {
     /// Create a new simulator
     pub fn new() -> Self {
-        Self {
-            rng: rand::thread_rng(),
-        }
+        Self
     }
 
     /// Simulate an action and predict outcomes

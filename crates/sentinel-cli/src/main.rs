@@ -131,7 +131,7 @@ async fn main() -> anyhow::Result<()> {
             let gemini_key = std::env::var("GEMINI_API_KEY").ok();
             let openrouter_key = std::env::var("OPENROUTER_API_KEY").ok();
 
-            if let Some(key) = gemini_key.or(openrouter_key) {
+            if gemini_key.or(openrouter_key).is_some() {
                 use sentinel_agent_native::llm_integration::{LLMClient, LLMContext};
                 use sentinel_agent_native::openrouter::{OpenRouterClient, OpenRouterModel};
                 use sentinel_agent_native::providers::gemini::GeminiClient;

@@ -841,10 +841,6 @@ async fn handle_tool_call(params: Option<Value>) -> Option<Value> {
         }
 
         "safe_write" => {
-            let path = arguments
-                .and_then(|a| a.get("path"))
-                .and_then(|v| v.as_str())
-                .unwrap_or("unknown");
             let content = arguments
                 .and_then(|a| a.get("content"))
                 .and_then(|v| v.as_str())

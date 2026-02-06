@@ -165,18 +165,24 @@ fn find_manifold_path() -> Option<PathBuf> {
         }
     }
 
-    if let Ok(mut current_dir) = std::env::current_dir() {
-        loop {
-            let candidate = current_dir.join("sentinel.json");
-            if candidate.exists() {
-                return Some(candidate);
-            }
-            if !current_dir.pop() {
-                break;
-            }
-        }
+    if let Ok(current_dir) = std::env::current_dir() {
+        return search_up_for_manifold(&current_dir);
     }
 
+    None
+}
+
+fn search_up_for_manifold(start_dir: &Path) -> Option<PathBuf> {
+    let mut current_dir = start_dir.to_path_buf();
+    loop {
+        let candidate = current_dir.join("sentinel.json");
+        if candidate.exists() {
+            return Some(candidate);
+        }
+        if !current_dir.pop() {
+            break;
+        }
+    }
     None
 }
 
@@ -194,4 +200,51 @@ pub async fn run_server() -> anyhow::Result<()> {
     Server::new(stdin, stdout, socket).serve(service).await;
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use sentinel_core::goal_manifold::Intent;
+
+    fn temp_path(name: &str) -> PathBuf {
+        let unique = format!(
+            "sentinel_lsp_test_{}_{}_{}",
+            name,
+            std::process::id(),
+            chrono::Utc::now().timestamp_nanos_opt().unwrap_or_default()
+        );
+        std::env::temp_dir().join(unique)
+    }
+
+    #[test]
+    fn search_up_for_manifold_finds_parent_file() {
+        let root = temp_path("search");
+        let nested = root.join("a").join("b");
+        std::fs::create_dir_all(&nested).expect("create temp dirs");
+        std::fs::write(root.join("sentinel.json"), "{}").expect("create manifold file");
+
+        let found = search_up_for_manifold(&nested).expect("should find sentinel.json");
+        assert_eq!(found, root.join("sentinel.json"));
+
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn load_manifold_parses_serialized_goal_manifold() {
+        let temp_dir = temp_path("load");
+        std::fs::create_dir_all(&temp_dir).expect("create temp dir");
+        let manifold_path = temp_dir.join("sentinel.json");
+
+        let intent = Intent::new("Test project intent", vec!["constraint".to_string()]);
+        let manifold = GoalManifold::new(intent.clone());
+        let serialized = serde_json::to_string_pretty(&manifold).expect("serialize manifold");
+        std::fs::write(&manifold_path, serialized).expect("write manifold file");
+
+        let loaded = load_manifold(&manifold_path).expect("load manifold");
+        assert_eq!(loaded.root_intent.description, intent.description);
+        assert_eq!(loaded.root_intent.constraints, intent.constraints);
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
 }
