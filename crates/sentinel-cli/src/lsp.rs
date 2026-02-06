@@ -9,6 +9,8 @@ use tower_lsp::jsonrpc::Result;
 use tower_lsp::lsp_types::*;
 use tower_lsp::{Client, LanguageServer, LspService, Server};
 
+use crate::reliability;
+
 /// Backend del Server LSP di Sentinel
 pub struct Backend {
     client: Client,
@@ -102,12 +104,15 @@ impl Backend {
 
                     match field.compute_alignment(&state).await {
                         Ok(alignment) => {
-                            let reliability = reliability_from_signals(
+                            let reliability = reliability::snapshot_from_signals(
                                 alignment.score,
                                 alignment.confidence,
                                 completion,
                                 guardrail.allowed,
                             );
+                            let config = reliability::load_reliability_config(&manifold_path);
+                            let evaluation =
+                                reliability::evaluate_snapshot(&reliability, &config.thresholds);
                             if alignment.score < 70.0 {
                                 diagnostics.push(Diagnostic {
                                     range: Range::default(),
@@ -138,9 +143,7 @@ impl Backend {
                                 });
                             }
 
-                            if reliability.rollback_rate > 0.10
-                                || reliability.invariant_violation_rate > 0.05
-                            {
+                            if !evaluation.healthy {
                                 diagnostics.push(Diagnostic {
                                     range: Range::default(),
                                     severity: Some(DiagnosticSeverity::WARNING),
@@ -149,7 +152,8 @@ impl Backend {
                                     )),
                                     source: Some("Sentinel".to_string()),
                                     message: format!(
-                                        "Reliability alert: rollback {:.1}%, invariant violations {:.1}% (success {:.1}%).",
+                                        "Reliability SLO violated: {} | rollback {:.1}% | invariant violations {:.1}% (success {:.1}%).",
+                                        evaluation.violations.join(" ; "),
                                         reliability.rollback_rate * 100.0,
                                         reliability.invariant_violation_rate * 100.0,
                                         reliability.task_success_rate * 100.0
@@ -162,11 +166,12 @@ impl Backend {
                                 .log_message(
                                     MessageType::INFO,
                                     format!(
-                                        "Sentinel reliability: success {:.1}% | no-regression {:.1}% | rollback {:.1}% | inv-viol {:.1}%",
+                                        "Sentinel reliability: success {:.1}% | no-regression {:.1}% | rollback {:.1}% | inv-viol {:.1}% | slo={}",
                                         reliability.task_success_rate * 100.0,
                                         reliability.no_regression_rate * 100.0,
                                         reliability.rollback_rate * 100.0,
-                                        reliability.invariant_violation_rate * 100.0
+                                        reliability.invariant_violation_rate * 100.0,
+                                        if evaluation.healthy { "healthy" } else { "violated" }
                                     ),
                                 )
                                 .await;
@@ -230,45 +235,6 @@ fn search_up_for_manifold(start_dir: &Path) -> Option<PathBuf> {
 fn load_manifold(path: &Path) -> anyhow::Result<GoalManifold> {
     let content = std::fs::read_to_string(path)?;
     Ok(serde_json::from_str(&content)?)
-}
-
-fn reliability_from_signals(
-    alignment_score: f64,
-    alignment_confidence: f64,
-    completion_percentage: f64,
-    guardrail_allowed: bool,
-) -> sentinel_core::ReliabilitySnapshot {
-    let alignment_factor = (alignment_score / 100.0).clamp(0.0, 1.0);
-    let confidence_factor = alignment_confidence.clamp(0.0, 1.0);
-    let completion_factor = completion_percentage.clamp(0.0, 1.0);
-
-    let task_success_rate =
-        (alignment_factor * 0.60 + confidence_factor * 0.20 + completion_factor * 0.20)
-            .clamp(0.0, 1.0);
-    let no_regression_rate = if guardrail_allowed {
-        (alignment_factor * 0.70 + confidence_factor * 0.30).clamp(0.0, 1.0)
-    } else {
-        (alignment_factor * 0.50 + confidence_factor * 0.20).clamp(0.0, 1.0)
-    };
-    let rollback_rate = if guardrail_allowed {
-        ((1.0 - task_success_rate) * 0.25).clamp(0.0, 1.0)
-    } else {
-        ((1.0 - task_success_rate) * 0.55 + 0.05).clamp(0.0, 1.0)
-    };
-    let invariant_violation_rate = if guardrail_allowed {
-        ((1.0 - alignment_factor) * 0.35).clamp(0.0, 1.0)
-    } else {
-        ((1.0 - alignment_factor) * 0.65 + 0.05).clamp(0.0, 1.0)
-    };
-    let avg_time_to_recover_ms = (rollback_rate * 1200.0) + (invariant_violation_rate * 800.0);
-
-    sentinel_core::ReliabilitySnapshot {
-        task_success_rate,
-        no_regression_rate,
-        rollback_rate,
-        avg_time_to_recover_ms,
-        invariant_violation_rate,
-    }
 }
 
 /// Avvia il server LSP su stdin/stdout

@@ -15,6 +15,7 @@ use std::{
     time::{Duration, Instant},
 };
 
+use crate::reliability;
 use std::path::PathBuf;
 
 pub struct AgentStatus {
@@ -38,6 +39,8 @@ pub struct TuiApp {
     pub estimated_tokens: usize,
     pub is_barrier_locked: bool,
     pub reliability: sentinel_core::ReliabilitySnapshot,
+    pub reliability_thresholds: reliability::ReliabilityThresholds,
+    pub reliability_eval: reliability::ReliabilityEvaluation,
 }
 
 impl TuiApp {
@@ -60,6 +63,8 @@ impl TuiApp {
             estimated_tokens: 0,
             is_barrier_locked: false,
             reliability: sentinel_core::ReliabilitySnapshot::from_counts(0, 0, 0, 0, 0, 0, 0),
+            reliability_thresholds: reliability::ReliabilityThresholds::default(),
+            reliability_eval: reliability::ReliabilityEvaluation::default(),
         }
     }
 
@@ -80,11 +85,17 @@ impl TuiApp {
                     let decision = sentinel_core::guardrail::GuardrailEngine::evaluate(&manifold);
                     self.is_barrier_locked = !decision.allowed;
                     self.alignment_score = decision.score_at_check;
-                    self.reliability = reliability_from_tui_signals(
+                    self.reliability = reliability::snapshot_from_signals(
                         self.alignment_score,
+                        1.0,
                         manifold.completion_percentage(),
-                        self.conflicts.len() as u64,
-                        self.is_barrier_locked,
+                        !self.is_barrier_locked,
+                    );
+                    let config = reliability::load_reliability_config(&self.manifold_path);
+                    self.reliability_thresholds = config.thresholds;
+                    self.reliability_eval = reliability::evaluate_snapshot(
+                        &self.reliability,
+                        &self.reliability_thresholds,
                     );
 
                     let report =
@@ -465,12 +476,26 @@ fn ui(f: &mut Frame, app: &TuiApp) {
             };
 
             let inner_text = format!(
-                "RUNTIME RELIABILITY SNAPSHOT:\n\n- Task Success Rate: {:.1}%\n- No-Regression Rate: {:.1}%\n- Rollback Rate: {:.1}%\n- Avg Time To Recover: {:.0} ms\n- Invariant Violation Rate: {:.1}%\n\nSLO Targets:\n- Success >= 95%\n- No-Regression >= 95%\n- Rollback <= 5%\n- Invariant Violations <= 2%",
+                "RUNTIME RELIABILITY SNAPSHOT:\n\n- Task Success Rate: {:.1}%\n- No-Regression Rate: {:.1}%\n- Rollback Rate: {:.1}%\n- Avg Time To Recover: {:.0} ms\n- Invariant Violation Rate: {:.1}%\n\nSLO Targets (sentinel.json):\n- Success >= {:.1}%\n- No-Regression >= {:.1}%\n- Rollback <= {:.1}%\n- Invariant Violations <= {:.1}%\n\nVerdict: {}\nViolations: {}",
                 app.reliability.task_success_rate * 100.0,
                 app.reliability.no_regression_rate * 100.0,
                 app.reliability.rollback_rate * 100.0,
                 app.reliability.avg_time_to_recover_ms,
-                app.reliability.invariant_violation_rate * 100.0
+                app.reliability.invariant_violation_rate * 100.0,
+                app.reliability_thresholds.min_task_success_rate * 100.0,
+                app.reliability_thresholds.min_no_regression_rate * 100.0,
+                app.reliability_thresholds.max_rollback_rate * 100.0,
+                app.reliability_thresholds.max_invariant_violation_rate * 100.0,
+                if app.reliability_eval.healthy {
+                    "HEALTHY"
+                } else {
+                    "VIOLATED"
+                },
+                if app.reliability_eval.violations.is_empty() {
+                    "none".to_string()
+                } else {
+                    app.reliability_eval.violations.join(" | ")
+                }
             );
             let main_block = Paragraph::new(inner_text)
                 .block(
@@ -478,7 +503,11 @@ fn ui(f: &mut Frame, app: &TuiApp) {
                         .borders(Borders::ALL)
                         .title("Reliability KPIs"),
                 )
-                .style(Style::default().fg(rollback_color));
+                .style(Style::default().fg(if app.reliability_eval.healthy {
+                    rollback_color
+                } else {
+                    Color::Red
+                }));
             f.render_widget(main_block, main_chunk);
         }
         _ => {}
@@ -525,39 +554,4 @@ impl TuiApp {
         };
         self.goal_list_state.select(Some(i));
     }
-}
-
-fn reliability_from_tui_signals(
-    alignment_score: f64,
-    completion_percentage: f64,
-    conflict_count: u64,
-    barrier_locked: bool,
-) -> sentinel_core::ReliabilitySnapshot {
-    let alignment_factor = alignment_score.clamp(0.0, 1.0);
-    let completion_factor = completion_percentage.clamp(0.0, 1.0);
-    let total_tasks_estimate = (completion_factor * 100.0).round() as u64 + 1;
-    let successful = (alignment_factor * total_tasks_estimate as f64).round() as u64;
-    let regressions = conflict_count.min(total_tasks_estimate);
-    let rollbacks = if barrier_locked {
-        regressions.max(1)
-    } else {
-        regressions
-    };
-    let recoveries = rollbacks;
-    let total_recovery_ms = rollbacks * if barrier_locked { 1500 } else { 800 };
-    let invariant_violations = if barrier_locked {
-        regressions.max(1)
-    } else {
-        regressions / 2
-    };
-
-    sentinel_core::ReliabilitySnapshot::from_counts(
-        total_tasks_estimate,
-        successful,
-        regressions,
-        rollbacks,
-        recoveries,
-        total_recovery_ms,
-        invariant_violations,
-    )
 }
