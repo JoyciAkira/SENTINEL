@@ -229,6 +229,85 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
       }
     }
 
+    if (text.trim() === "/help") {
+      this.postMessage({
+        type: "chatResponse",
+        id: messageId,
+        content:
+          "Comandi disponibili:\n- `/init <descrizione>`\n- `/clear-memory`\n- `/memory-status`\n- `/memory-search <query>`\n- `/memory-export [path]`\n- `/memory-import <path> [merge=true|false]`",
+      });
+      return;
+    }
+
+    if (text.trim() === "/memory-status") {
+      const result = (await this.client.callTool("chat_memory_status", {})) as any;
+      this.postMessage({
+        type: "chatResponse",
+        id: messageId,
+        content: `Memory turns: ${result?.turn_count ?? 0}\nRecent:\n${(result?.recent_turns ?? [])
+          .map((t: any) => `- ${t.id?.slice(0, 8)} ${t.intent_summary ?? ""}`)
+          .join("\n")}`,
+      });
+      return;
+    }
+
+    if (text.startsWith("/memory-search ")) {
+      const query = text.replace("/memory-search ", "").trim();
+      const result = (await this.client.callTool("chat_memory_search", {
+        query,
+        limit: 8,
+      })) as any;
+      this.postMessage({
+        type: "chatResponse",
+        id: messageId,
+        content: `Memory hits (${result?.count ?? 0}) for "${query}":\n${(result?.hits ?? [])
+          .map((h: any) => `- ${h.id?.slice(0, 8)}: ${h.intent_summary ?? ""}`)
+          .join("\n")}`,
+      });
+      return;
+    }
+
+    if (text.startsWith("/memory-export")) {
+      const maybePath = text.replace("/memory-export", "").trim();
+      const args: Record<string, unknown> = {};
+      if (maybePath) args.path = maybePath;
+      const result = (await this.client.callTool("chat_memory_export", args)) as any;
+      this.postMessage({
+        type: "chatResponse",
+        id: messageId,
+        content: result?.ok
+          ? `Memory export completato: ${result.path}\nTurns: ${result.turn_count}`
+          : `Memory export fallito: ${result?.error ?? "unknown error"}`,
+      });
+      return;
+    }
+
+    if (text.startsWith("/memory-import ")) {
+      const payload = text.replace("/memory-import ", "").trim();
+      const [pathArg, mergeArg] = payload.split(/\s+/);
+      if (!pathArg) {
+        this.postMessage({
+          type: "chatResponse",
+          id: messageId,
+          content: "Usage: /memory-import <path> [merge=true|false]",
+        });
+        return;
+      }
+      const merge = mergeArg ? mergeArg.toLowerCase() !== "merge=false" : true;
+      const result = (await this.client.callTool("chat_memory_import", {
+        path: pathArg,
+        merge,
+      })) as any;
+      this.postMessage({
+        type: "chatResponse",
+        id: messageId,
+        content: result?.ok
+          ? `Memory import completato (${merge ? "merge" : "replace"}): ${result.turn_count} turns`
+          : `Memory import fallito: ${result?.error ?? "unknown error"}`,
+      });
+      return;
+    }
+
     try {
       // Send a "thinking" state
       this.postMessage({

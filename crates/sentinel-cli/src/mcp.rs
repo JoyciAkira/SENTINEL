@@ -348,6 +348,45 @@ async fn handle_request(req: McpRequest, id: Value) -> McpResponse {
                         "name": "chat_memory_clear",
                         "description": "Azzera la memoria conversazionale persistente locale usata per il contesto chat",
                         "inputSchema": { "type": "object", "properties": {} }
+                    },
+                    {
+                        "name": "chat_memory_status",
+                        "description": "Restituisce statistiche e ultimi turni della memoria conversazionale",
+                        "inputSchema": { "type": "object", "properties": {} }
+                    },
+                    {
+                        "name": "chat_memory_search",
+                        "description": "Ricerca semantica lightweight nella memoria conversazionale",
+                        "inputSchema": {
+                            "type": "object",
+                            "properties": {
+                                "query": { "type": "string" },
+                                "limit": { "type": "integer" }
+                            },
+                            "required": ["query"]
+                        }
+                    },
+                    {
+                        "name": "chat_memory_export",
+                        "description": "Esporta la memoria conversazionale su file JSON",
+                        "inputSchema": {
+                            "type": "object",
+                            "properties": {
+                                "path": { "type": "string" }
+                            }
+                        }
+                    },
+                    {
+                        "name": "chat_memory_import",
+                        "description": "Importa memoria conversazionale da file JSON",
+                        "inputSchema": {
+                            "type": "object",
+                            "properties": {
+                                "path": { "type": "string" },
+                                "merge": { "type": "boolean" }
+                            },
+                            "required": ["path"]
+                        }
                     }
                 ]
             })),
@@ -439,6 +478,11 @@ fn find_chat_memory_path() -> Option<PathBuf> {
     Some(dir.join("chat_memory.json"))
 }
 
+fn default_chat_memory_export_path() -> Option<PathBuf> {
+    let root = find_manifold_path()?.parent()?.to_path_buf();
+    Some(root.join(".sentinel").join("chat_memory_export.json"))
+}
+
 fn load_chat_memory() -> ChatMemoryStore {
     let Some(path) = find_chat_memory_path() else {
         return ChatMemoryStore {
@@ -473,6 +517,27 @@ fn save_chat_memory(store: &ChatMemoryStore) -> Result<(), String> {
     let content = serde_json::to_string_pretty(store)
         .map_err(|e| format!("Errore serializzazione memoria: {}", e))?;
     std::fs::write(path, content).map_err(|e| format!("Errore scrittura memoria: {}", e))
+}
+
+fn save_chat_memory_to_path(path: &std::path::Path, store: &ChatMemoryStore) -> Result<(), String> {
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)
+            .map_err(|e| format!("Errore creazione directory export: {}", e))?;
+    }
+    let content = serde_json::to_string_pretty(store)
+        .map_err(|e| format!("Errore serializzazione export memoria: {}", e))?;
+    std::fs::write(path, content).map_err(|e| format!("Errore scrittura export memoria: {}", e))
+}
+
+fn load_chat_memory_from_path(path: &std::path::Path) -> Result<ChatMemoryStore, String> {
+    let content = std::fs::read_to_string(path)
+        .map_err(|e| format!("Errore lettura import memoria '{}': {}", path.display(), e))?;
+    let mut store: ChatMemoryStore = serde_json::from_str(&content)
+        .map_err(|e| format!("Errore parsing import memoria: {}", e))?;
+    if store.version == 0 {
+        store.version = 1;
+    }
+    Ok(store)
 }
 
 fn normalize_terms(input: &str) -> std::collections::BTreeSet<String> {
@@ -1627,6 +1692,145 @@ async fn handle_tool_call(params: Option<Value>) -> Option<Value> {
             )
         }
 
+        "chat_memory_status" => {
+            let store = load_chat_memory();
+            let mut recent = store.turns.clone();
+            recent.reverse();
+            recent.truncate(10);
+            let result_json = serde_json::json!({
+                "ok": true,
+                "version": store.version,
+                "turn_count": store.turns.len(),
+                "recent_turns": recent.iter().map(|turn| {
+                    serde_json::json!({
+                        "id": turn.id,
+                        "timestamp": turn.timestamp,
+                        "intent_summary": turn.intent_summary,
+                        "evidence": turn.evidence,
+                    })
+                }).collect::<Vec<_>>()
+            });
+            Some(
+                serde_json::json!({ "content": [{ "type": "text", "text": result_json.to_string() }] }),
+            )
+        }
+
+        "chat_memory_search" => {
+            let query = arguments
+                .and_then(|a| a.get("query"))
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .trim()
+                .to_string();
+            let limit = arguments
+                .and_then(|a| a.get("limit"))
+                .and_then(|v| v.as_u64())
+                .map(|v| v as usize)
+                .unwrap_or(10)
+                .clamp(1, 50);
+            if query.is_empty() {
+                return Some(serde_json::json!({
+                    "isError": true,
+                    "content": [{ "type": "text", "text": "query è obbligatoria." }]
+                }));
+            }
+            let store = load_chat_memory();
+            let hits = top_memory_context(&store, &query, limit);
+            let result_json = serde_json::json!({
+                "ok": true,
+                "query": query,
+                "count": hits.len(),
+                "hits": hits.iter().map(|hit| {
+                    serde_json::json!({
+                        "id": hit.id,
+                        "timestamp": hit.timestamp,
+                        "user": hit.user,
+                        "assistant": hit.assistant,
+                        "intent_summary": hit.intent_summary,
+                        "evidence": hit.evidence
+                    })
+                }).collect::<Vec<_>>()
+            });
+            Some(
+                serde_json::json!({ "content": [{ "type": "text", "text": result_json.to_string() }] }),
+            )
+        }
+
+        "chat_memory_export" => {
+            let export_path = arguments
+                .and_then(|a| a.get("path"))
+                .and_then(|v| v.as_str())
+                .map(PathBuf::from)
+                .or_else(default_chat_memory_export_path);
+            let result_json = match export_path {
+                Some(path) => {
+                    let store = load_chat_memory();
+                    match save_chat_memory_to_path(&path, &store) {
+                        Ok(_) => serde_json::json!({
+                            "ok": true,
+                            "path": path.display().to_string(),
+                            "turn_count": store.turns.len()
+                        }),
+                        Err(e) => serde_json::json!({ "ok": false, "error": e }),
+                    }
+                }
+                None => {
+                    serde_json::json!({ "ok": false, "error": "Impossibile risolvere path export." })
+                }
+            };
+            Some(
+                serde_json::json!({ "content": [{ "type": "text", "text": result_json.to_string() }] }),
+            )
+        }
+
+        "chat_memory_import" => {
+            let import_path = arguments
+                .and_then(|a| a.get("path"))
+                .and_then(|v| v.as_str())
+                .map(PathBuf::from);
+            let merge = arguments
+                .and_then(|a| a.get("merge"))
+                .and_then(|v| v.as_bool())
+                .unwrap_or(true);
+            let result_json = match import_path {
+                Some(path) => match load_chat_memory_from_path(&path) {
+                    Ok(imported) => {
+                        let current = load_chat_memory();
+                        let mut next = if merge {
+                            let mut turns = current.turns.clone();
+                            turns.extend(imported.turns.clone());
+                            turns.sort_by_key(|turn| turn.timestamp);
+                            turns.dedup_by(|a, b| a.id == b.id);
+                            ChatMemoryStore { version: 1, turns }
+                        } else {
+                            ChatMemoryStore {
+                                version: 1,
+                                turns: imported.turns.clone(),
+                            }
+                        };
+                        if next.turns.len() > 1000 {
+                            let keep_from = next.turns.len().saturating_sub(1000);
+                            next.turns = next.turns.split_off(keep_from);
+                        }
+                        match save_chat_memory(&next) {
+                            Ok(_) => serde_json::json!({
+                                "ok": true,
+                                "merge": merge,
+                                "path": path.display().to_string(),
+                                "turn_count": next.turns.len()
+                            }),
+                            Err(e) => serde_json::json!({ "ok": false, "error": e }),
+                        }
+                    }
+                    Err(e) => serde_json::json!({ "ok": false, "error": e }),
+                },
+                None => serde_json::json!({ "ok": false, "error": "path è obbligatorio." }),
+            };
+            Some(
+                serde_json::json!({ "content": [{ "type": "text", "text": result_json.to_string() }] }),
+            )
+        }
+
         _ => Some(
             serde_json::json!({ "isError": true, "content": [{ "type": "text", "text": "Tool non supportato." }] }),
         ),
@@ -1673,4 +1877,46 @@ fn governance_seed_diff(
             "remove": current_ports.difference(&next_ports).cloned().collect::<Vec<_>>()
         }
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn stream_chunks_preserves_content() {
+        let text = "Sentinel generates deterministic output with explainability blocks.";
+        let chunks = stream_chunks(text, 12);
+        let rebuilt = chunks.join("");
+        assert_eq!(rebuilt, text);
+        assert!(chunks.len() >= 2);
+    }
+
+    #[test]
+    fn top_memory_context_prioritizes_overlap() {
+        let store = ChatMemoryStore {
+            version: 1,
+            turns: vec![
+                ChatMemoryTurn {
+                    id: "a".to_string(),
+                    timestamp: 1000,
+                    user: "implement auth middleware".to_string(),
+                    assistant: "added middleware".to_string(),
+                    intent_summary: "auth middleware".to_string(),
+                    evidence: vec![],
+                },
+                ChatMemoryTurn {
+                    id: "b".to_string(),
+                    timestamp: 2000,
+                    user: "improve css theme".to_string(),
+                    assistant: "new colors".to_string(),
+                    intent_summary: "theme".to_string(),
+                    evidence: vec![],
+                },
+            ],
+        };
+        let hits = top_memory_context(&store, "auth token middleware", 1);
+        assert_eq!(hits.len(), 1);
+        assert_eq!(hits[0].id, "a");
+    }
 }

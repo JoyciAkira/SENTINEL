@@ -1,7 +1,7 @@
 import React from "react";
 import { useStore } from "../../state/store";
 import { useVSCodeAPI } from "../../hooks/useVSCodeAPI";
-import { Sparkles, Terminal, Shield, Target } from "lucide-react";
+import { Sparkles, Terminal, Shield, Target, Brain, HelpCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const PROMPTS = [
@@ -9,6 +9,8 @@ const PROMPTS = [
   { label: "Alignment Status", text: "Show current alignment status", icon: Shield },
   { label: "List Goals", text: "What are the active goals?", icon: Target },
   { label: "Verify Action", text: "Validate my next changes", icon: Terminal },
+  { label: "Memory Status", text: "/memory-status", icon: Brain },
+  { label: "Help", text: "/help", icon: HelpCircle },
 ];
 
 export default function QuickPrompts() {
