@@ -167,18 +167,24 @@ impl ContextManager {
     /// 3. Query semantic memory (knowledge graph, 300ms)
     /// 4. Merge, deduplicate, re-rank
     /// 5. Compress to token budget
-    pub async fn retrieve_context(&mut self, query: &Query, limit: usize) -> Result<UnifiedContext> {
+    pub async fn retrieve_context(
+        &mut self,
+        query: &Query,
+        limit: usize,
+    ) -> Result<UnifiedContext> {
         tracing::debug!("Retrieving context for query: {}", query.text);
 
         let start_time = std::time::Instant::now();
 
         // Check cache first
         if let Some(cached) = self.query_cache.get(&query.text) {
-            tracing::debug!("Cache hit for query");
-            self.stats.cache_hits += 1;
-            self.stats.total_queries += 1;
-
-            return Ok(cached.context.clone());
+            let age_seconds = (Utc::now() - cached.timestamp).num_seconds();
+            if age_seconds >= 0 && age_seconds as u64 <= cached.ttl_seconds {
+                tracing::debug!("Cache hit for query");
+                self.stats.cache_hits += 1;
+                self.stats.total_queries += 1;
+                return Ok(cached.context.clone());
+            }
         }
 
         // Step 1: Query Working Memory (instant)
@@ -214,8 +220,11 @@ impl ContextManager {
         };
 
         // Step 4: Merge and rank all results
-        let all_results =
-            self.merge_and_rank_results(working_results.clone(), episodic_results.clone(), semantic_results.clone());
+        let all_results = self.merge_and_rank_results(
+            working_results.clone(),
+            episodic_results.clone(),
+            semantic_results.clone(),
+        );
 
         // Step 5: Compress context to token budget
         let target_tokens = 128_000; // 128k token budget
@@ -280,9 +289,10 @@ impl ContextManager {
 
         // Add working memory results with source weighting
         for result in working {
+            let trust = result.item.trust_score();
             all_results.push(MemoryQueryResult {
                 item: result.item.clone(),
-                score: result.score * 1.5, // WM has highest priority
+                score: result.score * 1.5 * trust, // WM has highest priority
                 source: MemorySource::Working,
             });
         }
@@ -290,19 +300,25 @@ impl ContextManager {
         // Add episodic memory results with recency scoring
         for (i, result) in episodic.iter().enumerate() {
             let recency_score = 1.0 - (i as f64) / episodic.len() as f64;
+            let trust = result.item.trust_score();
             all_results.push(MemoryQueryResult {
                 item: result.item.clone(),
-                score: result.score * 0.8 + recency_score * 0.2,
+                score: (result.score * 0.8 + recency_score * 0.2) * trust,
                 source: MemorySource::Episodic,
             });
         }
 
         // Add semantic memory results with goal contribution scoring
         for result in semantic {
-            let goal_score = if !result.item.goal_ids.is_empty() { 0.2 } else { 0.0 };
+            let goal_score = if !result.item.goal_ids.is_empty() {
+                0.2
+            } else {
+                0.0
+            };
+            let trust = result.item.trust_score();
             all_results.push(MemoryQueryResult {
                 item: result.item.clone(),
-                score: result.score * 0.6 + goal_score,
+                score: (result.score * 0.6 + goal_score) * trust,
                 source: MemorySource::Semantic,
             });
         }
@@ -715,10 +731,7 @@ mod tests {
         }));
 
         assert!(!context_manager.is_critical_item(&MemoryQueryResult {
-            item: MemoryItem::new(
-                "Created auth.rs file".to_string(),
-                MemoryType::Action
-            ),
+            item: MemoryItem::new("Created auth.rs file".to_string(), MemoryType::Action),
             score: 0.85,
             source: sentinel_core::memory::MemorySource::Episodic,
         }));
@@ -730,10 +743,7 @@ mod tests {
         let context_manager = ContextManager::new(memory_manifold);
 
         let results = vec![MemoryQueryResult {
-            item: MemoryItem::new(
-                "Test description 1".to_string(),
-                MemoryType::Observation
-            ),
+            item: MemoryItem::new("Test description 1".to_string(), MemoryType::Observation),
             score: 0.9,
             source: sentinel_core::memory::MemorySource::Episodic,
         }];
