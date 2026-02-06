@@ -512,9 +512,7 @@ impl GoalManifold {
         for (name, endpoint) in pending.proposed_endpoints {
             self.governance.allowed_endpoints.insert(name, endpoint);
         }
-        self.governance
-            .allowed_ports
-            .extend(pending.proposed_ports);
+        self.governance.allowed_ports.extend(pending.proposed_ports);
 
         self.governance.allowed_dependencies =
             dedup_sorted(self.governance.allowed_dependencies.clone());
@@ -562,6 +560,49 @@ impl GoalManifold {
         self.governance.pending_proposal = None;
         self.update_hash("Governance proposal rejected");
         Ok(proposal_id)
+    }
+
+    /// Seed or regenerate governance baseline from a deterministic workspace observation.
+    pub fn apply_governance_seed(
+        &mut self,
+        dependencies: Vec<String>,
+        frameworks: Vec<String>,
+        endpoints: Vec<String>,
+        ports: Vec<u16>,
+        lock_required_to_allowed: bool,
+    ) {
+        self.governance.allowed_dependencies = dedup_sorted(dependencies);
+        self.governance.allowed_frameworks = dedup_sorted(frameworks);
+        self.governance.allowed_ports = dedup_sorted(ports);
+        self.governance.allowed_endpoints.clear();
+        for (index, endpoint) in endpoints.into_iter().enumerate() {
+            self.governance
+                .allowed_endpoints
+                .insert(format!("seeded_{}", index + 1), endpoint);
+        }
+
+        if lock_required_to_allowed {
+            self.governance.required_dependencies = self.governance.allowed_dependencies.clone();
+            self.governance.required_frameworks = self.governance.allowed_frameworks.clone();
+        } else {
+            self.governance.required_dependencies = self
+                .governance
+                .required_dependencies
+                .iter()
+                .filter(|dep| self.governance.allowed_dependencies.contains(dep))
+                .cloned()
+                .collect();
+            self.governance.required_frameworks = self
+                .governance
+                .required_frameworks
+                .iter()
+                .filter(|framework| self.governance.allowed_frameworks.contains(framework))
+                .cloned()
+                .collect();
+        }
+
+        self.governance.pending_proposal = None;
+        self.update_hash("Governance baseline seeded");
     }
 
     /// Get a goal by ID
@@ -812,5 +853,79 @@ mod tests {
 
         // 50% complete
         assert!((manifold.completion_percentage() - 0.5).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_apply_governance_seed_lock_required_to_allowed() {
+        let intent = Intent::new("Test project", Vec::<String>::new());
+        let mut manifold = GoalManifold::new(intent);
+
+        manifold.governance.required_dependencies = vec!["cargo:legacy".to_string()];
+        manifold.governance.required_frameworks = vec!["framework:legacy".to_string()];
+        manifold.governance.pending_proposal = Some(GovernanceChangeProposal {
+            id: Uuid::new_v4(),
+            created_at: chrono::Utc::now(),
+            rationale: "legacy proposal".to_string(),
+            proposed_dependencies: vec!["cargo:old".to_string()],
+            proposed_frameworks: vec!["framework:old".to_string()],
+            proposed_endpoints: std::collections::HashMap::new(),
+            proposed_ports: vec![1111],
+            status: GovernanceProposalStatus::PendingUserApproval,
+            user_note: None,
+        });
+
+        manifold.apply_governance_seed(
+            vec!["cargo:tokio".to_string(), "cargo:serde".to_string()],
+            vec!["framework:axum".to_string()],
+            vec!["/health".to_string()],
+            vec![3000, 3001],
+            true,
+        );
+
+        assert_eq!(
+            manifold.governance.allowed_dependencies,
+            vec!["cargo:serde".to_string(), "cargo:tokio".to_string()]
+        );
+        assert_eq!(
+            manifold.governance.required_dependencies,
+            manifold.governance.allowed_dependencies
+        );
+        assert_eq!(
+            manifold.governance.required_frameworks,
+            manifold.governance.allowed_frameworks
+        );
+        assert_eq!(manifold.governance.allowed_endpoints.len(), 1);
+        assert_eq!(
+            manifold.governance.allowed_endpoints.get("seeded_1"),
+            Some(&"/health".to_string())
+        );
+        assert!(manifold.governance.pending_proposal.is_none());
+    }
+
+    #[test]
+    fn test_apply_governance_seed_intersects_required_when_not_locked() {
+        let intent = Intent::new("Test project", Vec::<String>::new());
+        let mut manifold = GoalManifold::new(intent);
+        manifold.governance.required_dependencies =
+            vec!["cargo:serde".to_string(), "cargo:nonexistent".to_string()];
+        manifold.governance.required_frameworks =
+            vec!["framework:axum".to_string(), "framework:legacy".to_string()];
+
+        manifold.apply_governance_seed(
+            vec!["cargo:serde".to_string(), "cargo:tokio".to_string()],
+            vec!["framework:axum".to_string()],
+            vec![],
+            vec![],
+            false,
+        );
+
+        assert_eq!(
+            manifold.governance.required_dependencies,
+            vec!["cargo:serde".to_string()]
+        );
+        assert_eq!(
+            manifold.governance.required_frameworks,
+            vec!["framework:axum".to_string()]
+        );
     }
 }

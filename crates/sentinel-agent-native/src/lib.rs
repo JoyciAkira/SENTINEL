@@ -100,6 +100,14 @@ pub struct SentinelAgent {
     pub orchestrator: std::sync::Arc<tokio::sync::Mutex<orchestrator::AgentOrchestrator>>,
 }
 
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct GovernanceObservation {
+    pub dependencies: Vec<String>,
+    pub frameworks: Vec<String>,
+    pub endpoints: Vec<String>,
+    pub ports: Vec<u16>,
+}
+
 /// Agent authority level determines voting weight in swarm consensus
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum AgentAuthority {
@@ -1072,6 +1080,16 @@ fn build_governance_proposal(
         status: sentinel_core::goal_manifold::GovernanceProposalStatus::PendingUserApproval,
         user_note: None,
     }
+}
+
+pub fn observe_workspace_governance(root: &Path) -> Result<GovernanceObservation> {
+    let observed = observe_workspace_contract(root)?;
+    Ok(GovernanceObservation {
+        dependencies: observed.dependencies.into_iter().collect(),
+        frameworks: observed.frameworks.into_iter().collect(),
+        endpoints: observed.endpoints.into_iter().collect(),
+        ports: observed.ports.into_iter().collect(),
+    })
 }
 
 fn observe_workspace_contract(root: &Path) -> Result<ObservedWorkspaceContract> {

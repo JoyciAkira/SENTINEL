@@ -127,6 +127,18 @@ enum GovernanceAction {
         /// Motivazione del rifiuto
         reason: String,
     },
+    /// Genera preview baseline governance dal workspace e opzionalmente applica lock
+    Seed {
+        /// Applica realmente la baseline (altrimenti solo preview)
+        #[arg(long)]
+        apply: bool,
+        /// Se true, sincronizza anche required=*allowed (lock stretto)
+        #[arg(long, default_value = "true")]
+        lock_required: bool,
+        /// Output in formato JSON
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 #[tokio::main]
@@ -584,6 +596,58 @@ async fn main() -> anyhow::Result<()> {
                     save_manifold(&cli.manifold, &manifold)?;
                     println!("Governance proposal rejected: {} ({})", proposal_id, reason);
                 }
+                GovernanceAction::Seed {
+                    apply,
+                    lock_required,
+                    json,
+                } => {
+                    let root = cli
+                        .manifold
+                        .parent()
+                        .map(std::path::Path::to_path_buf)
+                        .unwrap_or_else(|| std::path::PathBuf::from("."));
+                    let observed = sentinel_agent_native::observe_workspace_governance(&root)?;
+
+                    let diff = governance_seed_diff(&manifold, &observed);
+                    if json {
+                        println!(
+                            "{}",
+                            serde_json::json!({
+                                "apply": apply,
+                                "lock_required": lock_required,
+                                "observed": observed,
+                                "diff": diff
+                            })
+                        );
+                    } else {
+                        println!("SENTINEL GOVERNANCE SEED");
+                        println!("Workspace root: {}", root.display());
+                        println!(
+                            "Observed: deps={} frameworks={} endpoints={} ports={}",
+                            observed.dependencies.len(),
+                            observed.frameworks.len(),
+                            observed.endpoints.len(),
+                            observed.ports.len()
+                        );
+                        println!("Diff: {}", serde_json::to_string_pretty(&diff)?);
+                    }
+
+                    if apply {
+                        manifold.apply_governance_seed(
+                            observed.dependencies.clone(),
+                            observed.frameworks.clone(),
+                            observed.endpoints.clone(),
+                            observed.ports.clone(),
+                            lock_required,
+                        );
+                        save_manifold(&cli.manifold, &manifold)?;
+                        if !json {
+                            println!("Governance baseline seeded and locked.");
+                        }
+                    } else if !json {
+                        println!("Preview only. Re-run with `--apply` to persist baseline.");
+                    }
+                }
             }
         }
         Commands::Sync => {
@@ -614,4 +678,91 @@ fn save_manifold(
     let content = serde_json::to_string_pretty(manifold)?;
     std::fs::write(path, content)?;
     Ok(())
+}
+
+fn governance_seed_diff(
+    manifold: &sentinel_core::GoalManifold,
+    observed: &sentinel_agent_native::GovernanceObservation,
+) -> serde_json::Value {
+    fn set_of<T: Clone + Ord>(values: &[T]) -> std::collections::BTreeSet<T> {
+        values.iter().cloned().collect()
+    }
+
+    let current_deps = set_of(&manifold.governance.allowed_dependencies);
+    let next_deps = set_of(&observed.dependencies);
+    let current_frameworks = set_of(&manifold.governance.allowed_frameworks);
+    let next_frameworks = set_of(&observed.frameworks);
+    let current_endpoints: std::collections::BTreeSet<String> = manifold
+        .governance
+        .allowed_endpoints
+        .values()
+        .cloned()
+        .collect();
+    let next_endpoints = set_of(&observed.endpoints);
+    let current_ports = set_of(&manifold.governance.allowed_ports);
+    let next_ports = set_of(&observed.ports);
+
+    serde_json::json!({
+        "dependencies": {
+            "add": next_deps.difference(&current_deps).cloned().collect::<Vec<_>>(),
+            "remove": current_deps.difference(&next_deps).cloned().collect::<Vec<_>>()
+        },
+        "frameworks": {
+            "add": next_frameworks.difference(&current_frameworks).cloned().collect::<Vec<_>>(),
+            "remove": current_frameworks.difference(&next_frameworks).cloned().collect::<Vec<_>>()
+        },
+        "endpoints": {
+            "add": next_endpoints.difference(&current_endpoints).cloned().collect::<Vec<_>>(),
+            "remove": current_endpoints.difference(&next_endpoints).cloned().collect::<Vec<_>>()
+        },
+        "ports": {
+            "add": next_ports.difference(&current_ports).cloned().collect::<Vec<_>>(),
+            "remove": current_ports.difference(&next_ports).cloned().collect::<Vec<_>>()
+        }
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use sentinel_core::goal_manifold::Intent;
+
+    #[test]
+    fn governance_seed_diff_reports_additions_and_removals() {
+        let intent = Intent::new("test", Vec::<String>::new());
+        let mut manifold = sentinel_core::GoalManifold::new(intent);
+        manifold.governance.allowed_dependencies = vec!["cargo:serde".to_string()];
+        manifold.governance.allowed_frameworks = vec!["framework:axum".to_string()];
+        manifold
+            .governance
+            .allowed_endpoints
+            .insert("api".to_string(), "/health".to_string());
+        manifold.governance.allowed_ports = vec![3000];
+
+        let observed = sentinel_agent_native::GovernanceObservation {
+            dependencies: vec!["cargo:serde".to_string(), "cargo:tokio".to_string()],
+            frameworks: vec!["framework:actix".to_string()],
+            endpoints: vec!["/metrics".to_string()],
+            ports: vec![4000],
+        };
+
+        let diff = governance_seed_diff(&manifold, &observed);
+        assert_eq!(
+            diff["dependencies"]["add"],
+            serde_json::json!(["cargo:tokio"])
+        );
+        assert_eq!(diff["dependencies"]["remove"], serde_json::json!([]));
+        assert_eq!(
+            diff["frameworks"]["add"],
+            serde_json::json!(["framework:actix"])
+        );
+        assert_eq!(
+            diff["frameworks"]["remove"],
+            serde_json::json!(["framework:axum"])
+        );
+        assert_eq!(diff["endpoints"]["add"], serde_json::json!(["/metrics"]));
+        assert_eq!(diff["endpoints"]["remove"], serde_json::json!(["/health"]));
+        assert_eq!(diff["ports"]["add"], serde_json::json!([4000]));
+        assert_eq!(diff["ports"]["remove"], serde_json::json!([3000]));
+    }
 }
