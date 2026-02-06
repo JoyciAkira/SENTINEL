@@ -1,24 +1,24 @@
 //! Atomic Contract definition for Sentinel
-//! 
+//!
 //! This module defines the formal contracts for "Atomic Truth" execution.
 
 use serde::{Deserialize, Serialize};
 
 /// A formal contract for an atomic coding task.
-/// 
-/// This is the foundation of the "Atomic Truth" vision. Every atomic task 
+///
+/// This is the foundation of the "Atomic Truth" vision. Every atomic task
 /// must satisfy this contract before being committed.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct AtomicContract {
     /// The specific inputs required for this atom.
     pub inputs: Vec<InputSpec>,
-    
+
     /// The expected outputs this atom must produce.
     pub outputs: Vec<OutputSpec>,
-    
+
     /// Rules that must hold true throughout the execution.
     pub invariants: Vec<Invariant>,
-    
+
     /// Isolation level for this atom.
     pub isolation_level: IsolationLevel,
 }
@@ -75,5 +75,11 @@ impl AtomicContract {
             invariants: Vec::new(),
             isolation_level: IsolationLevel::Sandboxed,
         }
+    }
+}
+
+impl Default for AtomicContract {
+    fn default() -> Self {
+        Self::new()
     }
 }

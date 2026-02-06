@@ -54,11 +54,7 @@
 //! ```
 
 use anyhow::Result;
-use sentinel_core::{
-    goal_manifold::Goal,
-    types::Timestamp,
-    Uuid,
-};
+use sentinel_core::{goal_manifold::Goal, types::Timestamp, Uuid};
 use std::collections::{HashMap, HashSet};
 use tokio::task::JoinSet;
 
@@ -259,6 +255,12 @@ pub struct OrchestrationResult {
     pub conflicts: Vec<ConflictResolution>,
 }
 
+impl Default for AgentOrchestrator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Task status
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum TaskStatus {
@@ -429,7 +431,7 @@ impl AgentOrchestrator {
             parent_id: Some(goal.id),
             required_agent: agent_type,
             priority: 0.9,
-            estimated_duration_ms: self.estimate_task_duration(&goal, agent_type),
+            estimated_duration_ms: self.estimate_task_duration(goal, agent_type),
             dependencies: vec![tasks[0].id],
             anti_dependencies: vec![],
         });
@@ -550,10 +552,10 @@ impl AgentOrchestrator {
         let mut recursion_stack = Vec::new();
 
         for node_id in self.dependency_graph.nodes.keys() {
-            if !visited.contains(node_id) {
-                if self.has_cycle_from(node_id, &mut visited, &mut recursion_stack) {
-                    return Some(recursion_stack.clone());
-                }
+            if !visited.contains(node_id)
+                && self.has_cycle_from(node_id, &mut visited, &mut recursion_stack)
+            {
+                return Some(recursion_stack.clone());
             }
         }
 
@@ -572,10 +574,10 @@ impl AgentOrchestrator {
 
         if let Some(dependencies) = self.dependency_graph.edges.get(node_id) {
             for dep_id in dependencies {
-                if !visited.contains(dep_id) {
-                    if self.has_cycle_from(dep_id, visited, recursion_stack) {
-                        return true;
-                    }
+                if !visited.contains(dep_id)
+                    && self.has_cycle_from(dep_id, visited, recursion_stack)
+                {
+                    return true;
                 }
             }
         }
@@ -594,7 +596,7 @@ impl AgentOrchestrator {
                         for anti_dep_sub_id in &anti_dep.dependencies {
                             if dep_id == anti_dep_sub_id && anti_dep_sub_id == &task.id {
                                 // Both tasks depend on each other (potential cycle via anti-deps)
-                                return Some(vec![task.id, anti_dep_id.clone()]);
+                                return Some(vec![task.id, *anti_dep_id]);
                             }
                         }
                     }
@@ -954,10 +956,7 @@ impl ConflictDetector {
                         conflict_type: ConflictType::ResourceConflict {
                             resource: "shared_resource".to_string(),
                         },
-                        involved_agents: vec![
-                            assignment_a.agent_id.clone(),
-                            assignment_b.agent_id.clone(),
-                        ],
+                        involved_agents: vec![assignment_a.agent_id, assignment_b.agent_id],
                     });
                 }
             }
@@ -1057,6 +1056,12 @@ impl ConflictDetector {
                 });
             }
         }
+    }
+}
+
+impl Default for ConflictDetector {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

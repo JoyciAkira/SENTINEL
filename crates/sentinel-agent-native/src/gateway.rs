@@ -1,8 +1,8 @@
-use anyhow::{Result, Context};
+use anyhow::{Context, Result};
+use async_trait::async_trait;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use async_trait::async_trait;
 
 /// Unified LLM Request
 #[derive(Debug, Clone)]
@@ -38,6 +38,12 @@ pub struct IntelligenceGateway {
     providers: Vec<Arc<dyn LLMProvider>>,
     cache: Arc<Mutex<HashMap<String, GatewayResponse>>>,
     fallback_strategy: FallbackStrategy,
+}
+
+impl Default for IntelligenceGateway {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -78,7 +84,11 @@ impl IntelligenceGateway {
 
         for provider in &self.providers {
             // Check capabilities
-            if !req.required_capabilities.iter().all(|cap| provider.supports(cap)) {
+            if !req
+                .required_capabilities
+                .iter()
+                .all(|cap| provider.supports(cap))
+            {
                 continue;
             }
 
@@ -102,7 +112,7 @@ impl IntelligenceGateway {
     fn hash_request(&self, req: &GatewayRequest) -> String {
         use std::collections::hash_map::DefaultHasher;
         use std::hash::{Hash, Hasher};
-        
+
         let mut hasher = DefaultHasher::new();
         req.prompt.hash(&mut hasher);
         req.system_prompt.hash(&mut hasher);
@@ -120,7 +130,10 @@ pub struct MockProvider {
 
 impl MockProvider {
     pub fn new(name: &str, should_fail: bool) -> Self {
-        Self { name: name.to_string(), should_fail }
+        Self {
+            name: name.to_string(),
+            should_fail,
+        }
     }
 }
 
@@ -130,7 +143,7 @@ impl LLMProvider for MockProvider {
         if self.should_fail {
             return Err(anyhow::anyhow!("Simulated failure"));
         }
-        
+
         Ok(GatewayResponse {
             content: format!("Processed by {}: {}", self.name, req.prompt),
             provider: self.name.clone(),

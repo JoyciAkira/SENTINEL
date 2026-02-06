@@ -34,7 +34,7 @@ impl LearningEngine {
     pub fn new(knowledge_base: Arc<KnowledgeBase>) -> Self {
         let miner = PatternMiningEngine::new();
         let synthesizer = StrategySynthesizer::new(knowledge_base.clone());
-        
+
         Self {
             miner,
             knowledge_base,
@@ -43,10 +43,13 @@ impl LearningEngine {
     }
 
     /// Apprende da un progetto appena completato
-    pub async fn learn_from_completion(&mut self, project: &CompletedProject) -> Result<LearningReport> {
+    pub async fn learn_from_completion(
+        &mut self,
+        project: &CompletedProject,
+    ) -> Result<LearningReport> {
         // 1. Estrazione pattern di successo
         let success_patterns = self.miner.extract_success_patterns(project);
-        
+
         // 2. Estrazione pattern di deviazione
         let deviation_patterns = self.miner.extract_deviation_patterns(project);
 
@@ -66,7 +69,7 @@ impl LearningEngine {
             knowledge_base_size: kb_stats.total_patterns,
             training_examples_added: project.actions.len(),
             cross_patterns_discovered: 0, // Placeholder
-            confidence_improvement: 0.05,  // Heuristic
+            confidence_improvement: 0.05, // Heuristic
         })
     }
 

@@ -3,7 +3,7 @@
 //! Gestisce il processo di votazione e risoluzione dei conflitti tra
 //! molteplici agenti che propongono modifiche al Goal Manifold.
 
-use crate::types::{Timestamp, GoalStatus};
+use crate::types::{GoalStatus, Timestamp};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use uuid::Uuid;
@@ -31,6 +31,12 @@ pub struct Vote {
 pub struct ConsensusEngine {
     pub active_proposals: HashMap<Uuid, Proposal>,
     pub votes: HashMap<Uuid, Vec<Vote>>,
+}
+
+impl Default for ConsensusEngine {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl ConsensusEngine {
@@ -64,7 +70,8 @@ impl ConsensusEngine {
     pub fn evaluate_consensus(&self, proposal_id: Uuid, threshold: f64) -> bool {
         if let Some(proposal_votes) = self.votes.get(&proposal_id) {
             let total_authority: f64 = proposal_votes.iter().map(|v| v.authority_weight).sum();
-            let approved_authority: f64 = proposal_votes.iter()
+            let approved_authority: f64 = proposal_votes
+                .iter()
                 .filter(|v| v.approve)
                 .map(|v| v.authority_weight)
                 .sum();
@@ -78,7 +85,9 @@ impl ConsensusEngine {
 
     /// Risolve conflitti tra proposte multiple per lo stesso goal
     pub fn resolve_conflicts(&self, goal_id: Uuid) -> Option<Uuid> {
-        let same_goal_proposals: Vec<_> = self.active_proposals.values()
+        let same_goal_proposals: Vec<_> = self
+            .active_proposals
+            .values()
             .filter(|p| p.goal_id == goal_id)
             .collect();
 
@@ -87,18 +96,28 @@ impl ConsensusEngine {
         }
 
         // Strategia: vince la proposta con il peso di autorità approvato più alto
-        same_goal_proposals.iter()
+        same_goal_proposals
+            .iter()
             .max_by(|a, b| {
                 let auth_a = self.get_approved_authority(a.id);
                 let auth_b = self.get_approved_authority(b.id);
-                auth_a.partial_cmp(&auth_b).unwrap_or(std::cmp::Ordering::Equal)
+                auth_a
+                    .partial_cmp(&auth_b)
+                    .unwrap_or(std::cmp::Ordering::Equal)
             })
             .map(|p| p.id)
     }
 
     fn get_approved_authority(&self, proposal_id: Uuid) -> f64 {
-        self.votes.get(&proposal_id)
-            .map(|votes| votes.iter().filter(|v| v.approve).map(|v| v.authority_weight).sum())
+        self.votes
+            .get(&proposal_id)
+            .map(|votes| {
+                votes
+                    .iter()
+                    .filter(|v| v.approve)
+                    .map(|v| v.authority_weight)
+                    .sum()
+            })
             .unwrap_or(0.0)
     }
 }

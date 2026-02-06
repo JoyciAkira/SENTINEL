@@ -124,12 +124,12 @@ impl CognitiveState {
         let goal = self
             .goal_manifold
             .get_goal_mut(&goal_id)
-            .ok_or_else(|| crate::error::GoalError::NotFound(goal_id))?;
+            .ok_or(crate::error::GoalError::NotFound(goal_id))?;
 
         goal.mark_ready().ok(); // Ensure proper state transitions
         goal.start().ok();
         goal.begin_validation().ok();
-        goal.complete().map_err(crate::error::SentinelError::from)?;
+        goal.complete()?;
 
         // 2. Prepare CompletedProject for learning
         let relevant_actions: Vec<RecordedAction> = self

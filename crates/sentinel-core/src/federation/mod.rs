@@ -3,9 +3,9 @@
 //! Gestisce l'identità crittografica del nodo e il protocollo di
 //! comunicazione peer-to-peer tra istanze di Sentinel.
 
-use ed25519_dalek::{SigningKey, VerifyingKey, Signer, Verifier, Signature};
-use rand::RngCore;
+use ed25519_dalek::{Signature, Signer, SigningKey, Verifier, VerifyingKey};
 use rand::rngs::OsRng;
+use rand::RngCore;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -24,10 +24,10 @@ impl NodeIdentity {
         let mut csprng = OsRng;
         let mut secret_bytes = [0u8; 32];
         csprng.fill_bytes(&mut secret_bytes);
-        
+
         let signing_key = SigningKey::from_bytes(&secret_bytes);
         let verifying_key: VerifyingKey = (&signing_key).into();
-        
+
         let public_key_hex = hex::encode(verifying_key.to_bytes());
         let node_id = format!("sentinel-node-{}", &public_key_hex[..12]);
 
@@ -48,12 +48,22 @@ impl NodeIdentity {
 
     /// Verifica la firma di un altro nodo
     pub fn verify_signature(public_key_hex: &str, message: &[u8], signature_hex: &str) -> bool {
-        let Ok(public_key_bytes) = hex::decode(public_key_hex) else { return false; };
-        let Ok(signature_bytes) = hex::decode(signature_hex) else { return false; };
-        
-        let Ok(public_key_arr): Result<[u8; 32], _> = public_key_bytes.try_into() else { return false; };
-        let Ok(verifying_key) = VerifyingKey::from_bytes(&public_key_arr) else { return false; };
-        let Ok(signature) = Signature::from_slice(&signature_bytes) else { return false; };
+        let Ok(public_key_bytes) = hex::decode(public_key_hex) else {
+            return false;
+        };
+        let Ok(signature_bytes) = hex::decode(signature_hex) else {
+            return false;
+        };
+
+        let Ok(public_key_arr): Result<[u8; 32], _> = public_key_bytes.try_into() else {
+            return false;
+        };
+        let Ok(verifying_key) = VerifyingKey::from_bytes(&public_key_arr) else {
+            return false;
+        };
+        let Ok(signature) = Signature::from_slice(&signature_bytes) else {
+            return false;
+        };
 
         verifying_key.verify(message, &signature).is_ok()
     }
@@ -75,7 +85,9 @@ impl FederatedPattern {
         Self {
             source_node: node_id.to_string(),
             goal_type_abstract: format!("{:?}", pattern.applicable_to_goal_types[0]),
-            action_sequence_hashes: pattern.action_sequence.iter()
+            action_sequence_hashes: pattern
+                .action_sequence
+                .iter()
                 .map(|a| hex::encode(blake3::hash(format!("{:?}", a).as_bytes()).as_bytes()))
                 .collect(),
             efficiency_score: pattern.success_rate,
@@ -117,9 +129,9 @@ pub struct ThreatAlert {
     pub timestamp: chrono::DateTime<chrono::Utc>,
 }
 
-pub mod gossip;
 pub mod consensus;
+pub mod gossip;
 pub mod network;
 
-pub use gossip::{GossipMessage, GossipPayload};
 pub use consensus::{Proposal, Vote};
+pub use gossip::{GossipMessage, GossipPayload};

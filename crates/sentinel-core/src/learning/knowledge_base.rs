@@ -6,12 +6,12 @@
 
 use crate::error::Result;
 use crate::learning::types::*;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use uuid::Uuid;
-use std::path::{Path, PathBuf};
-use serde::{Serialize, Deserialize};
 
 /// Struttura per la persistenza della Knowledge Base
 #[derive(Serialize, Deserialize)]
@@ -62,15 +62,18 @@ impl KnowledgeBase {
     /// Carica i dati dal disco
     async fn load_from_disk(&mut self) -> Result<()> {
         let path = self.storage_path.as_ref().unwrap();
-        let content = tokio::fs::read_to_string(path).await.map_err(crate::error::SentinelError::Io)?;
+        let content = tokio::fs::read_to_string(path)
+            .await
+            .map_err(crate::error::SentinelError::Io)?;
 
-        let data: KnowledgeBaseData = serde_json::from_str(&content).map_err(crate::error::SentinelError::Serialization)?;
+        let data: KnowledgeBaseData =
+            serde_json::from_str(&content).map_err(crate::error::SentinelError::Serialization)?;
 
         // Popola pattern e indici
         {
             let mut patterns = self.patterns.write().await;
             let mut by_type = self.pattern_by_goal_type.write().await;
-            
+
             for (id, pattern) in data.patterns {
                 for goal_type in &pattern.applicable_to_goal_types {
                     by_type.entry(goal_type.clone()).or_default().push(id);
@@ -96,20 +99,23 @@ impl KnowledgeBase {
             let data = {
                 let patterns = self.patterns.read().await;
                 let relations = self.pattern_relations.read().await;
-                
+
                 KnowledgeBaseData {
                     patterns: patterns.clone(),
                     pattern_relations: relations.iter().map(|(k, v)| (*k, *v)).collect(),
                 }
             };
 
-            let content = serde_json::to_string_pretty(&data).map_err(crate::error::SentinelError::Serialization)?;
+            let content = serde_json::to_string_pretty(&data)
+                .map_err(crate::error::SentinelError::Serialization)?;
 
             if let Some(parent) = path.parent() {
                 tokio::fs::create_dir_all(parent).await.ok();
             }
 
-            tokio::fs::write(path, content).await.map_err(crate::error::SentinelError::Io)?;
+            tokio::fs::write(path, content)
+                .await
+                .map_err(crate::error::SentinelError::Io)?;
         }
         Ok(())
     }
@@ -138,7 +144,7 @@ impl KnowledgeBase {
                 patterns.insert(pattern.id, updated);
             } else {
                 patterns.insert(pattern.id, pattern.clone());
-                
+
                 // Aggiorna indici per goal type solo per nuovi pattern
                 let mut by_type = self.pattern_by_goal_type.write().await;
                 for goal_type in &pattern.applicable_to_goal_types {
@@ -444,7 +450,7 @@ mod tests {
     async fn test_knowledge_base_persistence() {
         let temp_dir = std::env::temp_dir();
         let kb_path = temp_dir.join(format!("kb_test_{}.json", Uuid::new_v4()));
-        
+
         let pattern = SuccessPattern {
             id: Uuid::new_v4(),
             name: "Persistent Pattern".to_string(),
@@ -471,14 +477,14 @@ mod tests {
             let kb = KnowledgeBase::with_storage(&kb_path).await.unwrap();
             let stats = kb.get_statistics().await.unwrap();
             assert_eq!(stats.total_patterns, 1);
-            
+
             let test_goal = crate::goal_manifold::goal::Goal::builder()
                 .description("Fix bug")
                 .add_success_criterion(crate::goal_manifold::predicate::Predicate::AlwaysTrue)
                 .value_to_root(1.0)
                 .build()
                 .unwrap();
-            
+
             let applicable = kb.find_applicable_patterns(&test_goal).await.unwrap();
             assert_eq!(applicable[0].name, "Persistent Pattern");
         }

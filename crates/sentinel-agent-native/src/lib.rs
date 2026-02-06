@@ -389,7 +389,7 @@ impl SentinelAgent {
                 let action = Action {
                     id: Uuid::new_v4(),
                     action_type: ActionType::ApplyPattern {
-                        pattern_id: pattern.id.clone(),
+                        pattern_id: pattern.id,
                     },
                     description: format!("Applying proven pattern from network: {}", pattern.name),
                     goal_id: Some(goal.id),

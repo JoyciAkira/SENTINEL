@@ -4,15 +4,15 @@
 //! of Sentinel. It provides cryptographically verified, immutable representation
 //! of project objectives with formal success criteria.
 
+pub mod atomic;
 pub mod dag;
 pub mod goal;
 pub mod predicate;
-pub mod atomic;
 pub mod slicer;
 
+pub use self::InvariantSeverity as GoalInvariantSeverity;
 pub use dag::GoalDag;
 pub use goal::Goal;
-pub use self::InvariantSeverity as GoalInvariantSeverity;
 
 use crate::error::{Result, ResultExt};
 use crate::types::{Blake3Hash, Timestamp};
@@ -63,7 +63,7 @@ use uuid::Uuid;
 ///
 /// manifold.add_goal(goal).unwrap();
 /// ```
-use crate::types::{HumanOverride, HandoverNote};
+use crate::types::{HandoverNote, HumanOverride};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GoalManifold {
@@ -278,7 +278,6 @@ impl GoalManifold {
 
         manifold
     }
-
 
     /// Compute the cryptographic hash of the entire manifold
     ///

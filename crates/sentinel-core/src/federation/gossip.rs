@@ -2,7 +2,10 @@
 //!
 //! Gestisce la diffusione di messaggi firmati tra i peer della rete Sentinel.
 
-use crate::federation::{NodeIdentity, FederatedPattern, consensus::{Proposal, Vote}};
+use crate::federation::{
+    consensus::{Proposal, Vote},
+    FederatedPattern, NodeIdentity,
+};
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 
@@ -59,13 +62,15 @@ impl GossipService {
 
     /// Riceve e valida un messaggio da un altro nodo (Zero-Trust)
     pub fn receive_message(&mut self, message: GossipMessage) -> bool {
-        let Ok(payload_json) = serde_json::to_string(&message.payload) else { return false; };
-        
+        let Ok(payload_json) = serde_json::to_string(&message.payload) else {
+            return false;
+        };
+
         // Verifica crittografica: il messaggio è autentico?
         if NodeIdentity::verify_signature(
             &message.sender_public_key,
             payload_json.as_bytes(),
-            &message.signature
+            &message.signature,
         ) {
             self.message_queue.push_back(message);
             true

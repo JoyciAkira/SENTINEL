@@ -2,9 +2,12 @@
 //!
 //! Estrattore di pattern di successo e deviazioni dai progetti completati.
 
+use crate::learning::types::{
+    ActionType, CompletedProject, DeviationEvent, DeviationPattern, GoalType, RecordedAction,
+    SuccessPattern,
+};
 use std::collections::HashMap;
 use uuid::Uuid;
-use crate::learning::types::{RecordedAction, SuccessPattern, DeviationPattern, CompletedProject, GoalType, ActionType, DeviationEvent};
 
 #[derive(Debug, Clone)]
 pub struct PatternMiningEngine {
@@ -23,7 +26,7 @@ impl PatternMiningEngine {
     pub fn extract_success_patterns(&mut self, project: &CompletedProject) -> Vec<SuccessPattern> {
         let mut patterns = Vec::new();
         let sequences = self.extract_sequences(&project.actions.iter().collect::<Vec<_>>());
-        
+
         for sequence in sequences {
             let pattern = SuccessPattern {
                 id: Uuid::new_v4(),
@@ -49,16 +52,25 @@ impl PatternMiningEngine {
     ) -> Vec<DeviationPattern> {
         let mut patterns = Vec::new();
         for deviation in &project.deviations {
-            if let Some(recorded_action) = project.actions.iter().find(|a| a.action.id == deviation.triggering_action) {
+            if let Some(recorded_action) = project
+                .actions
+                .iter()
+                .find(|a| a.action.id == deviation.triggering_action)
+            {
                 let pattern = DeviationPattern {
                     id: Uuid::new_v4(),
-                    name: format!("Deviation for {:?}", ActionType::from(recorded_action.action.action_type.clone())),
+                    name: format!(
+                        "Deviation for {:?}",
+                        ActionType::from(recorded_action.action.action_type.clone())
+                    ),
                     description: deviation.symptoms.join(", "),
-                    trigger_action_types: vec![ActionType::from(recorded_action.action.action_type.clone())],
+                    trigger_action_types: vec![ActionType::from(
+                        recorded_action.action.action_type.clone(),
+                    )],
                     context_signatures: self.extract_context_signatures(deviation),
                     symptom_patterns: deviation.symptoms.clone(),
                     frequency: 1.0,
-                    severity: deviation.severity.clone(),
+                    severity: deviation.severity,
                 };
                 patterns.push(pattern);
             }
@@ -76,8 +88,10 @@ impl PatternMiningEngine {
 
         for mut goal_actions in by_goal.into_values() {
             goal_actions.sort_by_key(|a| a.timestamp);
-            let sequence: Vec<ActionType> =
-                goal_actions.iter().map(|a| ActionType::from(a.action.action_type.clone())).collect();
+            let sequence: Vec<ActionType> = goal_actions
+                .iter()
+                .map(|a| ActionType::from(a.action.action_type.clone()))
+                .collect();
             if !sequence.is_empty() {
                 sequences.push(sequence);
             }
@@ -86,14 +100,21 @@ impl PatternMiningEngine {
     }
 
     fn generate_pattern_name(&self, sequence: &[ActionType]) -> String {
-        format!("Pattern-{:?}", sequence.get(0).unwrap_or(&ActionType::RunCommand))
+        format!(
+            "Pattern-{:?}",
+            sequence.first().unwrap_or(&ActionType::RunCommand)
+        )
     }
 
     fn classify_goal_types(&self, root_goal: &crate::goal_manifold::goal::Goal) -> Vec<GoalType> {
         let mut types = Vec::new();
         let desc = root_goal.description.to_lowercase();
-        if desc.contains("api") { types.push(GoalType::Api); }
-        if types.is_empty() { types.push(GoalType::FeatureImplementation); }
+        if desc.contains("api") {
+            types.push(GoalType::Api);
+        }
+        if types.is_empty() {
+            types.push(GoalType::FeatureImplementation);
+        }
         types
     }
 
@@ -103,6 +124,14 @@ impl PatternMiningEngine {
 
     pub fn update_patterns(&mut self, project: &CompletedProject) {
         let success = self.extract_success_patterns(project);
-        for p in success { self.success_patterns.insert(p.id, p); }
+        for p in success {
+            self.success_patterns.insert(p.id, p);
+        }
+    }
+}
+
+impl Default for PatternMiningEngine {
+    fn default() -> Self {
+        Self::new()
     }
 }

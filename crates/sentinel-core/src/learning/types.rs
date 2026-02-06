@@ -239,11 +239,12 @@ impl From<crate::cognitive_state::action::ActionType> for ActionType {
                 ActionType::Custom { type_name: name }
             }
             crate::cognitive_state::action::ActionType::Query { .. } => ActionType::Query,
-            crate::cognitive_state::action::ActionType::ApplyPattern { .. } => ActionType::ApplyPattern,
+            crate::cognitive_state::action::ActionType::ApplyPattern { .. } => {
+                ActionType::ApplyPattern
+            }
         }
     }
 }
-
 
 /// Goal type for pattern classification
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]

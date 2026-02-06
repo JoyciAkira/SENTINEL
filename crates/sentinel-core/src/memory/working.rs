@@ -43,11 +43,11 @@ impl WorkingMemory {
         let id = item.id;
 
         // If already exists, update and move to back
-        if self.items.contains_key(&id) {
+        if let std::collections::hash_map::Entry::Occupied(mut entry) = self.items.entry(id) {
             self.lru_queue.retain(|&x| x != id);
             self.lru_queue.push_back(id);
             item.access();
-            self.items.insert(id, item);
+            entry.insert(item);
             return None;
         }
 

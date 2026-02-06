@@ -70,10 +70,7 @@
 
 #![recursion_limit = "256"]
 #![deny(unsafe_code)]
-#![warn(
-    rust_2018_idioms,
-    clippy::all
-)]
+#![warn(rust_2018_idioms, clippy::all)]
 #![allow(dead_code, unused_variables)]
 
 pub mod alignment;
@@ -87,7 +84,6 @@ pub mod memory;
 pub mod types;
 
 // Re-export commonly used types for convenience
-pub use uuid::Uuid;
 pub use alignment::{
     AlignmentField, AlignmentVector, MonteCarloSimulator, ProjectState, SimulationResult,
 };
@@ -100,6 +96,7 @@ pub use learning::{
 };
 pub use memory::{MemoryItem, MemoryManifold, MemoryType};
 pub use types::{Blake3Hash, GoalStatus, ProbabilityDistribution, Timestamp};
+pub use uuid::Uuid;
 
 /// Library version
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -234,6 +231,6 @@ mod integration_tests {
     }
 }
 pub mod evidence;
-pub mod guardrail;
 pub mod federation;
+pub mod guardrail;
 pub mod security;

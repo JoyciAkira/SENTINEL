@@ -3,12 +3,12 @@
 //! Questo motore trasforma l'Intento (Natural Language) in una struttura
 //! formale di Goal e Invarianti. È il "primo respiro" di ogni progetto Sentinel.
 
-use serde::{Deserialize, Serialize};
+use crate::error::Result;
 use crate::goal_manifold::goal::Goal;
 use crate::goal_manifold::Intent;
-use crate::error::Result;
-use crate::types::ProbabilityDistribution;
 use crate::memory::embeddings::Embedder;
+use crate::types::ProbabilityDistribution;
+use serde::{Deserialize, Serialize};
 
 /// Una proposta architettonica generata da Sentinel
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -21,6 +21,12 @@ pub struct ArchitecturalProposal {
 
 pub struct ArchitectEngine {
     embedder: Embedder,
+}
+
+impl Default for ArchitectEngine {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl ArchitectEngine {
@@ -37,16 +43,16 @@ impl ArchitectEngine {
 
         // 1. Generazione Embedding dell'intento
         let intent_vector = self.embedder.embed(&intent.description);
-        
+
         // 2. Analisi semantica (Iterazione 2.2)
         // In futuro: confronto con KB di pattern globali. Per ora: euristica potenziata semantizzata.
-        let desc = intent.description.to_lowercase();
+        let _desc = intent.description.to_lowercase();
 
         // Obiettivi standard che ogni progetto dovrebbe avere
         proposed_goals.push(self.create_suggested_goal(
             "Kernel Foundation",
             "Inizializzazione del core allineato ai vettori d'intento rilevati.",
-            0.1
+            0.1,
         )?);
 
         // Esempio di check semantico (molto più preciso delle keyword semplici)
@@ -54,18 +60,22 @@ impl ArchitectEngine {
             proposed_goals.push(self.create_suggested_goal(
                 "Service Mesh Layer",
                 "Definizione della comunicazione tra servizi e contratti API.",
-                0.25
+                0.25,
             )?);
             proposed_invariants.push("Zero-Trust Communication tra i moduli".to_string());
         }
 
-        if self.is_semantic_match(&intent_vector, "secure, cryptography, blockchain, protected") {
+        if self.is_semantic_match(
+            &intent_vector,
+            "secure, cryptography, blockchain, protected",
+        ) {
             proposed_goals.push(self.create_suggested_goal(
                 "Security Manifold",
                 "Implementazione dei guardrails di sicurezza crittografica.",
-                0.3
+                0.3,
             )?);
-            proposed_invariants.push("Tutti i dati sensibili devono essere cifrati via Blake3".to_string());
+            proposed_invariants
+                .push("Tutti i dati sensibili devono essere cifrati via Blake3".to_string());
         }
 
         Ok(ArchitecturalProposal {
@@ -81,16 +91,24 @@ impl ArchitectEngine {
         crate::memory::embeddings::cosine_similarity(intent_vec, &target_vec) > 0.4
     }
 
-    fn create_suggested_goal(&self, title: &str, desc: &str, value: f64) -> crate::error::Result<Goal> {
+    fn create_suggested_goal(
+        &self,
+        title: &str,
+        desc: &str,
+        value: f64,
+    ) -> crate::error::Result<Goal> {
         let mut criteria = Vec::new();
         let lower_desc = desc.to_lowercase();
         // let lower_title = title.to_lowercase(); // Unused
 
         // World-Class Type System: Infer Success Criteria based on Intent Semantics
         // A Goal is only valid if it is Verifiable.
-        
+
         // 1. Code Generation Criteria
-        if lower_desc.contains("create") || lower_desc.contains("implement") || lower_desc.contains("api") {
+        if lower_desc.contains("create")
+            || lower_desc.contains("implement")
+            || lower_desc.contains("api")
+        {
             criteria.push(crate::goal_manifold::predicate::Predicate::TestsPassing {
                 suite: "unit".to_string(),
                 min_coverage: 0.8,
@@ -98,7 +116,10 @@ impl ArchitectEngine {
         }
 
         // 2. Security Criteria
-        if lower_desc.contains("secure") || lower_desc.contains("auth") || lower_desc.contains("protection") {
+        if lower_desc.contains("secure")
+            || lower_desc.contains("auth")
+            || lower_desc.contains("protection")
+        {
             criteria.push(crate::goal_manifold::predicate::Predicate::Custom {
                 code: "cargo audit".to_string(),
                 language: crate::goal_manifold::predicate::PredicateLanguage::Shell,
@@ -107,7 +128,10 @@ impl ArchitectEngine {
         }
 
         // 3. Performance Criteria
-        if lower_desc.contains("fast") || lower_desc.contains("performant") || lower_desc.contains("latency") {
+        if lower_desc.contains("fast")
+            || lower_desc.contains("performant")
+            || lower_desc.contains("latency")
+        {
             criteria.push(crate::goal_manifold::predicate::Predicate::Performance {
                 metric: "response_time_ms".to_string(),
                 threshold: 200.0,

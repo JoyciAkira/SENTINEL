@@ -4,9 +4,9 @@
 //! linea d'azione per raggiungere un nuovo obiettivo.
 
 use crate::error::Result;
+use crate::goal_manifold::goal::Goal;
 use crate::learning::knowledge_base::KnowledgeBase;
 use crate::learning::types::*;
-use crate::goal_manifold::goal::Goal;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -39,7 +39,7 @@ impl StrategySynthesizer {
 
         // 3. Identificazione potenziali rischi (basato su similarità)
         // Nota: Qui potremmo integrare DeviationClassifier in futuro
-        let pitfalls = vec![]; 
+        let pitfalls = vec![];
 
         // 4. Calcolo metriche aggregate
         let confidence = self.calculate_aggregate_confidence(&recommended);
@@ -64,7 +64,9 @@ impl StrategySynthesizer {
         patterns.sort_by(|a, b| {
             let score_a = a.success_rate * (a.support as f64).ln().max(1.0);
             let score_b = b.success_rate * (b.support as f64).ln().max(1.0);
-            score_b.partial_cmp(&score_a).unwrap_or(std::cmp::Ordering::Equal)
+            score_b
+                .partial_cmp(&score_a)
+                .unwrap_or(std::cmp::Ordering::Equal)
         });
 
         // Prendiamo i top 3 pattern per non sovraccaricare la strategia
@@ -85,10 +87,11 @@ impl StrategySynthesizer {
     /// Stima il tempo di completamento basandosi sulla complessità dei pattern
     fn estimate_completion_time(&self, patterns: &[SuccessPattern]) -> Duration {
         let base_minutes = 30;
-        let pattern_minutes: u64 = patterns.iter()
+        let pattern_minutes: u64 = patterns
+            .iter()
             .map(|p| p.action_sequence.len() as u64 * 10) // 10 min per azione media
             .sum();
-        
+
         Duration::from_secs((base_minutes + pattern_minutes) * 60)
     }
 
@@ -124,7 +127,9 @@ impl StrategySynthesizer {
             pitfalls_to_avoid: vec![],
             estimated_completion_time: Duration::from_secs(3600),
             confidence: 0.2,
-            rationale: "Approccio standard: Analisi iniziale seguita da implementazione incrementale.".to_string(),
+            rationale:
+                "Approccio standard: Analisi iniziale seguita da implementazione incrementale."
+                    .to_string(),
             generated_at: crate::types::now(),
         }
     }
@@ -140,7 +145,7 @@ mod tests {
     async fn test_suggest_strategy_empty_kb() {
         let kb = Arc::new(KnowledgeBase::new());
         let synthesizer = StrategySynthesizer::new(kb);
-        
+
         let goal = Goal::builder()
             .description("Task ignoto")
             .add_success_criterion(crate::goal_manifold::predicate::Predicate::AlwaysTrue)
@@ -156,7 +161,7 @@ mod tests {
     #[tokio::test]
     async fn test_strategy_ranking() {
         let kb = Arc::new(KnowledgeBase::new());
-        
+
         // Mock pattern 1: Alto successo, basso supporto
         let p1 = SuccessPattern {
             id: Uuid::new_v4(),
@@ -199,7 +204,7 @@ mod tests {
             .unwrap();
 
         let strategy = synthesizer.suggest_strategy(&goal).await.unwrap();
-        
+
         assert!(!strategy.recommended_approaches.is_empty());
         // Il pattern B dovrebbe vincere grazie al supporto molto più alto nonostante il success rate leggermente inferiore
         assert_eq!(strategy.recommended_approaches[0].name, "Pattern B");

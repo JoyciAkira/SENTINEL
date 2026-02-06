@@ -555,7 +555,7 @@ impl HierarchicalPlanner {
 
         for action_id in action_ids {
             if let Some(cycle) =
-                self.find_cycle(&graph, &action_id, &mut visiting, &mut visited, &mut stack)
+                Self::find_cycle(&graph, &action_id, &mut visiting, &mut visited, &mut stack)
             {
                 return Some(cycle);
             }
@@ -566,7 +566,6 @@ impl HierarchicalPlanner {
 
     /// Return cycle path if a cycle is found from `node`.
     fn find_cycle(
-        &self,
         graph: &HashMap<Uuid, Vec<Uuid>>,
         node: &Uuid,
         visiting: &mut HashSet<Uuid>,
@@ -589,7 +588,7 @@ impl HierarchicalPlanner {
         stack.push(*node);
         if let Some(neighbors) = graph.get(node) {
             for neighbor in neighbors {
-                if let Some(cycle) = self.find_cycle(graph, neighbor, visiting, visited, stack) {
+                if let Some(cycle) = Self::find_cycle(graph, neighbor, visiting, visited, stack) {
                     return Some(cycle);
                 }
             }

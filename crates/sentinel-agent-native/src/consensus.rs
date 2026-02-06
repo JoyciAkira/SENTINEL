@@ -270,7 +270,7 @@ impl P2PConsensus {
 
         let gossipsub = gossipsub::Behaviour::new(
             gossipsub::MessageAuthenticity::Signed(
-                libp2p::identity::Keypair::ed25519_from_bytes(seed.clone()).unwrap(),
+                libp2p::identity::Keypair::ed25519_from_bytes(seed).unwrap(),
             ),
             gossip_config,
         )

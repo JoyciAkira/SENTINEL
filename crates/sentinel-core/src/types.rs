@@ -45,7 +45,10 @@ impl GoalStatus {
     }
 
     pub fn is_working(self) -> bool {
-        matches!(self, GoalStatus::Ready | GoalStatus::InProgress | GoalStatus::Validating)
+        matches!(
+            self,
+            GoalStatus::Ready | GoalStatus::InProgress | GoalStatus::Validating
+        )
     }
 }
 
@@ -68,9 +71,15 @@ pub fn now() -> Timestamp {
 pub struct Blake3Hash([u8; 32]);
 
 impl Blake3Hash {
-    pub fn new(bytes: [u8; 32]) -> Self { Self(bytes) }
-    pub fn empty() -> Self { Self([0u8; 32]) }
-    pub fn to_hex(&self) -> String { hex::encode(self.0) }
+    pub fn new(bytes: [u8; 32]) -> Self {
+        Self(bytes)
+    }
+    pub fn empty() -> Self {
+        Self([0u8; 32])
+    }
+    pub fn to_hex(&self) -> String {
+        hex::encode(self.0)
+    }
     pub fn from_hex(s: &str) -> Result<Self, hex::FromHexError> {
         let mut bytes = [0u8; 32];
         hex::decode_to_slice(s, &mut bytes)?;
@@ -196,7 +205,11 @@ impl ProbabilityDistribution {
     pub fn confidence_interval(&self, confidence: f64) -> (f64, f64) {
         match self.distribution_type {
             DistributionType::Normal => {
-                let z = if (confidence - 0.95).abs() < 0.01 { 1.96 } else { 1.0 };
+                let z = if (confidence - 0.95).abs() < 0.01 {
+                    1.96
+                } else {
+                    1.0
+                };
                 (self.mean - z * self.std_dev, self.mean + z * self.std_dev)
             }
             _ => (self.min, self.max),
@@ -206,17 +219,27 @@ impl ProbabilityDistribution {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
-pub enum DistributionType { Normal, Uniform, Point }
+pub enum DistributionType {
+    Normal,
+    Uniform,
+    Point,
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Comparison {
-    #[serde(rename = "==")] Equal,
-    #[serde(rename = "!=")] NotEqual,
-    #[serde(rename = "<")] LessThan,
-    #[serde(rename = "<=")] LessThanOrEqual,
-    #[serde(rename = ">")] GreaterThan,
-    #[serde(rename = ">=")] GreaterThanOrEqual,
+    #[serde(rename = "==")]
+    Equal,
+    #[serde(rename = "!=")]
+    NotEqual,
+    #[serde(rename = "<")]
+    LessThan,
+    #[serde(rename = "<=")]
+    LessThanOrEqual,
+    #[serde(rename = ">")]
+    GreaterThan,
+    #[serde(rename = ">=")]
+    GreaterThanOrEqual,
 }
 
 impl Comparison {

@@ -556,7 +556,7 @@ impl TreeSitterGenerator {
         let template = self.select_template(&requirements, file_path)?;
 
         // Apply template with requirements
-        let code_ast = self.apply_template(&template, &requirements)?;
+        let code_ast = self.apply_template(template, &requirements)?;
 
         Ok(code_ast)
     }

@@ -116,7 +116,7 @@ impl BeliefNetwork {
     pub fn add_dependency(&mut self, belief_id: Uuid, depends_on: Uuid) {
         self.dependencies
             .entry(belief_id)
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(depends_on);
     }
 

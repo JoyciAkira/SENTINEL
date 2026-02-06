@@ -52,7 +52,7 @@ impl DependencyWatcher {
                 // Estrarre solo il testo utile (semplificato)
                 let fragment = scraper::Html::parse_fragment(&html);
                 let selector = scraper::Selector::parse("main, article, .content").unwrap();
-                
+
                 for element in fragment.select(&selector) {
                     full_content.push_str(&element.text().collect::<Vec<_>>().join(" "));
                 }
@@ -70,14 +70,23 @@ impl DependencyWatcher {
         if cargo_path.exists() {
             let content = tokio::fs::read_to_string(cargo_path).await?;
             let value: toml::Value = toml::from_str(&content).map_err(|e| {
-                crate::error::SentinelError::Predicate(crate::error::PredicateError::CustomPredicateFailed(format!("TOML Error: {}", e)))
+                crate::error::SentinelError::Predicate(
+                    crate::error::PredicateError::CustomPredicateFailed(format!(
+                        "TOML Error: {}",
+                        e
+                    )),
+                )
             })?;
 
             if let Some(dependencies) = value.get("dependencies").and_then(|d| d.as_table()) {
                 for (name, version) in dependencies {
                     let version_str = match version {
                         toml::Value::String(s) => s.clone(),
-                        toml::Value::Table(t) => t.get("version").and_then(|v| v.as_str()).unwrap_or("unknown").to_string(),
+                        toml::Value::Table(t) => t
+                            .get("version")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("unknown")
+                            .to_string(),
                         _ => "unknown".to_string(),
                     };
 
@@ -92,7 +101,8 @@ impl DependencyWatcher {
         }
 
         for dep in &deps {
-            self.watched_dependencies.insert(dep.name.clone(), dep.clone());
+            self.watched_dependencies
+                .insert(dep.name.clone(), dep.clone());
         }
 
         Ok(deps)
@@ -101,7 +111,8 @@ impl DependencyWatcher {
     /// Verifica se i cambiamenti nelle dipendenze creano un disallineamento
     pub fn check_alignment_risk(&self) -> f64 {
         // Se troviamo dipendenze con risk_level alto, restituiamo un punteggio di rischio
-        self.watched_dependencies.values()
+        self.watched_dependencies
+            .values()
             .map(|d| d.risk_level)
             .sum::<f64>()
             .min(1.0)
@@ -112,7 +123,10 @@ impl DependencyWatcher {
         let mut alerts = Vec::new();
         for dep in self.watched_dependencies.values() {
             if dep.name == "tokio" && dep.version.starts_with("0.") {
-                alerts.push(format!("Vulnerabilità rilevata: {} v{} è obsoleta e insicura.", dep.name, dep.version));
+                alerts.push(format!(
+                    "Vulnerabilità rilevata: {} v{} è obsoleta e insicura.",
+                    dep.name, dep.version
+                ));
             }
             if dep.risk_level > 0.5 {
                 alerts.push(format!("Rischio Allineamento: {} è marcata come libreria non approvata dal Goal Manifold.", dep.name));

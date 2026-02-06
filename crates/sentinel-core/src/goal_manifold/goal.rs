@@ -5,9 +5,9 @@
 //! dependencies, and verifiable completion state.
 
 use crate::error::{GoalError, Result};
-use crate::goal_manifold::predicate::Predicate;
 use crate::goal_manifold::atomic::AtomicContract;
-use crate::types::{GoalStatus, ProbabilityDistribution, Timestamp, GoalLock};
+use crate::goal_manifold::predicate::Predicate;
+use crate::types::{GoalLock, GoalStatus, ProbabilityDistribution, Timestamp};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -101,7 +101,7 @@ pub struct Goal {
 }
 
 /// Metadata associated with a goal
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 pub struct GoalMetadata {
     /// Tags for categorization
     pub tags: Vec<String>,
@@ -118,19 +118,6 @@ pub struct GoalMetadata {
 
     /// Notes from execution
     pub notes: Vec<String>,
-}
-
-impl Default for GoalMetadata {
-    fn default() -> Self {
-        Self {
-            tags: Vec::new(),
-            retry_count: 0,
-            failure_reason: None,
-            blocked_reason: None,
-            blocker_ids: Vec::new(),
-            notes: Vec::new(),
-        }
-    }
 }
 
 impl Goal {
@@ -178,7 +165,7 @@ impl Goal {
 
         // Complexity mean should be reasonable (1-10 scale)
         let complexity_mean = self.complexity_estimate.mean;
-        if complexity_mean < 0.0 || complexity_mean > 10.0 {
+        if !(0.0..=10.0).contains(&complexity_mean) {
             return Err(GoalError::InvalidComplexity(format!(
                 "Complexity mean {} outside valid range [0.0, 10.0]",
                 complexity_mean

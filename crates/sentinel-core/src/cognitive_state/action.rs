@@ -84,7 +84,7 @@ impl Action {
         }
     }
 
-    fn is_critical_file(path: &PathBuf) -> bool {
+    fn is_critical_file(path: &std::path::Path) -> bool {
         let path_str = path.to_string_lossy();
         path_str.contains("/.git/")
             || path_str.ends_with("Cargo.toml")
@@ -142,9 +142,7 @@ pub enum ActionType {
     },
 
     /// Apply a learned pattern from the knowledge base or P2P network
-    ApplyPattern {
-        pattern_id: Uuid,
-    },
+    ApplyPattern { pattern_id: Uuid },
 }
 
 /// Metadata for an action

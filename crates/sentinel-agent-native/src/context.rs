@@ -485,10 +485,7 @@ impl ContextManager {
         for item in items {
             let category = self.categorize_item(item);
 
-            categories
-                .entry(category)
-                .or_insert_with(Vec::new)
-                .push(item);
+            categories.entry(category).or_default().push(item);
         }
 
         // Summarize each category

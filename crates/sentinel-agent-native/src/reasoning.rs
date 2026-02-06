@@ -60,13 +60,13 @@
 //! └─────────────────────────────────────┘
 //! ```
 
+use crate::consensus::ConsensusQueryResult;
 use anyhow::Result;
 use sentinel_core::{
     cognitive_state::{Action, ActionType},
     goal_manifold::Goal,
     Uuid,
 };
-use crate::consensus::ConsensusQueryResult;
 use std::collections::HashMap;
 
 /// Structured Reasoner - Deterministic, explainable reasoning
@@ -80,6 +80,12 @@ pub struct StructuredReasoner {
 
     /// Statistics
     pub stats: ReasoningStats,
+}
+
+impl Default for StructuredReasoner {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 /// Knowledge base of reasoning rules
@@ -351,47 +357,40 @@ impl StructuredReasoner {
 
     /// Extract generic requirements using heuristics
     fn extract_generic_requirements(&self, goal: &Goal) -> Result<Vec<Requirement>> {
-        let mut requirements = Vec::new();
-
-        // Requirement 1: Code quality
-        requirements.push(Requirement {
-            description: "Code must follow Rust best practices and idioms".to_string(),
-            reasoning_type: ReasoningType::RuleApplication {
-                rule_name: "Rust Best Practices".to_string(),
+        let requirements = vec![
+            Requirement {
+                description: "Code must follow Rust best practices and idioms".to_string(),
+                reasoning_type: ReasoningType::RuleApplication {
+                    rule_name: "Rust Best Practices".to_string(),
+                },
+                evidence: vec!["Goal: ".to_string(), goal.description.clone()],
+                priority: 0.9,
             },
-            evidence: vec!["Goal: ".to_string(), goal.description.clone()],
-            priority: 0.9,
-        });
-
-        // Requirement 2: Error handling
-        requirements.push(Requirement {
-            description: "Comprehensive error handling with proper types".to_string(),
-            reasoning_type: ReasoningType::RuleApplication {
-                rule_name: "Error Handling Best Practices".to_string(),
+            Requirement {
+                description: "Comprehensive error handling with proper types".to_string(),
+                reasoning_type: ReasoningType::RuleApplication {
+                    rule_name: "Error Handling Best Practices".to_string(),
+                },
+                evidence: vec![],
+                priority: 0.85,
             },
-            evidence: vec![],
-            priority: 0.85,
-        });
-
-        // Requirement 3: Testing
-        requirements.push(Requirement {
-            description: "Comprehensive test coverage (>80%)".to_string(),
-            reasoning_type: ReasoningType::RuleApplication {
-                rule_name: "Testing Best Practices".to_string(),
+            Requirement {
+                description: "Comprehensive test coverage (>80%)".to_string(),
+                reasoning_type: ReasoningType::RuleApplication {
+                    rule_name: "Testing Best Practices".to_string(),
+                },
+                evidence: vec![],
+                priority: 0.8,
             },
-            evidence: vec![],
-            priority: 0.8,
-        });
-
-        // Requirement 4: Documentation
-        requirements.push(Requirement {
-            description: "Clear and concise documentation".to_string(),
-            reasoning_type: ReasoningType::RuleApplication {
-                rule_name: "Documentation Best Practices".to_string(),
+            Requirement {
+                description: "Clear and concise documentation".to_string(),
+                reasoning_type: ReasoningType::RuleApplication {
+                    rule_name: "Documentation Best Practices".to_string(),
+                },
+                evidence: vec![],
+                priority: 0.7,
             },
-            evidence: vec![],
-            priority: 0.7,
-        });
+        ];
 
         Ok(requirements)
     }
@@ -547,13 +546,20 @@ impl StructuredReasoner {
             alignment_score: pattern.alignment_impact,
             success_probability: pattern.success_rate,
             estimated_effort: analysis.complexity * 0.5, // Patterns are usually faster
-            steps: pattern.steps.iter().enumerate().map(|(i, s)| ReasoningStep {
-                step_number: i + 1,
-                description: s.clone(),
-                reasoning_type: ReasoningType::PatternMatching { pattern_id: pattern.id.to_string() },
-                evidence: vec![],
-                conclusion: "Step derived from proven pattern".to_string(),
-            }).collect(),
+            steps: pattern
+                .steps
+                .iter()
+                .enumerate()
+                .map(|(i, s)| ReasoningStep {
+                    step_number: i + 1,
+                    description: s.clone(),
+                    reasoning_type: ReasoningType::PatternMatching {
+                        pattern_id: pattern.id.to_string(),
+                    },
+                    evidence: vec![],
+                    conclusion: "Step derived from proven pattern".to_string(),
+                })
+                .collect(),
         })
     }
 
@@ -880,7 +886,9 @@ impl StructuredReasoner {
                 created_at: chrono::Utc::now(),
                 dependencies: vec![],
                 metadata: sentinel_core::cognitive_state::action::ActionMetadata {
-                    estimated_duration: Some(solution.estimated_effort * 60.0 / solution.steps.len() as f64),
+                    estimated_duration: Some(
+                        solution.estimated_effort * 60.0 / solution.steps.len() as f64,
+                    ),
                     risk_level: 0.1,
                     reversible: true,
                     tags: vec![],

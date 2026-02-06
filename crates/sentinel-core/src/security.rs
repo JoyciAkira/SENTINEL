@@ -3,8 +3,8 @@
 //! Scansiona il contenuto dei file alla ricerca di pattern pericolosi
 //! (API Keys, Secrets, TODOs critici) prima della scrittura.
 
-use regex::Regex;
 use lazy_static::lazy_static;
+use regex::Regex;
 
 pub struct SecurityReport {
     pub is_safe: bool,
@@ -15,10 +15,26 @@ pub struct SecurityReport {
 lazy_static! {
     static ref PATTERNS: Vec<(&'static str, Regex, f64)> = vec![
         ("AWS Key", Regex::new(r"AKIA[0-9A-Z]{16}").unwrap(), 1.0),
-        ("Generic Private Key", Regex::new(r"(?i)private_key\s*=\s*['\u0022][^'\u0022]+['\u0022]").unwrap(), 1.0),
-        ("Hardcoded Password", Regex::new(r"(?i)password\s*=\s*['\u0022][^'\u0022]+['\u0022]").unwrap(), 0.9),
-        ("TODO Critical", Regex::new(r"(?i)TODO.*(security|fix|hack)").unwrap(), 0.3),
-        ("IP Address Hardcoded", Regex::new(r"\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}").unwrap(), 0.2),
+        (
+            "Generic Private Key",
+            Regex::new(r"(?i)private_key\s*=\s*['\u0022][^'\u0022]+['\u0022]").unwrap(),
+            1.0
+        ),
+        (
+            "Hardcoded Password",
+            Regex::new(r"(?i)password\s*=\s*['\u0022][^'\u0022]+['\u0022]").unwrap(),
+            0.9
+        ),
+        (
+            "TODO Critical",
+            Regex::new(r"(?i)TODO.*(security|fix|hack)").unwrap(),
+            0.3
+        ),
+        (
+            "IP Address Hardcoded",
+            Regex::new(r"\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}").unwrap(),
+            0.2
+        ),
     ];
 }
 
@@ -32,13 +48,18 @@ impl SecurityScanner {
 
         for (name, regex, severity) in PATTERNS.iter() {
             if regex.is_match(content) {
-                threats.push(format!("Rilevato {}: Pattern insicuro trovato nel codice.", name));
+                threats.push(format!(
+                    "Rilevato {}: Pattern insicuro trovato nel codice.",
+                    name
+                ));
                 total_risk += severity;
             }
         }
 
         // Normalizzazione del rischio (max 1.0)
-        if total_risk > 1.0 { total_risk = 1.0; }
+        if total_risk > 1.0 {
+            total_risk = 1.0;
+        }
 
         SecurityReport {
             is_safe: threats.is_empty(),

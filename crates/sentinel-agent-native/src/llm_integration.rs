@@ -22,11 +22,7 @@
 //! - Creativity from LLM + Rigor from Sentinel ✅
 
 use anyhow::{Context, Result};
-use sentinel_core::{
-    alignment::AlignmentField,
-    goal_manifold::GoalManifold,
-    Uuid,
-};
+use sentinel_core::{alignment::AlignmentField, goal_manifold::GoalManifold, Uuid};
 use std::collections::HashSet;
 use std::sync::Arc;
 use tokio::sync::Semaphore;
@@ -690,7 +686,7 @@ impl LLMIntegrationManager {
     async fn validate_code_quality(&self, suggestion: &LLMSuggestion) -> Result<ValidationResult> {
         tracing::debug!("Validating code quality");
 
-        let complexity_score = self.estimate_complexity(&suggestion);
+        let complexity_score = self.estimate_complexity(suggestion);
 
         let result = if complexity_score <= self.quality_thresholds.max_complexity {
             ValidationStatus::Pass {
