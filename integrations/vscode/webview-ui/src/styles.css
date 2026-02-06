@@ -1,8 +1,9 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: var(--vscode-font-family, "Inter", system-ui, sans-serif);
-  --font-mono: var(--vscode-editor-font-family, ui-monospace, monospace);
+  --font-sans:
+    "Space Grotesk", "Avenir Next", "Manrope", "Segoe UI", "Helvetica Neue", sans-serif;
+  --font-mono: var(--vscode-editor-font-family, "IBM Plex Mono", ui-monospace, monospace);
 
   --color-background: var(--vscode-sideBar-background);
   --color-foreground: var(--vscode-sideBar-foreground);
@@ -32,29 +33,454 @@
   --color-input: var(--vscode-input-background);
   --color-ring: var(--vscode-focusBorder);
 
-  --radius-lg: 0.5rem;
-  --radius-md: calc(0.5rem - 2px);
-  --radius-sm: calc(0.5rem - 4px);
+  --radius-lg: 0.75rem;
+  --radius-md: calc(0.75rem - 2px);
+  --radius-sm: calc(0.75rem - 4px);
+}
+
+:root {
+  --sentinel-ink: color-mix(in oklab, var(--vscode-editor-foreground) 92%, black);
+  --sentinel-muted: color-mix(in oklab, var(--vscode-editor-foreground) 45%, transparent);
+  --sentinel-border: color-mix(in oklab, var(--vscode-editor-foreground) 18%, transparent);
+  --sentinel-surface: color-mix(in oklab, var(--vscode-editor-background) 82%, var(--vscode-sideBar-background));
+  --sentinel-surface-2: color-mix(in oklab, var(--vscode-editor-background) 66%, var(--vscode-sideBar-background));
+  --sentinel-accent: color-mix(in oklab, var(--vscode-button-background) 90%, #0e7490);
+  --sentinel-accent-soft: color-mix(in oklab, var(--vscode-button-background) 20%, transparent);
+  --sentinel-success: #16a34a;
+  --sentinel-warning: #d97706;
+  --sentinel-danger: #dc2626;
 }
 
 @layer base {
   * {
     @apply border-border outline-ring/50;
+    box-sizing: border-box;
   }
+
+  html,
+  body,
+  #root {
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+  }
+
   body {
     @apply bg-background text-foreground;
     font-family: var(--font-sans);
+    background-image:
+      radial-gradient(circle at 12% 8%, color-mix(in oklab, var(--sentinel-accent) 14%, transparent), transparent 36%),
+      radial-gradient(circle at 90% 12%, color-mix(in oklab, var(--sentinel-accent) 10%, transparent), transparent 34%),
+      linear-gradient(170deg, color-mix(in oklab, var(--vscode-sideBar-background) 88%, black), var(--vscode-editor-background));
+    background-attachment: fixed;
+    overflow: hidden;
   }
 }
 
-/* Custom VS Code Integration Styles */
-:root {
-  --bg-surface: var(--vscode-sideBar-background);
-  --bg-card: var(--vscode-editor-background);
-  --border-color: var(--vscode-sideBar-border);
+.sentinel-shell {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  gap: 16px;
+  padding: 14px;
 }
 
-/* Fix for ScrollArea thumb visibility */
+.sentinel-rail {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  border: 1px solid var(--sentinel-border);
+  border-radius: 16px;
+  padding: 16px;
+  background:
+    linear-gradient(188deg, color-mix(in oklab, var(--sentinel-surface) 76%, black), color-mix(in oklab, var(--sentinel-surface-2) 78%, black));
+  box-shadow: 0 14px 32px color-mix(in oklab, black 28%, transparent);
+  min-width: 0;
+}
+
+.sentinel-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.sentinel-brand__glyph {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  display: grid;
+  place-content: center;
+  font-weight: 700;
+  color: white;
+  background: linear-gradient(150deg, var(--sentinel-accent), color-mix(in oklab, var(--sentinel-accent) 65%, #164e63));
+  box-shadow: 0 6px 14px color-mix(in oklab, var(--sentinel-accent) 35%, transparent);
+}
+
+.sentinel-brand__title {
+  font-size: 13px;
+  letter-spacing: 0.12em;
+  font-weight: 700;
+}
+
+.sentinel-brand__subtitle {
+  font-size: 11px;
+  color: var(--sentinel-muted);
+}
+
+.sentinel-nav {
+  display: grid;
+  gap: 8px;
+}
+
+.sentinel-nav__item {
+  width: 100%;
+  border: 1px solid var(--sentinel-border);
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--sentinel-surface) 85%, transparent);
+  color: var(--sentinel-muted);
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 160ms ease;
+}
+
+.sentinel-nav__item:hover {
+  color: var(--sentinel-ink);
+  border-color: color-mix(in oklab, var(--sentinel-accent) 32%, var(--sentinel-border));
+  transform: translateX(2px);
+}
+
+.sentinel-nav__item--active {
+  color: var(--sentinel-ink);
+  border-color: color-mix(in oklab, var(--sentinel-accent) 46%, var(--sentinel-border));
+  background: color-mix(in oklab, var(--sentinel-accent-soft) 70%, var(--sentinel-surface));
+}
+
+.sentinel-nav__counter {
+  margin-left: auto;
+  min-width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  display: grid;
+  place-content: center;
+  font-size: 10px;
+  font-weight: 700;
+  border: 1px solid var(--sentinel-border);
+  background: color-mix(in oklab, var(--sentinel-accent-soft) 80%, transparent);
+  color: var(--sentinel-ink);
+}
+
+.sentinel-rail__footer {
+  margin-top: auto;
+  border-top: 1px solid var(--sentinel-border);
+  padding-top: 12px;
+  display: grid;
+  gap: 8px;
+}
+
+.sentinel-kv {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--sentinel-muted);
+}
+
+.sentinel-kv span:last-child {
+  font-weight: 700;
+  color: var(--sentinel-ink);
+}
+
+.sentinel-up {
+  color: var(--sentinel-success) !important;
+}
+
+.sentinel-down {
+  color: var(--sentinel-danger) !important;
+}
+
+.sentinel-main {
+  min-width: 0;
+  border-radius: 16px;
+  border: 1px solid var(--sentinel-border);
+  background: color-mix(in oklab, var(--sentinel-surface) 90%, transparent);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.sentinel-topbar {
+  min-height: 64px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--sentinel-border);
+  background: linear-gradient(170deg, color-mix(in oklab, var(--sentinel-surface) 88%, transparent), color-mix(in oklab, var(--sentinel-surface-2) 82%, transparent));
+}
+
+.sentinel-topbar h1 {
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.2;
+  letter-spacing: 0.01em;
+}
+
+.sentinel-topbar__eyebrow {
+  margin: 0;
+  font-size: 10px;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--sentinel-muted);
+}
+
+.sentinel-topbar__metrics {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.sentinel-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 6px 10px;
+  border: 1px solid var(--sentinel-border);
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--sentinel-surface-2) 86%, transparent);
+}
+
+.sentinel-risk-badge {
+  border: 1px solid var(--sentinel-border);
+}
+
+.sentinel-risk-low {
+  color: var(--sentinel-success);
+}
+
+.sentinel-risk-moderate {
+  color: var(--sentinel-warning);
+}
+
+.sentinel-risk-high {
+  color: var(--sentinel-danger);
+}
+
+.sentinel-content {
+  flex: 1;
+  min-height: 0;
+}
+
+.sentinel-content__inner {
+  padding: 16px;
+  display: grid;
+  gap: 14px;
+}
+
+.sentinel-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+}
+
+.sentinel-grid--forge {
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+}
+
+.sentinel-card {
+  border-color: var(--sentinel-border);
+  background: color-mix(in oklab, var(--sentinel-surface-2) 90%, transparent);
+  box-shadow: 0 8px 20px color-mix(in oklab, black 20%, transparent);
+}
+
+.sentinel-card--hero {
+  grid-row: span 2;
+}
+
+.sentinel-progress__meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--sentinel-muted);
+  margin-bottom: 8px;
+}
+
+.sentinel-progress {
+  width: 100%;
+  height: 9px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: color-mix(in oklab, var(--sentinel-border) 35%, transparent);
+}
+
+.sentinel-progress > div {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--sentinel-accent), color-mix(in oklab, var(--sentinel-accent) 70%, #06b6d4));
+  transition: width 240ms ease;
+}
+
+.sentinel-metrics {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.sentinel-metrics > div {
+  border: 1px solid var(--sentinel-border);
+  border-radius: 12px;
+  padding: 10px;
+  background: color-mix(in oklab, var(--sentinel-surface) 84%, transparent);
+}
+
+.sentinel-metrics > div > div {
+  font-size: 11px;
+  color: var(--sentinel-muted);
+  margin-bottom: 4px;
+}
+
+.sentinel-metrics > div > strong {
+  font-size: 15px;
+}
+
+.sentinel-metrics--network {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.sentinel-goal-row {
+  width: 100%;
+  border: 1px solid var(--sentinel-border);
+  border-radius: 10px;
+  background: color-mix(in oklab, var(--sentinel-surface) 88%, transparent);
+  padding: 8px 10px;
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  text-align: left;
+  cursor: pointer;
+  font-size: 12px;
+  transition: border-color 160ms ease, transform 160ms ease;
+}
+
+.sentinel-goal-row:hover {
+  border-color: color-mix(in oklab, var(--sentinel-accent) 40%, var(--sentinel-border));
+  transform: translateX(2px);
+}
+
+.sentinel-event-row,
+.sentinel-audit-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--sentinel-border);
+  border-radius: 10px;
+  background: color-mix(in oklab, var(--sentinel-surface) 90%, transparent);
+  padding: 9px 10px;
+}
+
+.sentinel-event-row p,
+.sentinel-audit-row p {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.sentinel-event-row small,
+.sentinel-audit-row small {
+  font-size: 10px;
+  color: var(--sentinel-muted);
+}
+
+.sentinel-event-row code,
+.sentinel-audit-row code {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--sentinel-muted);
+}
+
+.sentinel-chat {
+  display: flex;
+  flex-direction: column;
+  min-height: min(720px, calc(100vh - 160px));
+}
+
+.sentinel-chat__body {
+  display: grid;
+  gap: 10px;
+  min-height: 0;
+}
+
+.sentinel-chat__messages {
+  min-height: 0;
+  height: min(56vh, 560px);
+  border-radius: 12px;
+  border: 1px solid var(--sentinel-border);
+  background: color-mix(in oklab, var(--sentinel-surface) 88%, transparent);
+  overflow: hidden;
+}
+
+.sentinel-selected-goal {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--sentinel-border);
+  border-radius: 12px;
+  padding: 10px;
+  background: color-mix(in oklab, var(--sentinel-surface) 88%, transparent);
+}
+
+.sentinel-selected-goal p {
+  margin: 0;
+  font-size: 12px;
+}
+
+.sentinel-settings-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.sentinel-settings-grid > div {
+  border: 1px solid var(--sentinel-border);
+  border-radius: 12px;
+  padding: 12px;
+  display: grid;
+  gap: 6px;
+  background: color-mix(in oklab, var(--sentinel-surface) 88%, transparent);
+}
+
+.sentinel-settings-grid p {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.sentinel-settings-grid small {
+  font-size: 11px;
+  color: var(--sentinel-muted);
+}
+
+.sentinel-empty {
+  margin: 0;
+  color: var(--sentinel-muted);
+  font-size: 12px;
+}
+
+/* ScrollArea thumb for VS Code themes */
 [data-slot="scroll-area-thumb"] {
   background-color: var(--vscode-scrollbarSlider-background);
 }
@@ -63,12 +489,95 @@
   background-color: var(--vscode-scrollbarSlider-hoverBackground);
 }
 
-/* Animations */
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
+@media (max-width: 1180px) {
+  .sentinel-shell {
+    grid-template-columns: 76px minmax(0, 1fr);
+  }
+
+  .sentinel-brand__title,
+  .sentinel-brand__subtitle,
+  .sentinel-nav__item span,
+  .sentinel-rail__footer {
+    display: none;
+  }
+
+  .sentinel-nav__item {
+    justify-content: center;
+    padding: 9px;
+  }
+
+  .sentinel-nav__counter {
+    display: none;
+  }
 }
 
-.animate-pulse-slow {
-  animation: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+@media (max-width: 900px) {
+  .sentinel-shell {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+    padding: 8px;
+    gap: 8px;
+  }
+
+  .sentinel-rail {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+    padding: 10px;
+  }
+
+  .sentinel-brand {
+    display: none;
+  }
+
+  .sentinel-nav {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .sentinel-nav__item {
+    border-radius: 10px;
+    justify-content: center;
+  }
+
+  .sentinel-main {
+    min-height: 0;
+  }
+
+  .sentinel-topbar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .sentinel-topbar__metrics {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .sentinel-grid,
+  .sentinel-grid--forge,
+  .sentinel-settings-grid,
+  .sentinel-metrics--network {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sentinel-card--hero {
+    grid-row: auto;
+  }
+
+  .sentinel-chat {
+    min-height: calc(100vh - 210px);
+  }
+
+  .sentinel-chat__messages {
+    height: 42vh;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
