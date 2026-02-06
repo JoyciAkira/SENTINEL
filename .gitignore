@@ -110,6 +110,7 @@ criterion/
 # Local configuration
 config.local.toml
 sentinel.local.json
+.codex/
 
 # IDE specific
 *.iml

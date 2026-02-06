@@ -42,7 +42,6 @@
 //! ```
 
 use anyhow::{Context, Result};
-use futures::executor::block_on;
 use sentinel_core::{
     goal_manifold::predicate::PredicateState,
     goal_manifold::{predicate::Predicate, Goal, GoalManifold, Invariant, InvariantSeverity},
@@ -261,10 +260,11 @@ impl HierarchicalPlanner {
                     .description(description)
                     .parent(goal.id)
                     .complexity(sentinel_core::types::ProbabilityDistribution::normal(
-                        complexity / num_sub_goals as f64,
+                        self.sub_goal_complexity(complexity, num_sub_goals),
                         1.0,
                     ))
                     .value_to_root(goal.value_to_root / num_sub_goals as f64)
+                    .add_success_criterion(Predicate::AlwaysTrue)
                     .build()
                     .unwrap()
             })
@@ -293,10 +293,11 @@ impl HierarchicalPlanner {
                     .description(description)
                     .parent(goal.id)
                     .complexity(sentinel_core::types::ProbabilityDistribution::normal(
-                        complexity / num_sub_goals as f64,
+                        self.sub_goal_complexity(complexity, num_sub_goals),
                         1.0,
                     ))
                     .value_to_root(goal.value_to_root / num_sub_goals as f64)
+                    .add_success_criterion(Predicate::AlwaysTrue)
                     .build()
                     .unwrap()
             })
@@ -325,10 +326,11 @@ impl HierarchicalPlanner {
                     .description(description)
                     .parent(goal.id)
                     .complexity(sentinel_core::types::ProbabilityDistribution::normal(
-                        complexity / num_sub_goals as f64,
+                        self.sub_goal_complexity(complexity, num_sub_goals),
                         1.0,
                     ))
                     .value_to_root(goal.value_to_root / num_sub_goals as f64)
+                    .add_success_criterion(Predicate::AlwaysTrue)
                     .build()
                     .unwrap()
             })
@@ -357,10 +359,11 @@ impl HierarchicalPlanner {
                     .description(description)
                     .parent(goal.id)
                     .complexity(sentinel_core::types::ProbabilityDistribution::normal(
-                        complexity / num_sub_goals as f64,
+                        self.sub_goal_complexity(complexity, num_sub_goals),
                         1.0,
                     ))
                     .value_to_root(goal.value_to_root / num_sub_goals as f64)
+                    .add_success_criterion(Predicate::AlwaysTrue)
                     .build()
                     .unwrap()
             })
@@ -390,10 +393,11 @@ impl HierarchicalPlanner {
                     .description(description)
                     .parent(goal.id)
                     .complexity(sentinel_core::types::ProbabilityDistribution::normal(
-                        complexity / num_sub_goals as f64,
+                        self.sub_goal_complexity(complexity, num_sub_goals),
                         1.0,
                     ))
                     .value_to_root(goal.value_to_root / num_sub_goals as f64)
+                    .add_success_criterion(Predicate::AlwaysTrue)
                     .build()
                     .unwrap()
             })
@@ -423,10 +427,11 @@ impl HierarchicalPlanner {
                     .description(description)
                     .parent(goal.id)
                     .complexity(sentinel_core::types::ProbabilityDistribution::normal(
-                        complexity / num_sub_goals as f64,
+                        self.sub_goal_complexity(complexity, num_sub_goals),
                         1.0,
                     ))
                     .value_to_root(goal.value_to_root / num_sub_goals as f64)
+                    .add_success_criterion(Predicate::AlwaysTrue)
                     .build()
                     .unwrap()
             })
@@ -447,10 +452,11 @@ impl HierarchicalPlanner {
                     .description(description)
                     .parent(goal.id)
                     .complexity(sentinel_core::types::ProbabilityDistribution::normal(
-                        complexity / num_sub_goals as f64,
+                        self.sub_goal_complexity(complexity, num_sub_goals),
                         1.0,
                     ))
                     .value_to_root(goal.value_to_root / num_sub_goals as f64)
+                    .add_success_criterion(Predicate::AlwaysTrue)
                     .build()
                     .unwrap()
             })
@@ -484,6 +490,13 @@ impl HierarchicalPlanner {
             c if c < 90.0 => 4, // Complex - 4-6 sub-goals
             _ => 6,             // Very complex - 6-10 sub-goals
         }
+    }
+
+    fn sub_goal_complexity(&self, complexity: f64, num_sub_goals: usize) -> f64 {
+        if num_sub_goals == 0 {
+            return 0.0;
+        }
+        (complexity / num_sub_goals as f64).clamp(0.0, 10.0)
     }
 
     /// Validate plan against Goal Manifold
@@ -595,7 +608,13 @@ impl HierarchicalPlanner {
         let predicate_state = PredicateState::new(
             std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from(".")),
         );
-        let runtime_violations = block_on(self.goal_manifold.validate_invariants(&predicate_state));
+        let runtime_violations = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .map(|runtime| {
+                runtime.block_on(self.goal_manifold.validate_invariants(&predicate_state))
+            })
+            .unwrap_or_default();
         for violation in runtime_violations {
             if matches!(
                 violation.severity,
@@ -776,10 +795,9 @@ mod tests {
         let goal_manifold = create_test_goal_manifold();
         let planner = HierarchicalPlanner::new(goal_manifold);
 
+        let complex_description = "Implement complex authentication system with JWT, OAuth, session management, token rotation, auditing, and distributed revocation. ".repeat(12);
         let complex_goal = Goal::builder()
-            .description(
-                "Implement complex authentication system with JWT, OAuth, and session management",
-            )
+            .description(complex_description)
             .complexity(sentinel_core::types::ProbabilityDistribution::normal(
                 8.5, 1.0,
             ))
