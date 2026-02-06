@@ -28,6 +28,7 @@ use sentinel_core::{
     goal_manifold::GoalManifold,
     Uuid,
 };
+use std::collections::HashSet;
 use std::sync::Arc;
 use tokio::sync::Semaphore;
 
@@ -903,13 +904,83 @@ impl LLMIntegrationManager {
     /// Compute alignment for suggestion (simplified)
     async fn compute_alignment_for_suggestion(
         &self,
-        _intent: &str,
+        intent: &str,
         suggestion_content: &str,
     ) -> Result<f64> {
-        // Simplified alignment computation
-        // In production, this would use full AlignmentField with ProjectState
+        let mut intent_tokens = self.tokenize_text(intent);
+        intent_tokens.extend(self.tokenize_text(&self.goal_manifold.root_intent.description));
+        for constraint in &self.goal_manifold.root_intent.constraints {
+            intent_tokens.extend(self.tokenize_text(constraint));
+        }
+        for outcome in &self.goal_manifold.root_intent.expected_outcomes {
+            intent_tokens.extend(self.tokenize_text(outcome));
+        }
 
-        Ok(90.0) // Assume good alignment for now
+        let suggestion_tokens = self.tokenize_text(suggestion_content);
+        if suggestion_tokens.is_empty() {
+            return Ok(0.0);
+        }
+        if intent_tokens.is_empty() {
+            return Ok(50.0);
+        }
+
+        let overlap = suggestion_tokens.intersection(&intent_tokens).count() as f64;
+        let intent_coverage = overlap / intent_tokens.len() as f64;
+        let suggestion_precision = overlap / suggestion_tokens.len() as f64;
+
+        // Favor covering the project intent, while still rewarding precision.
+        let semantic_alignment = (intent_coverage * 0.65) + (suggestion_precision * 0.35);
+        let mut score = semantic_alignment * 100.0;
+
+        let constraint_tokens: HashSet<String> = self
+            .goal_manifold
+            .root_intent
+            .constraints
+            .iter()
+            .flat_map(|constraint| self.tokenize_text(constraint))
+            .collect();
+        if !constraint_tokens.is_empty() {
+            let matched_constraints =
+                constraint_tokens.intersection(&suggestion_tokens).count() as f64;
+            let constraint_coverage = matched_constraints / constraint_tokens.len() as f64;
+            score = (score * 0.75) + (constraint_coverage * 25.0);
+        }
+
+        let lowered = suggestion_content.to_lowercase();
+        let anti_goal_markers = [
+            "ignore requirement",
+            "skip tests",
+            "temporary hack",
+            "disable validation",
+            "hardcode secret",
+        ];
+        if anti_goal_markers
+            .iter()
+            .any(|marker| lowered.contains(marker))
+        {
+            score -= 35.0;
+        }
+
+        Ok(score.clamp(0.0, 100.0))
+    }
+
+    fn tokenize_text(&self, text: &str) -> HashSet<String> {
+        const STOP_WORDS: &[&str] = &[
+            "the", "and", "for", "with", "that", "this", "from", "into", "your", "you", "are",
+            "was", "were", "will", "have", "has", "had", "use", "using", "build", "create", "make",
+            "add",
+        ];
+
+        text.split(|ch: char| !ch.is_ascii_alphanumeric())
+            .filter_map(|token| {
+                let lowered = token.trim().to_lowercase();
+                if lowered.len() < 3 || STOP_WORDS.contains(&lowered.as_str()) {
+                    None
+                } else {
+                    Some(lowered)
+                }
+            })
+            .collect()
     }
 
     /// Build context for LLM
