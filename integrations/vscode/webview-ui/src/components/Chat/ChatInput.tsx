@@ -17,6 +17,15 @@ export default function ChatInput() {
     const text = inputText.trim();
     if (!text || !connected) return;
 
+    if (text === "/clear-memory") {
+      vscode.postMessage({ type: "clearChatMemory" });
+      setInputText("");
+      if (textareaRef.current) {
+        textareaRef.current.style.height = "auto";
+      }
+      return;
+    }
+
     addMessage({
       id: crypto.randomUUID(),
       role: "user",

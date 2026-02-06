@@ -80,6 +80,22 @@ struct GoalCriteriaSpec {
     comparison: Option<String>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+struct ChatMemoryStore {
+    version: u32,
+    turns: Vec<ChatMemoryTurn>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct ChatMemoryTurn {
+    id: String,
+    timestamp: i64,
+    user: String,
+    assistant: String,
+    intent_summary: String,
+    evidence: Vec<String>,
+}
+
 /// Avvia il server MCP su stdin/stdout
 pub async fn run_server() -> anyhow::Result<()> {
     let mut stdin = BufReader::new(tokio::io::stdin());
@@ -319,7 +335,7 @@ async fn handle_request(req: McpRequest, id: Value) -> McpResponse {
                     },
                     {
                         "name": "chat",
-                        "description": "Invia un messaggio all'agente Sentinel per ragionamento, pianificazione o esecuzione (Real Inference)",
+                        "description": "Invia un messaggio all'agente Sentinel con memoria contestuale persistente ed explainability per turno",
                         "inputSchema": {
                             "type": "object",
                             "properties": {
@@ -327,6 +343,11 @@ async fn handle_request(req: McpRequest, id: Value) -> McpResponse {
                             },
                             "required": ["message"]
                         }
+                    },
+                    {
+                        "name": "chat_memory_clear",
+                        "description": "Azzera la memoria conversazionale persistente locale usata per il contesto chat",
+                        "inputSchema": { "type": "object", "properties": {} }
                     }
                 ]
             })),
@@ -410,6 +431,104 @@ fn save_manifold(manifold: &GoalManifold) -> Result<(), String> {
     let content = serde_json::to_string_pretty(manifold)
         .map_err(|e| format!("Errore serializzazione: {}", e))?;
     std::fs::write(&path, content).map_err(|e| format!("Errore scrittura file: {}", e))
+}
+
+fn find_chat_memory_path() -> Option<PathBuf> {
+    let root = find_manifold_path()?.parent()?.to_path_buf();
+    let dir = root.join(".sentinel");
+    Some(dir.join("chat_memory.json"))
+}
+
+fn load_chat_memory() -> ChatMemoryStore {
+    let Some(path) = find_chat_memory_path() else {
+        return ChatMemoryStore {
+            version: 1,
+            turns: Vec::new(),
+        };
+    };
+    let content = match std::fs::read_to_string(path) {
+        Ok(v) => v,
+        Err(_) => {
+            return ChatMemoryStore {
+                version: 1,
+                turns: Vec::new(),
+            }
+        }
+    };
+    let mut store: ChatMemoryStore = serde_json::from_str(&content).unwrap_or_default();
+    if store.version == 0 {
+        store.version = 1;
+    }
+    store
+}
+
+fn save_chat_memory(store: &ChatMemoryStore) -> Result<(), String> {
+    let Some(path) = find_chat_memory_path() else {
+        return Ok(());
+    };
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)
+            .map_err(|e| format!("Errore creazione directory memoria: {}", e))?;
+    }
+    let content = serde_json::to_string_pretty(store)
+        .map_err(|e| format!("Errore serializzazione memoria: {}", e))?;
+    std::fs::write(path, content).map_err(|e| format!("Errore scrittura memoria: {}", e))
+}
+
+fn normalize_terms(input: &str) -> std::collections::BTreeSet<String> {
+    input
+        .split(|c: char| !c.is_alphanumeric())
+        .map(|term| term.trim().to_lowercase())
+        .filter(|term| term.len() >= 3)
+        .collect()
+}
+
+fn top_memory_context(store: &ChatMemoryStore, message: &str, limit: usize) -> Vec<ChatMemoryTurn> {
+    if store.turns.is_empty() {
+        return Vec::new();
+    }
+
+    let query_terms = normalize_terms(message);
+    let mut ranked: Vec<(f64, &ChatMemoryTurn)> = store
+        .turns
+        .iter()
+        .map(|turn| {
+            let turn_terms = normalize_terms(&format!("{} {}", turn.user, turn.assistant));
+            let overlap = query_terms.intersection(&turn_terms).count() as f64;
+            let recency = (turn.timestamp as f64) / 1_000_000_000_000.0;
+            (overlap * 10.0 + recency, turn)
+        })
+        .collect();
+
+    ranked.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
+    ranked
+        .into_iter()
+        .take(limit)
+        .map(|(_, turn)| turn.clone())
+        .collect()
+}
+
+fn stream_chunks(content: &str, chunk_len: usize) -> Vec<String> {
+    let mut chunks = Vec::new();
+    let mut cursor = 0usize;
+    let chars: Vec<char> = content.chars().collect();
+    while cursor < chars.len() {
+        let mut end = (cursor + chunk_len).min(chars.len());
+        if end < chars.len() {
+            for idx in (cursor..end).rev() {
+                if matches!(chars[idx], '.' | ',' | ';' | ':' | '!' | '?' | '\n' | ' ') {
+                    end = idx + 1;
+                    break;
+                }
+            }
+        }
+        let chunk: String = chars[cursor..end].iter().collect();
+        if !chunk.is_empty() {
+            chunks.push(chunk);
+        }
+        cursor = end.max(cursor + 1);
+    }
+    chunks
 }
 
 fn parse_comparison(value: Option<&str>) -> Comparison {
@@ -1354,18 +1473,158 @@ async fn handle_tool_call(params: Option<Value>) -> Option<Value> {
                 }));
             }
 
-            let system_prompt = build_system_prompt() +
-                "\nSei un agente Sentinel. Il tuo compito è aiutare l'utente con l'allineamento degli obiettivi. \
-                Usa un tono professionale, tecnico e deterministico. Rispondi in italiano.";
-
-            let response_text = match chat_with_llm(&system_prompt, message).await {
-                Some(content) => content,
-                None => "Errore durante l'inferenza dell'agente. Verifica le API key.".to_string(),
+            let memory_store = load_chat_memory();
+            let memory_hits = top_memory_context(&memory_store, message, 5);
+            let memory_context = if memory_hits.is_empty() {
+                "Nessun precedente rilevante.".to_string()
+            } else {
+                memory_hits
+                    .iter()
+                    .map(|hit| {
+                        format!(
+                            "- [{}] user='{}' | summary='{}'",
+                            hit.id, hit.user, hit.intent_summary
+                        )
+                    })
+                    .collect::<Vec<_>>()
+                    .join("\n")
             };
 
+            let manifold = get_manifold().ok();
+            let reliability_snapshot = if let Some(manifold) = &manifold {
+                let completion = manifold.completion_percentage();
+                let guardrail = sentinel_core::guardrail::GuardrailEngine::evaluate(manifold);
+                let state = ProjectState::new(PathBuf::from("."));
+                let field = AlignmentField::new(manifold.clone());
+                match field.compute_alignment(&state).await {
+                    Ok(alignment) => {
+                        let reliability = reliability::snapshot_from_signals(
+                            alignment.score,
+                            alignment.confidence,
+                            completion,
+                            guardrail.allowed,
+                        );
+                        Some((alignment, reliability, guardrail.allowed))
+                    }
+                    Err(_) => None,
+                }
+            } else {
+                None
+            };
+
+            let system_prompt = build_system_prompt()
+                + "\nSei un agente Sentinel. Il tuo compito è aiutare l'utente con l'allineamento degli obiettivi. \
+                Usa un tono professionale, tecnico e deterministico. Rispondi in italiano."
+                + "\nRegole output: prima risposta concreta, poi razionale sintetico. Evita prolissità."
+                + "\nSe trovi rischio governance/reliability, esplicitalo chiaramente.";
+
+            let user_prompt = format!(
+                "Messaggio utente:\n{}\n\nMemoria rilevante:\n{}\n\nRispondi con priorità a: cosa fare adesso, come farlo in sicurezza, quali rischi monitorare.",
+                message, memory_context
+            );
+
+            let response_text = match chat_with_llm(&system_prompt, &user_prompt).await {
+                Some(content) => content.trim().to_string(),
+                None => "Errore durante l'inferenza dell'agente. Verifica le API key.".to_string(),
+            };
+            let stream_chunks = stream_chunks(&response_text, 140);
+
+            let (alignment_score, reliability_ok, risk_flag) =
+                if let Some((alignment, reliability, _)) = reliability_snapshot {
+                    let config = find_manifold_path()
+                        .map(|path| reliability::load_reliability_config(&path))
+                        .unwrap_or_default();
+                    let slo = reliability::evaluate_snapshot(&reliability, &config.thresholds);
+                    (
+                        Some(alignment.score),
+                        Some(slo.healthy),
+                        if slo.healthy { "low" } else { "elevated" }.to_string(),
+                    )
+                } else {
+                    (None, None, "unknown".to_string())
+                };
+
+            let governance_pending = manifold.as_ref().and_then(|m| {
+                m.governance
+                    .pending_proposal
+                    .as_ref()
+                    .map(|p| p.id.to_string())
+            });
+            let intent_summary = message
+                .split_whitespace()
+                .take(14)
+                .collect::<Vec<_>>()
+                .join(" ");
+            let evidence = vec![
+                format!("memory_hits={}", memory_hits.len()),
+                format!("risk_flag={}", risk_flag),
+                governance_pending
+                    .as_ref()
+                    .map(|id| format!("governance_pending={}", id))
+                    .unwrap_or_else(|| "governance_pending=none".to_string()),
+            ];
+
+            let turn = ChatMemoryTurn {
+                id: uuid::Uuid::new_v4().to_string(),
+                timestamp: chrono::Utc::now().timestamp_millis(),
+                user: message.to_string(),
+                assistant: response_text.clone(),
+                intent_summary: intent_summary.clone(),
+                evidence: evidence.clone(),
+            };
+            let mut next_store = memory_store;
+            next_store.version = 1;
+            next_store.turns.push(turn.clone());
+            if next_store.turns.len() > 400 {
+                let keep_from = next_store.turns.len().saturating_sub(400);
+                next_store.turns = next_store.turns.split_off(keep_from);
+            }
+            let _ = save_chat_memory(&next_store);
+
+            let payload = serde_json::json!({
+                "answer": response_text,
+                "stream_chunks": stream_chunks,
+                "thought_chain": [
+                    format!("Intent detected: {}", intent_summary),
+                    format!("Memory context hits: {}", memory_hits.len()),
+                    format!("Risk assessment: {}", risk_flag),
+                ],
+                "explainability": {
+                    "intent_summary": intent_summary,
+                    "evidence": evidence,
+                    "alignment_score": alignment_score,
+                    "reliability_healthy": reliability_ok,
+                    "governance_pending_proposal": governance_pending,
+                },
+                "memory": {
+                    "turn_id": turn.id,
+                    "total_turns": next_store.turns.len(),
+                    "memory_hits": memory_hits.iter().map(|hit| {
+                        serde_json::json!({
+                            "id": hit.id,
+                            "timestamp": hit.timestamp,
+                            "intent_summary": hit.intent_summary
+                        })
+                    }).collect::<Vec<_>>()
+                }
+            });
+
             Some(serde_json::json!({
-                "content": [{ "type": "text", "text": response_text }]
+                "content": [{ "type": "text", "text": payload.to_string() }]
             }))
+        }
+
+        "chat_memory_clear" => {
+            let result_json = match save_chat_memory(&ChatMemoryStore {
+                version: 1,
+                turns: Vec::new(),
+            }) {
+                Ok(_) => serde_json::json!({ "ok": true, "message": "Chat memory cleared." }),
+                Err(e) => serde_json::json!({ "ok": false, "error": e }),
+            };
+            Some(
+                serde_json::json!({ "content": [{ "type": "text", "text": result_json.to_string() }] }),
+            )
         }
 
         _ => Some(

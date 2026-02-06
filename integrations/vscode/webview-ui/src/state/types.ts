@@ -3,6 +3,13 @@ export interface ChatMessage {
     role: 'user' | 'assistant';
     content: string; // The visible response
     thoughtChain?: string[]; // Internal reasoning steps (NEW)
+    explainability?: {
+        intent_summary?: string;
+        evidence?: string[];
+        alignment_score?: number | null;
+        reliability_healthy?: boolean | null;
+        governance_pending_proposal?: string | null;
+    };
     timestamp: number;
     toolCalls?: ToolCallInfo[];
     fileOperations?: FileOperation[];
@@ -100,7 +107,11 @@ export interface AppState {
     // Actions
     setConnected: (connected: boolean) => void;
     addMessage: (msg: ChatMessage) => void;
-    updateLastAssistant: (content: string, thoughts?: string[]) => void;
+    updateLastAssistant: (
+        content: string,
+        thoughts?: string[],
+        explainability?: ChatMessage["explainability"],
+    ) => void;
     appendToolCall: (messageId: string, tool: ToolCallInfo) => void;
     setAlignment: (alignment: AlignmentState) => void;
     setReliability: (

@@ -12,6 +12,7 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewId = "sentinel-chat";
 
   private view?: vscode.WebviewView;
+  private activeStreamId: string | null = null;
 
   constructor(
     private extensionUri: vscode.Uri,
@@ -98,6 +99,18 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
     switch (messageType) {
       case "chatMessage":
         await this.handleChatMessage(msg.text);
+        break;
+      case "regenerateLastResponse":
+        await this.handleChatMessage(msg.text);
+        break;
+      case "cancelStreaming":
+        if (typeof msg.messageId === "string" && this.activeStreamId === msg.messageId) {
+          this.activeStreamId = null;
+          this.postMessage({ type: "chatStreamingStopped", id: msg.messageId });
+        }
+        break;
+      case "clearChatMemory":
+        await this.handleClearChatMemory();
         break;
 
       case "fileApproval":
@@ -231,19 +244,55 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
       });
 
       let content = "No response from Sentinel.";
-      if (result && result.content && result.content[0] && result.content[0].text) {
-        content = result.content[0].text;
-      } else if (typeof result === 'string') {
+      let thoughtChain: string[] | undefined = undefined;
+      let explainability: unknown = undefined;
+      let streamChunks: string[] = [];
+
+      if (result && typeof result === "object") {
+        const structured = result as Record<string, unknown>;
+        if (typeof structured.answer === "string") {
+          content = structured.answer;
+        } else if (result.content && Array.isArray(result.content) && result.content[0]?.text) {
+          content = String(result.content[0].text);
+        }
+        if (Array.isArray(structured.thought_chain)) {
+          thoughtChain = structured.thought_chain.map((v) => String(v));
+        }
+        if (structured.explainability) {
+          explainability = structured.explainability;
+        }
+        if (Array.isArray(structured.stream_chunks)) {
+          streamChunks = structured.stream_chunks.map((v) => String(v));
+        }
+      } else if (typeof result === "string") {
         content = result;
       }
 
-      // Update with the final response
-      this.postMessage({
-        type: "chatResponse",
-        id: messageId,
-        content: content,
-        streaming: false,
-      });
+      this.activeStreamId = messageId;
+      if (streamChunks.length > 0) {
+        let partial = "";
+        for (const chunk of streamChunks) {
+          if (this.activeStreamId !== messageId) break;
+          partial += chunk;
+          this.postMessage({
+            type: "chatStreaming",
+            id: messageId,
+            content: partial,
+          });
+          await new Promise((resolve) => setTimeout(resolve, 24));
+        }
+      }
+      if (this.activeStreamId === messageId) {
+        this.postMessage({
+          type: "chatResponse",
+          id: messageId,
+          content,
+          thoughtChain,
+          explainability,
+          streaming: false,
+        });
+      }
+      this.activeStreamId = null;
 
       // After chat, refresh goals in background to keep UI synced
       void this.refreshGoalSnapshot();
@@ -410,6 +459,26 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
       this.postMessage({
         type: "policyActionResult",
         kind: "governance_seed",
+        ok: false,
+        message: err.message,
+      });
+    }
+  }
+
+  private async handleClearChatMemory(): Promise<void> {
+    if (!this.client.connected) return;
+    try {
+      const result = (await this.client.callTool("chat_memory_clear", {})) as any;
+      this.postMessage({
+        type: "policyActionResult",
+        kind: "chat_memory_clear",
+        ok: result?.ok !== false,
+        message: result?.message ?? "Chat memory cleared.",
+      });
+    } catch (err: any) {
+      this.postMessage({
+        type: "policyActionResult",
+        kind: "chat_memory_clear",
         ok: false,
         message: err.message,
       });

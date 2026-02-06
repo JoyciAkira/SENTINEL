@@ -9,6 +9,7 @@ export default function MessageBubble({ message, index }: { message: ChatMessage
   const isUser = message.role === "user";
   const [thoughtsExpanded, setThoughtsExpanded] = useState(false);
   const hasThoughts = message.thoughtChain && message.thoughtChain.length > 0;
+  const hasExplainability = Boolean(message.explainability);
 
   return (
     <div className={cn(
@@ -48,6 +49,9 @@ export default function MessageBubble({ message, index }: { message: ChatMessage
                     {thoughtsExpanded ? "Hide thoughts" : "Show thoughts"}
                   </button>
                 )}
+                {hasExplainability && (
+                  <span className="text-[9px] normal-case opacity-60">Explainable turn</span>
+                )}
               </div>
             )}
 
@@ -69,6 +73,32 @@ export default function MessageBubble({ message, index }: { message: ChatMessage
               <span className="inline-block w-1.5 h-4 ml-1 bg-primary/40 animate-pulse align-middle" />
             )}
           </div>
+
+          {!isUser && message.explainability && (
+            <div className="text-[11px] border rounded-lg p-2 bg-card/60 space-y-1">
+              <div className="font-semibold text-[10px] uppercase tracking-wider text-muted-foreground">Turn Explainability</div>
+              {message.explainability.intent_summary && (
+                <div><span className="text-muted-foreground">Intent:</span> {message.explainability.intent_summary}</div>
+              )}
+              {typeof message.explainability.alignment_score === "number" && (
+                <div>
+                  <span className="text-muted-foreground">Alignment:</span>{" "}
+                  {message.explainability.alignment_score.toFixed(1)}%
+                </div>
+              )}
+              {typeof message.explainability.reliability_healthy === "boolean" && (
+                <div>
+                  <span className="text-muted-foreground">Reliability:</span>{" "}
+                  {message.explainability.reliability_healthy ? "Healthy" : "Violated"}
+                </div>
+              )}
+              {message.explainability.evidence?.length ? (
+                <div className="text-muted-foreground">
+                  Evidence: {message.explainability.evidence.join(" | ")}
+                </div>
+              ) : null}
+            </div>
+          )}
 
           {/* TOOL CALLS & ACTIONS */}
           {(message.toolCalls || message.fileOperations) && (

@@ -19,7 +19,7 @@ export const useStore = create<AppState>((set) => ({
     addMessage: (msg: ChatMessage) =>
         set((state) => ({ messages: [...state.messages, msg] })),
 
-    updateLastAssistant: (content: string, thoughts?: string[]) =>
+    updateLastAssistant: (content: string, thoughts?: string[], explainability?) =>
         set((state) => {
             const msgs = [...state.messages];
             for (let i = msgs.length - 1; i >= 0; i--) {
@@ -28,6 +28,7 @@ export const useStore = create<AppState>((set) => ({
                         ...msgs[i], 
                         content, 
                         thoughtChain: thoughts || msgs[i].thoughtChain, // Preserve existing thoughts if not provided
+                        explainability: explainability || msgs[i].explainability,
                         streaming: false 
                     };
                     break;

@@ -128,6 +128,14 @@ export default function App() {
     () => navItems.find((item) => item.id === activePage)?.label ?? "Command Center",
     [activePage],
   );
+  const lastUserMessage = useMemo(
+    () => [...messages].reverse().find((message) => message.role === "user"),
+    [messages],
+  );
+  const activeStreamingMessage = useMemo(
+    () => [...messages].reverse().find((message) => message.role === "assistant" && message.streaming),
+    [messages],
+  );
 
   const requestRuntimeRefresh = () => {
     vscodeApi.postMessage({ type: "refreshRuntimePolicies" });
@@ -291,11 +299,44 @@ export default function App() {
 
             {activePage === "chat" && (
               <Card className="sentinel-card sentinel-chat">
-                  <CardHeader>
-                    <CardTitle className="text-base">Prompt -&gt; Plan -&gt; Execute -&gt; Verify</CardTitle>
+                <CardHeader>
+                  <CardTitle className="text-base">Prompt -&gt; Plan -&gt; Execute -&gt; Verify</CardTitle>
                   <CardDescription>
                     Every action remains supervised and policy-gated before workspace mutation.
                   </CardDescription>
+                  <div className="sentinel-inline-actions">
+                    <Button
+                      size="xs"
+                      variant="outline"
+                      disabled={!lastUserMessage || Boolean(activeStreamingMessage)}
+                      onClick={() =>
+                        lastUserMessage &&
+                        vscodeApi.postMessage({
+                          type: "regenerateLastResponse",
+                          text: lastUserMessage.content,
+                        })
+                      }
+                    >
+                      Regenerate
+                    </Button>
+                    <Button
+                      size="xs"
+                      variant="outline"
+                      disabled={!activeStreamingMessage}
+                      onClick={() =>
+                        activeStreamingMessage &&
+                        vscodeApi.postMessage({
+                          type: "cancelStreaming",
+                          messageId: activeStreamingMessage.id,
+                        })
+                      }
+                    >
+                      Stop Stream
+                    </Button>
+                    <Button size="xs" variant="destructive" onClick={() => vscodeApi.postMessage({ type: "clearChatMemory" })}>
+                      Clear Memory
+                    </Button>
+                  </div>
                 </CardHeader>
                 <CardContent className="sentinel-chat__body">
                   <QuickPrompts />

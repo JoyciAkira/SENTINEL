@@ -37,19 +37,47 @@ export function useMCPMessages(vscodeApi: VSCodeAPI): void {
                     break;
 
                 case 'chatResponse':
-                    addMessage({
-                        id: msg.id ?? crypto.randomUUID(),
-                        role: 'assistant',
-                        content: msg.content,
-                        timestamp: Date.now(),
-                        toolCalls: msg.toolCalls,
-                        streaming: false,
-                    });
+                    if (msg.streaming) {
+                        addMessage({
+                            id: msg.id ?? crypto.randomUUID(),
+                            role: 'assistant',
+                            content: msg.content ?? '',
+                            timestamp: Date.now(),
+                            toolCalls: msg.toolCalls,
+                            streaming: true,
+                        });
+                    } else {
+                        const existing = useStore
+                            .getState()
+                            .messages.some((m) => m.id === msg.id && m.role === 'assistant');
+                        if (existing) {
+                            updateLastAssistant(msg.content ?? '', msg.thoughtChain, msg.explainability);
+                        } else {
+                            addMessage({
+                                id: msg.id ?? crypto.randomUUID(),
+                                role: 'assistant',
+                                content: msg.content ?? '',
+                                timestamp: Date.now(),
+                                toolCalls: msg.toolCalls,
+                                thoughtChain: msg.thoughtChain,
+                                explainability: msg.explainability,
+                                streaming: false,
+                            });
+                        }
+                    }
                     break;
 
                 case 'chatStreaming':
                     // Update the last assistant message content
-                    updateLastAssistant(msg.content);
+                    updateLastAssistant(msg.content ?? '');
+                    break;
+
+                case 'chatStreamingStopped':
+                    {
+                        const msgs = useStore.getState().messages;
+                        const last = msgs.length > 0 ? msgs[msgs.length - 1] : undefined;
+                        updateLastAssistant(last?.content ?? '');
+                    }
                     break;
 
                 case 'toolCall':
