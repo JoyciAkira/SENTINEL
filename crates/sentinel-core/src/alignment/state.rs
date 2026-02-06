@@ -199,7 +199,26 @@ impl ProjectState {
 
     /// Convert to PredicateState for predicate evaluation
     pub fn to_predicate_state(&self) -> PredicateState {
-        PredicateState::new(self.working_directory.clone())
+        let mut predicate_state = PredicateState::new(self.working_directory.clone())
+            .with_metric("test_coverage", self.metrics.test_coverage)
+            .with_metric("avg_complexity", self.metrics.avg_complexity)
+            .with_metric("tech_debt_ratio", self.metrics.tech_debt_ratio)
+            .with_metric("lines_of_code", self.metrics.lines_of_code as f64)
+            .with_metric("function_count", self.metrics.function_count as f64)
+            .with_metric("class_count", self.metrics.class_count as f64);
+
+        for (suite, result) in &self.test_results {
+            predicate_state = predicate_state.with_test_result(
+                suite.clone(),
+                crate::goal_manifold::predicate::PredicateTestResult {
+                    passed: result.passed,
+                    failed: result.failed,
+                    coverage: result.coverage,
+                },
+            );
+        }
+
+        predicate_state
     }
 
     /// Get the number of dimensions in this state space
@@ -369,7 +388,7 @@ mod tests {
 
     #[test]
     fn test_goal_state_progress() {
-        let mut goal_state = GoalState {
+        let goal_state = GoalState {
             id: Uuid::new_v4(),
             status: crate::types::GoalStatus::InProgress,
             completion: 0.0,
