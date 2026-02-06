@@ -50,6 +50,7 @@ use anyhow::Result;
 use sentinel_core::{
     alignment::{AlignmentField, ProjectState},
     cognitive_state::{Action, ActionType, CognitiveState},
+    execution::{ExecutionNorthStar, ReliabilitySnapshot},
     goal_manifold::{predicate::Predicate, Goal, GoalManifold, Intent},
     learning::{DeviationPattern, KnowledgeBase, LearningEngine},
     memory::MemoryManifold,
@@ -215,7 +216,7 @@ impl SentinelAgent {
         let plan = self
             .create_hierarchical_plan(&task_analysis, &consensus_result)
             .await?;
-        let execution_compass = self.build_execution_compass(&task_analysis, &plan);
+        let north_star = plan.north_star.clone();
 
         // Phase 4: Execution with Continuous Alignment
         let execution_result = self.execute_plan(plan).await?;
@@ -233,6 +234,10 @@ impl SentinelAgent {
             .signed_duration_since(start_time)
             .num_milliseconds();
 
+        let reliability = self
+            .build_reliability_snapshot(&execution_result, &consensus_result)
+            .await;
+
         Ok(ExecutionReport {
             task: task.to_string(),
             agent_id: self.agent_id,
@@ -241,7 +246,8 @@ impl SentinelAgent {
             actions_taken: execution_result.actions.len(),
             deviations_detected: execution_result.deviations.len(),
             success: execution_result.success,
-            execution_compass,
+            north_star,
+            reliability,
         })
     }
 
@@ -337,13 +343,51 @@ impl SentinelAgent {
 
         // Validate entire plan with Alignment Field
         let plan_sub_goals: Vec<Uuid> = sub_goals.iter().map(|g| g.id).collect();
+        let estimated_duration_minutes = (task_analysis.complexity * 2.0) as u32;
+        let action_count = actions.len();
         let plan = planning::ExecutionPlan {
             root_task: task_analysis.task.clone(),
             sub_goals: plan_sub_goals,
             actions,
             complexity: task_analysis.complexity,
-            estimated_duration_minutes: (task_analysis.complexity * 2.0) as u32,
+            estimated_duration_minutes,
+            north_star: self.build_execution_north_star(
+                task_analysis,
+                task_analysis.task.clone(),
+                action_count,
+                estimated_duration_minutes,
+            ),
         };
+
+        let planner = self.planner.lock().await;
+        match planner.validate_plan(&plan) {
+            planning::PlanValidation::Valid => {}
+            planning::PlanValidation::LowAlignment { score } => {
+                return Err(anyhow::anyhow!(
+                    "Hierarchical plan rejected: low alignment {:.2}",
+                    score
+                ));
+            }
+            planning::PlanValidation::ViolatesInvariants { invariants } => {
+                return Err(anyhow::anyhow!(
+                    "Hierarchical plan rejected: invariant violations {:?}",
+                    invariants
+                ));
+            }
+            planning::PlanValidation::CircularDependencies { cycle } => {
+                return Err(anyhow::anyhow!(
+                    "Hierarchical plan rejected: circular dependencies {:?}",
+                    cycle
+                ));
+            }
+            planning::PlanValidation::MissingNorthStar { reason } => {
+                return Err(anyhow::anyhow!(
+                    "Hierarchical plan rejected: invalid north star ({})",
+                    reason
+                ));
+            }
+        }
+        drop(planner);
 
         // Predictive Alignment for the plan
         let state = ProjectState::new(std::path::PathBuf::from("."));
@@ -783,38 +827,78 @@ impl SentinelAgent {
             ));
         }
 
+        let estimated_duration_minutes =
+            ((task_analysis.complexity * 1.5) + (100.0 - current_alignment.score) / 10.0) as u32;
+        let action_count = actions.len();
         Ok(planning::ExecutionPlan {
             root_task: format!("{} [alternative-plan]", task_analysis.task),
             sub_goals: task_analysis.goals.iter().map(|goal| goal.id).collect(),
             actions,
             complexity: (task_analysis.complexity * 0.8).max(1.0),
-            estimated_duration_minutes: ((task_analysis.complexity * 1.5)
-                + (100.0 - current_alignment.score) / 10.0)
-                as u32,
+            estimated_duration_minutes,
+            north_star: self.build_execution_north_star(
+                task_analysis,
+                format!("{} [alternative-plan]", task_analysis.task),
+                action_count,
+                estimated_duration_minutes,
+            ),
         })
     }
 
-    fn build_execution_compass(
+    fn build_execution_north_star(
         &self,
         task_analysis: &TaskAnalysis,
-        plan: &planning::ExecutionPlan,
-    ) -> ExecutionCompass {
-        ExecutionCompass {
+        target_task: String,
+        action_count: usize,
+        estimated_duration_minutes: u32,
+    ) -> ExecutionNorthStar {
+        ExecutionNorthStar {
             where_we_are: format!(
                 "Task analyzed with {} goals and {} constraints",
                 task_analysis.goals.len(),
                 task_analysis.constraints.len()
             ),
-            where_we_must_go: task_analysis.task.clone(),
+            where_we_must_go: target_task,
             how: format!(
                 "Plan with {} actions and estimated {} minutes",
-                plan.actions.len(),
-                plan.estimated_duration_minutes
+                action_count, estimated_duration_minutes
             ),
             why: "Every action must increase goal alignment while respecting invariants"
                 .to_string(),
             constraints: task_analysis.constraints.clone(),
         }
+    }
+
+    async fn build_reliability_snapshot(
+        &self,
+        execution: &ExecutionResult,
+        consensus: &ConsensusQueryResult,
+    ) -> ReliabilitySnapshot {
+        let total_tasks = execution.actions.len() as u64 + execution.deviations.len() as u64;
+        let successful_tasks = execution.actions.len() as u64;
+        let invariant_violations = execution
+            .deviations
+            .iter()
+            .filter(|deviation| deviation.reason.to_lowercase().contains("invariant"))
+            .count() as u64;
+        let rollbacks = execution.deviations.len() as u64;
+        let recovery_events = execution.deviations.len() as u64;
+        let total_recovery_ms = execution
+            .deviations
+            .iter()
+            .map(|deviation| ((deviation.probability.clamp(0.0, 1.0) * 1000.0) as u64).max(1))
+            .sum::<u64>()
+            + (consensus.threats.len() as u64 * 5);
+
+        ReliabilitySnapshot::from_counts(
+            total_tasks,
+            successful_tasks,
+            execution.deviations.len() as u64,
+            rollbacks,
+            recovery_events,
+            total_recovery_ms,
+            invariant_violations,
+        )
     }
 }
 
@@ -840,16 +924,8 @@ pub struct ExecutionReport {
     pub actions_taken: usize,
     pub deviations_detected: usize,
     pub success: bool,
-    pub execution_compass: ExecutionCompass,
-}
-
-#[derive(Debug, Clone, serde::Serialize)]
-pub struct ExecutionCompass {
-    pub where_we_are: String,
-    pub where_we_must_go: String,
-    pub how: String,
-    pub why: String,
-    pub constraints: Vec<String>,
+    pub north_star: ExecutionNorthStar,
+    pub reliability: ReliabilitySnapshot,
 }
 
 /// Deviation details

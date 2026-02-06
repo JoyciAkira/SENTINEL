@@ -77,10 +77,15 @@ pub mod alignment;
 pub mod architect;
 pub mod cognitive_state;
 pub mod error;
+pub mod evidence;
+pub mod execution;
 pub mod external;
+pub mod federation;
 pub mod goal_manifold;
+pub mod guardrail;
 pub mod learning;
 pub mod memory;
+pub mod security;
 pub mod types;
 
 // Re-export commonly used types for convenience
@@ -89,6 +94,7 @@ pub use alignment::{
 };
 pub use cognitive_state::{Action, ActionDecision, CognitiveMode, CognitiveState};
 pub use error::{Result, SentinelError};
+pub use execution::{ExecutionNorthStar, ReliabilitySnapshot};
 pub use goal_manifold::{GoalManifold, Intent};
 pub use learning::{
     CompletedProject, DeviationPattern, DeviationRisk, KnowledgeBase, LearningReport,
@@ -230,7 +236,3 @@ mod integration_tests {
         assert_eq!(history[2].version, 3);
     }
 }
-pub mod evidence;
-pub mod federation;
-pub mod guardrail;
-pub mod security;

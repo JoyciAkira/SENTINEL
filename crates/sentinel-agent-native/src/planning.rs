@@ -76,6 +76,9 @@ pub struct ExecutionPlan {
 
     /// Estimated completion time
     pub estimated_duration_minutes: u32,
+
+    /// Mandatory execution contract (where/goal/how/why).
+    pub north_star: sentinel_core::ExecutionNorthStar,
 }
 
 /// Action in execution plan
@@ -166,6 +169,9 @@ pub enum PlanValidation {
 
     /// Plan creates circular dependencies
     CircularDependencies { cycle: Vec<GoalId> },
+
+    /// Plan is missing a valid execution contract.
+    MissingNorthStar { reason: String },
 }
 
 impl HierarchicalPlanner {
@@ -508,6 +514,12 @@ impl HierarchicalPlanner {
     pub fn validate_plan(&self, plan: &ExecutionPlan) -> PlanValidation {
         tracing::debug!("Validating plan with {} actions", plan.actions.len());
 
+        if let Err(reason) = plan.north_star.validate() {
+            return PlanValidation::MissingNorthStar {
+                reason: reason.to_string(),
+            };
+        }
+
         // Check 1: No circular dependencies
         if let Some(cycle) = self.check_circular_dependencies(plan) {
             return PlanValidation::CircularDependencies { cycle };
@@ -823,6 +835,7 @@ mod tests {
             actions: vec![],
             complexity: 5.0,
             estimated_duration_minutes: 10,
+            north_star: create_test_north_star(),
         };
 
         let validation = planner.validate_plan(&plan);
@@ -856,6 +869,7 @@ mod tests {
             }],
             complexity: 5.0,
             estimated_duration_minutes: 10,
+            north_star: create_test_north_star(),
         };
 
         let validation = planner.validate_plan(&plan);
@@ -890,6 +904,7 @@ mod tests {
             }],
             complexity: 2.0,
             estimated_duration_minutes: 2,
+            north_star: create_test_north_star(),
         };
 
         let validation = planner.validate_plan(&plan);
@@ -925,6 +940,7 @@ mod tests {
             }],
             complexity: 4.0,
             estimated_duration_minutes: 1,
+            north_star: create_test_north_star(),
         };
 
         let validation = planner.validate_plan(&plan);
@@ -941,5 +957,42 @@ mod tests {
         );
 
         GoalManifold::new(intent)
+    }
+
+    fn create_test_north_star() -> sentinel_core::ExecutionNorthStar {
+        sentinel_core::ExecutionNorthStar {
+            where_we_are: "Repository state analyzed".to_string(),
+            where_we_must_go: "Aligned goal outcome".to_string(),
+            how: "Hierarchical validated plan".to_string(),
+            why: "Preserve invariants while improving alignment".to_string(),
+            constraints: vec!["No destructive action without checks".to_string()],
+        }
+    }
+
+    #[test]
+    fn test_validate_plan_missing_north_star() {
+        let goal_manifold = create_test_goal_manifold();
+        let planner = HierarchicalPlanner::new(goal_manifold);
+
+        let plan = ExecutionPlan {
+            root_task: "Missing contract".to_string(),
+            sub_goals: vec![],
+            actions: vec![],
+            complexity: 1.0,
+            estimated_duration_minutes: 1,
+            north_star: sentinel_core::ExecutionNorthStar {
+                where_we_are: String::new(),
+                where_we_must_go: "Target".to_string(),
+                how: "Plan".to_string(),
+                why: "Reason".to_string(),
+                constraints: vec![],
+            },
+        };
+
+        let validation = planner.validate_plan(&plan);
+        assert!(matches!(
+            validation,
+            PlanValidation::MissingNorthStar { .. }
+        ));
     }
 }

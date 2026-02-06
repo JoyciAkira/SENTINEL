@@ -243,6 +243,7 @@ pub struct OrchestrationStats {
     pub conflicts_detected: u64,
     pub conflicts_resolved: u64,
     pub avg_parallelism: f64,
+    pub last_reliability: Option<sentinel_core::ReliabilitySnapshot>,
 }
 
 /// Orchestration result
@@ -886,6 +887,19 @@ impl AgentOrchestrator {
             self.stats.avg_parallelism = self.stats.parallel_tasks as f64 / completed_count as f64;
             self.stats.serial_tasks = results.len() as u64 - self.stats.parallel_tasks;
         }
+
+        let total_tasks = results.len() as u64;
+        let successful_tasks = completed_count as u64;
+        let failures = total_tasks.saturating_sub(successful_tasks);
+        self.stats.last_reliability = Some(sentinel_core::ReliabilitySnapshot::from_counts(
+            total_tasks,
+            successful_tasks,
+            failures, // treat failed tasks as regressions for this run
+            resolutions.len() as u64,
+            resolutions.len() as u64,
+            total_time,
+            failures, // conservative proxy: failed tasks likely include invariant drift
+        ));
     }
 
     /// Estimate task duration based on goal and agent type
