@@ -42,11 +42,13 @@
 //! ```
 
 use anyhow::{Context, Result};
+use futures::executor::block_on;
 use sentinel_core::{
-    goal_manifold::{Goal, GoalDag, GoalManifold, predicate::Predicate},
+    goal_manifold::predicate::PredicateState,
+    goal_manifold::{predicate::Predicate, Goal, GoalManifold, Invariant, InvariantSeverity},
     Uuid,
 };
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 /// Hierarchical Planner - Goal-driven plan generation
 #[derive(Debug)]
@@ -506,93 +508,120 @@ impl HierarchicalPlanner {
             };
         }
 
-        // Check 3: Sufficient alignment (computed elsewhere)
-        // This is a placeholder - real implementation would compute alignment
+        // Check 3: Sufficient projected alignment
+        let alignment_score = self.compute_plan_alignment(plan);
+        let minimum_alignment = (self.goal_manifold.sensitivity * 100.0).max(70.0);
+        if alignment_score < minimum_alignment {
+            return PlanValidation::LowAlignment {
+                score: alignment_score,
+            };
+        }
 
         tracing::info!("Plan validation passed");
         PlanValidation::Valid
     }
 
-    /// Check for circular dependencies in plan
+    /// Check for circular dependencies in plan action graph
     fn check_circular_dependencies(&self, plan: &ExecutionPlan) -> Option<Vec<GoalId>> {
-        // Build dependency graph from plan
-        let mut graph: HashMap<GoalId, Vec<GoalId>> = HashMap::new();
-
+        // Dependencies reference action IDs, so cycle detection must use action IDs.
+        let action_ids: HashSet<Uuid> = plan.actions.iter().map(|action| action.id).collect();
+        let mut graph: HashMap<Uuid, Vec<Uuid>> = HashMap::new();
         for action in &plan.actions {
-            let goal_id = action.goal_id?;
-            if !graph.contains_key(&goal_id) {
+            let deps = action
+                .dependencies
+                .iter()
+                .copied()
+                .filter(|dep| action_ids.contains(dep))
+                .collect();
+            graph.insert(action.id, deps);
+        }
 
-                                graph.insert(goal_id, action.dependencies.clone());
+        let mut visiting = HashSet::new();
+        let mut visited = HashSet::new();
+        let mut stack = Vec::new();
 
-                            } else {
-
-                                graph
-
-                                    .get_mut(&goal_id)
-
-                                    .unwrap()
-
-                                    .extend(action.dependencies.clone());
-
-                            }
-
-                        }
-
-                
-        // Check for cycles using DFS
-        for goal_id in &plan.sub_goals {
-            if self.has_cycle(&graph, goal_id, &mut vec![]) {
-                return Some(vec![goal_id.clone()]);
+        for action_id in action_ids {
+            if let Some(cycle) =
+                self.find_cycle(&graph, &action_id, &mut visiting, &mut visited, &mut stack)
+            {
+                return Some(cycle);
             }
         }
 
         None
     }
 
-    /// Check if graph has cycle starting from node
-    fn has_cycle(
+    /// Return cycle path if a cycle is found from `node`.
+    fn find_cycle(
         &self,
-        graph: &HashMap<GoalId, Vec<GoalId>>,
-        node: &GoalId,
-        visited: &mut Vec<GoalId>,
-    ) -> bool {
+        graph: &HashMap<Uuid, Vec<Uuid>>,
+        node: &Uuid,
+        visiting: &mut HashSet<Uuid>,
+        visited: &mut HashSet<Uuid>,
+        stack: &mut Vec<Uuid>,
+    ) -> Option<Vec<Uuid>> {
         if visited.contains(node) {
-            return true;
+            return None;
         }
 
-        visited.push(node.clone());
+        if visiting.contains(node) {
+            let start = stack
+                .iter()
+                .position(|current| current == node)
+                .unwrap_or(0);
+            return Some(stack[start..].to_vec());
+        }
 
+        visiting.insert(*node);
+        stack.push(*node);
         if let Some(neighbors) = graph.get(node) {
             for neighbor in neighbors {
-                if self.has_cycle(graph, neighbor, visited) {
-                    return true;
+                if let Some(cycle) = self.find_cycle(graph, neighbor, visiting, visited, stack) {
+                    return Some(cycle);
                 }
             }
         }
 
-        visited.pop();
-        false
+        stack.pop();
+        visiting.remove(node);
+        visited.insert(*node);
+        None
     }
 
     /// Check if plan violates invariants
     fn check_invariants(&self, plan: &ExecutionPlan) -> Vec<String> {
         let mut violations = Vec::new();
 
-        // Get invariants from Goal Manifold
-        let invariants = self.goal_manifold.invariants.clone();
+        let predicate_state = PredicateState::new(
+            std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from(".")),
+        );
+        let runtime_violations = block_on(self.goal_manifold.validate_invariants(&predicate_state));
+        for violation in runtime_violations {
+            if matches!(
+                violation.severity,
+                InvariantSeverity::Critical | InvariantSeverity::Error
+            ) {
+                violations.push(format!(
+                    "Invariant runtime violation: {}",
+                    violation.description
+                ));
+            }
+        }
 
-        // Check each action against invariants
+        // Check each planned action against declared invariants.
         for action in &plan.actions {
-            for invariant in &invariants {
+            for invariant in &self.goal_manifold.invariants {
                 if self.action_violates_invariant(action, invariant) {
-                    let violation = format!(
+                    violations.push(format!(
                         "Action {:?} violates invariant {:?}",
                         action.action_type, invariant
-                    );
+                    ));
                 }
             }
         }
 
+        violations.sort();
+        violations.dedup();
         violations
     }
 
@@ -600,23 +629,114 @@ impl HierarchicalPlanner {
     fn action_violates_invariant(
         &self,
         action: &sentinel_core::cognitive_state::Action,
-        invariant: &sentinel_core::goal_manifold::Invariant,
+        invariant: &Invariant,
     ) -> bool {
-        // Invariant checking logic
+        // A conservative static check before execution.
         match &action.action_type {
             sentinel_core::cognitive_state::ActionType::RunCommand { command, .. } => {
-                // Check if command tries to delete source code
-                command.contains("rm -rf") || command.contains("del /Q")
+                self.is_dangerous_command(command)
+                    && matches!(
+                        invariant.severity,
+                        InvariantSeverity::Critical | InvariantSeverity::Error
+                    )
             }
             sentinel_core::cognitive_state::ActionType::DeleteFile { path, .. } => {
-                // Check if trying to delete critical files
-                let path_str = path.to_string_lossy();
-                path_str.contains("Cargo.toml")
-                    || path_str.contains("package.json")
-                    || path_str.contains("README.md")
+                if self.is_critical_file(path) {
+                    return true;
+                }
+                match &invariant.predicate {
+                    Predicate::FileExists(invariant_path)
+                    | Predicate::DirectoryExists(invariant_path) => {
+                        self.paths_may_overlap(path, invariant_path)
+                    }
+                    _ => false,
+                }
             }
             _ => false,
         }
+    }
+
+    fn is_dangerous_command(&self, command: &str) -> bool {
+        let dangerous_patterns = ["rm -rf", "del /Q", "git clean -fd", "format c:", "mkfs"];
+        dangerous_patterns
+            .iter()
+            .any(|pattern| command.contains(pattern))
+    }
+
+    fn is_critical_file(&self, path: &std::path::Path) -> bool {
+        let value = path.to_string_lossy();
+        value.ends_with("Cargo.toml")
+            || value.ends_with("package.json")
+            || value.ends_with("README.md")
+            || value.ends_with(".env")
+            || value.contains("/.git/")
+    }
+
+    fn paths_may_overlap(
+        &self,
+        action_path: &std::path::Path,
+        invariant_path: &std::path::Path,
+    ) -> bool {
+        if action_path == invariant_path {
+            return true;
+        }
+        let action = action_path.to_string_lossy();
+        let invariant = invariant_path.to_string_lossy();
+        action.ends_with(invariant.as_ref()) || invariant.ends_with(action.as_ref())
+    }
+
+    fn compute_plan_alignment(&self, plan: &ExecutionPlan) -> f64 {
+        if plan.actions.is_empty() {
+            return 100.0;
+        }
+
+        let mut weighted_score = 0.0;
+        let mut total_weight = 0.0;
+
+        for action in &plan.actions {
+            let goal_weight = self.goal_weight_for_action(action.goal_id).max(0.1);
+            let action_score = self.score_action_alignment(action);
+            weighted_score += action_score * goal_weight;
+            total_weight += goal_weight;
+        }
+
+        if total_weight <= f64::EPSILON {
+            0.0
+        } else {
+            ((weighted_score / total_weight) * 100.0).clamp(0.0, 100.0)
+        }
+    }
+
+    fn goal_weight_for_action(&self, goal_id: Option<Uuid>) -> f64 {
+        goal_id
+            .and_then(|id| self.goal_manifold.get_goal(&id))
+            .map(|goal| goal.value_to_root.clamp(0.0, 1.0))
+            .unwrap_or(0.5)
+    }
+
+    fn score_action_alignment(&self, action: &sentinel_core::cognitive_state::Action) -> f64 {
+        let mut score = action.expected_value.clamp(0.0, 1.0);
+        let risk_penalty = 1.0 - action.metadata.risk_level.clamp(0.0, 1.0) * 0.5;
+        score *= risk_penalty;
+
+        match &action.action_type {
+            sentinel_core::cognitive_state::ActionType::RunTests { .. } => {
+                score = (score + 0.1).clamp(0.0, 1.0);
+            }
+            sentinel_core::cognitive_state::ActionType::RunCommand { command, .. } => {
+                if self.is_dangerous_command(command) {
+                    score *= 0.2;
+                }
+            }
+            sentinel_core::cognitive_state::ActionType::DeleteFile { path, .. } => {
+                if self.is_critical_file(path) {
+                    score *= 0.2;
+                }
+            }
+            _ => {}
+        }
+
+        score.clamp(0.0, 1.0)
     }
 
     /// Get plan statistics
@@ -636,7 +756,9 @@ mod tests {
 
         let simple_goal = Goal::builder()
             .description("Add simple function")
-            .complexity(sentinel_core::types::ProbabilityDistribution::normal(3.0, 1.0))
+            .complexity(sentinel_core::types::ProbabilityDistribution::normal(
+                3.0, 1.0,
+            ))
             .value_to_root(1.0)
             .success_criteria(vec![Predicate::AlwaysTrue])
             .build()
@@ -655,8 +777,12 @@ mod tests {
         let planner = HierarchicalPlanner::new(goal_manifold);
 
         let complex_goal = Goal::builder()
-            .description("Implement complex authentication system with JWT, OAuth, and session management")
-            .complexity(sentinel_core::types::ProbabilityDistribution::normal(8.5, 1.0))
+            .description(
+                "Implement complex authentication system with JWT, OAuth, and session management",
+            )
+            .complexity(sentinel_core::types::ProbabilityDistribution::normal(
+                8.5, 1.0,
+            ))
             .value_to_root(1.0)
             .success_criteria(vec![Predicate::AlwaysTrue])
             .build()
@@ -720,6 +846,74 @@ mod tests {
         assert!(matches!(
             validation,
             PlanValidation::CircularDependencies { .. }
+        ));
+    }
+
+    #[test]
+    fn test_validate_plan_low_alignment() {
+        let mut goal_manifold = create_test_goal_manifold();
+        goal_manifold.sensitivity = 0.95;
+        let planner = HierarchicalPlanner::new(goal_manifold);
+
+        let plan = ExecutionPlan {
+            root_task: "Low alignment task".to_string(),
+            sub_goals: vec![Uuid::new_v4()],
+            actions: vec![sentinel_core::cognitive_state::Action {
+                id: Uuid::new_v4(),
+                action_type: sentinel_core::cognitive_state::ActionType::RunCommand {
+                    command: "echo hi".to_string(),
+                    working_dir: std::path::PathBuf::from("."),
+                },
+                description: "Low expected value action".to_string(),
+                goal_id: None,
+                expected_value: 0.1,
+                created_at: chrono::Utc::now(),
+                dependencies: vec![],
+                metadata: Default::default(),
+            }],
+            complexity: 2.0,
+            estimated_duration_minutes: 2,
+        };
+
+        let validation = planner.validate_plan(&plan);
+        assert!(matches!(validation, PlanValidation::LowAlignment { .. }));
+    }
+
+    #[test]
+    fn test_validate_plan_invariant_violation_on_critical_delete() {
+        let mut goal_manifold = create_test_goal_manifold();
+        goal_manifold
+            .add_invariant(sentinel_core::goal_manifold::Invariant::critical(
+                "Cargo manifest must exist",
+                Predicate::FileExists(std::path::PathBuf::from("Cargo.toml")),
+            ))
+            .unwrap();
+        let planner = HierarchicalPlanner::new(goal_manifold);
+
+        let plan = ExecutionPlan {
+            root_task: "Dangerous delete".to_string(),
+            sub_goals: vec![],
+            actions: vec![sentinel_core::cognitive_state::Action {
+                id: Uuid::new_v4(),
+                action_type: sentinel_core::cognitive_state::ActionType::DeleteFile {
+                    path: std::path::PathBuf::from("Cargo.toml"),
+                    backup: false,
+                },
+                description: "Delete manifest".to_string(),
+                goal_id: None,
+                expected_value: 0.8,
+                created_at: chrono::Utc::now(),
+                dependencies: vec![],
+                metadata: Default::default(),
+            }],
+            complexity: 4.0,
+            estimated_duration_minutes: 1,
+        };
+
+        let validation = planner.validate_plan(&plan);
+        assert!(matches!(
+            validation,
+            PlanValidation::ViolatesInvariants { .. }
         ));
     }
 
