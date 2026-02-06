@@ -565,7 +565,7 @@ mod tests {
         let intent = Intent::new("Test project", Vec::<String>::new());
         let mut manifold = GoalManifold::new(intent);
 
-        let mut goal1 = Goal::builder()
+        let goal1 = Goal::builder()
             .description("Goal 1")
             .add_success_criterion(Predicate::AlwaysTrue)
             .build()

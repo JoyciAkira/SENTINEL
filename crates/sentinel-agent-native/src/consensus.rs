@@ -42,18 +42,13 @@
 
 use anyhow::{Context, Result};
 use chrono::Utc;
-use ed25519_dalek::{Signature, Signer, SigningKey, VerifyingKey};
+use ed25519_dalek::Signer;
 use libp2p::{
     gossipsub,
-    identity::Keypair as Libp2pKeypair,
     swarm::{NetworkBehaviour, Swarm},
     PeerId,
 };
-use sentinel_core::federation::{
-    consensus::Proposal,
-    gossip::{GossipMessage, GossipPayload},
-    Severity, ThreatAlert, ThreatType,
-};
+use sentinel_core::federation::ThreatAlert;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum NetworkMessage {

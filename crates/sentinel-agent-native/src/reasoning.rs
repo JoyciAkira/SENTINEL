@@ -60,10 +60,10 @@
 //! └─────────────────────────────────────┘
 //! ```
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use sentinel_core::{
     cognitive_state::{Action, ActionType},
-    goal_manifold::{Goal, predicate::Predicate},
+    goal_manifold::Goal,
     Uuid,
 };
 use crate::consensus::ConsensusQueryResult;
@@ -1073,7 +1073,7 @@ struct ScoredSolution {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use sentinel_core::types::{ProbabilityDistribution, GoalStatus};
+    use sentinel_core::goal_manifold::predicate::Predicate;
 
     #[test]
     fn test_structured_reasoner_initialization() {

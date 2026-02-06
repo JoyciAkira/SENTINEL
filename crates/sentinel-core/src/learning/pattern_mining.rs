@@ -2,7 +2,7 @@
 //!
 //! Estrattore di pattern di successo e deviazioni dai progetti completati.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use uuid::Uuid;
 use crate::learning::types::{RecordedAction, SuccessPattern, DeviationPattern, CompletedProject, GoalType, ActionType, DeviationEvent};
 

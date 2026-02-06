@@ -13,8 +13,6 @@ pub mod types;
 use crate::error::Result;
 use crate::goal_manifold::goal::Goal;
 use std::sync::Arc;
-use uuid::Uuid;
-use crate::learning::types::GoalType;
 
 // Re-exports
 pub use classifier::DeviationClassifier;

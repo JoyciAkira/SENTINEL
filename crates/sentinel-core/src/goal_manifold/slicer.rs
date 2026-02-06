@@ -5,7 +5,7 @@
 
 use crate::error::Result;
 use crate::goal_manifold::goal::Goal;
-use crate::goal_manifold::atomic::{AtomicContract, InputSpec, OutputSpec};
+use crate::goal_manifold::atomic::AtomicContract;
 use uuid::Uuid;
 
 pub struct AtomicSlicer;

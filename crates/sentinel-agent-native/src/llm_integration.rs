@@ -24,7 +24,6 @@
 use anyhow::{Context, Result};
 use sentinel_core::{
     alignment::AlignmentField,
-    cognitive_state::{Action, ActionDecision, ActionResult, ActionType},
     goal_manifold::GoalManifold,
     Uuid,
 };

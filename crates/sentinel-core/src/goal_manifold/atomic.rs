@@ -3,7 +3,6 @@
 //! This module defines the formal contracts for "Atomic Truth" execution.
 
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 /// A formal contract for an atomic coding task.
 /// 

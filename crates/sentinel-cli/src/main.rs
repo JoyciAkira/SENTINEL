@@ -1,4 +1,5 @@
 #![recursion_limit = "256"]
+#![allow(dead_code, unused_variables)]
 
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;

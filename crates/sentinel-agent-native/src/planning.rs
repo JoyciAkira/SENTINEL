@@ -41,7 +41,7 @@
 //! └─────────────────────────────────────┘
 //! ```
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use sentinel_core::{
     goal_manifold::predicate::PredicateState,
     goal_manifold::{predicate::Predicate, Goal, GoalManifold, Invariant, InvariantSeverity},

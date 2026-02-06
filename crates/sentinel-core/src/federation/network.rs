@@ -3,14 +3,13 @@
 //! Gestisce lo swarm di libp2p, il routing Kademlia e il gossipsub
 //! per la distribuzione dell'intelligenza.
 
-use crate::federation::{NodeIdentity, gossip::{GossipMessage, GossipPayload}, consensus::{ConsensusEngine, Proposal, Vote}};
+use crate::federation::{NodeIdentity, gossip::{GossipMessage, GossipPayload}, consensus::ConsensusEngine};
 use libp2p::{
     gossipsub, kad, identify, noise, tcp, yamux,
     swarm::{NetworkBehaviour, SwarmEvent},
     PeerId,
 };
 use std::error::Error;
-use std::time::Duration;
 use futures::StreamExt;
 
 #[derive(NetworkBehaviour)]

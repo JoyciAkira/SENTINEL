@@ -57,9 +57,7 @@
 //! ```
 
 use anyhow::{Context, Result};
-use std::collections::HashMap;
-use std::path::Path;
-use tree_sitter::{Node, Parser, Tree, TreeCursor};
+use tree_sitter::{Node, Parser, Tree};
 
 /// Tree-Sitter based code generator
 pub struct TreeSitterGenerator {
@@ -301,7 +299,7 @@ impl TreeSitterGenerator {
             .set_language(tree_sitter_rust::language())
             .unwrap();
 
-        let mut tree = rust_parser
+        let tree = rust_parser
             .parse(&content, None)
             .context("Failed to parse file")?;
 
@@ -708,7 +706,7 @@ impl TreeSitterGenerator {
         let mut parser = Parser::new();
         parser.set_language(tree_sitter_rust::language()).unwrap();
 
-        let mut tree = parser
+        let tree = parser
             .parse(&changes.new_content, None)
             .context("Failed to parse replacement code")?;
 
@@ -761,7 +759,7 @@ impl TreeSitterGenerator {
         let mut errors = Vec::new();
 
         // Parse code
-        let mut tree = parser.parse(code, None).context("Failed to parse code")?;
+        let tree = parser.parse(code, None).context("Failed to parse code")?;
 
         // Check for syntax errors
         let root_node = tree.root_node();

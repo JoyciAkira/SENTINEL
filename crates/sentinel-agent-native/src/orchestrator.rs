@@ -53,15 +53,13 @@
 //!     Unified Execution Report
 //! ```
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use sentinel_core::{
-    cognitive_state::{Action, ActionDecision, ActionResult, ActionType},
-    goal_manifold::{predicate::Predicate, Goal},
+    goal_manifold::Goal,
     types::Timestamp,
     Uuid,
 };
 use std::collections::{HashMap, HashSet};
-use std::sync::Arc;
 use tokio::task::JoinSet;
 
 /// Agent type specialization
@@ -1065,7 +1063,8 @@ impl ConflictDetector {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use sentinel_core::types::{GoalStatus, ProbabilityDistribution};
+    use sentinel_core::goal_manifold::predicate::Predicate;
+    use sentinel_core::types::ProbabilityDistribution;
 
     #[test]
     fn test_agent_orchestrator_initialization() {

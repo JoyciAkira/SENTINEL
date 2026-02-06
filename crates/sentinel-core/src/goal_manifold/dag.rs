@@ -493,7 +493,7 @@ mod tests {
     fn test_dependencies_satisfied() {
         let mut dag = GoalDag::new();
 
-        let mut goal1 = create_test_goal("Goal 1");
+        let goal1 = create_test_goal("Goal 1");
         let goal2 = create_test_goal("Goal 2");
         let id1 = goal1.id;
         let id2 = goal2.id;

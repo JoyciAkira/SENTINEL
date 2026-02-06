@@ -71,11 +71,10 @@
 #![recursion_limit = "256"]
 #![deny(unsafe_code)]
 #![warn(
-    missing_docs,
     rust_2018_idioms,
-    missing_debug_implementations,
     clippy::all
 )]
+#![allow(dead_code, unused_variables)]
 
 pub mod alignment;
 pub mod architect;

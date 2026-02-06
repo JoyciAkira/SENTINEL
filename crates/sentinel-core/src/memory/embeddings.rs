@@ -201,7 +201,7 @@ impl CandleEmbedder {
     }
 
     fn embed_batch(&self, texts: &[String]) -> Result<Vec<Vec<f32>>> {
-        let mut tokenizer = self.tokenizer.lock().unwrap();
+        let tokenizer = self.tokenizer.lock().unwrap();
         let tokens = tokenizer
             .encode_batch(texts.to_vec(), true)
             .map_err(E::msg)?;

@@ -27,6 +27,14 @@
 //! 5. **Zero-Latency Validation**: Alignment is built-in, not an after-thought
 //! 6. **Multi-Agent Orchestration**: Orchestrates sub-agents for parallel work
 
+#![allow(
+    dead_code,
+    unused_imports,
+    unused_mut,
+    unused_variables,
+    private_interfaces
+)]
+
 pub mod codegen;
 pub mod consensus;
 pub mod context;
@@ -38,11 +46,10 @@ pub mod planning;
 pub mod providers;
 pub mod reasoning;
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use sentinel_core::{
     alignment::{AlignmentField, ProjectState},
-    cognitive_state::{Action, ActionDecision, ActionType, CognitiveState},
-    federation::{Severity, ThreatAlert, ThreatType},
+    cognitive_state::{Action, ActionType, CognitiveState},
     goal_manifold::{predicate::Predicate, Goal, GoalManifold, Intent},
     learning::{DeviationPattern, KnowledgeBase, LearningEngine},
     memory::MemoryManifold,
@@ -122,7 +129,7 @@ impl SentinelAgent {
         tracing::info!("Initializing Sentinel Native Agent");
 
         // Create Goal Manifold (Layer 1) - The immutable truth
-        let mut goal_manifold = GoalManifold::new(intent.clone());
+        let goal_manifold = GoalManifold::new(intent.clone());
 
         // Create Knowledge Base (Layer 5)
         let knowledge_base = std::sync::Arc::new(KnowledgeBase::new());
@@ -303,7 +310,7 @@ impl SentinelAgent {
         }
 
         // Decompose task into sub-goals using Goal DAG
-        let mut planner = self.planner.lock().await;
+        let planner = self.planner.lock().await;
         let sub_goals = planner.decompose_goals(&task_analysis.goals)?;
         drop(planner); // Release lock
 

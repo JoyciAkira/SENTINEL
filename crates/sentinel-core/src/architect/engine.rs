@@ -8,7 +8,6 @@ use crate::goal_manifold::goal::Goal;
 use crate::goal_manifold::Intent;
 use crate::error::Result;
 use crate::types::ProbabilityDistribution;
-use uuid::Uuid;
 use crate::memory::embeddings::Embedder;
 
 /// Una proposta architettonica generata da Sentinel
