@@ -480,6 +480,96 @@
   font-size: 12px;
 }
 
+.sentinel-policy-banner {
+  border: 1px solid var(--sentinel-border);
+  border-radius: 12px;
+  padding: 10px;
+  display: grid;
+  gap: 4px;
+  font-size: 12px;
+}
+
+.sentinel-policy-banner strong {
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 10px;
+}
+
+.sentinel-policy-banner--ok {
+  border-color: color-mix(in oklab, var(--sentinel-success) 55%, var(--sentinel-border));
+  background: color-mix(in oklab, var(--sentinel-success) 10%, transparent);
+}
+
+.sentinel-policy-banner--error {
+  border-color: color-mix(in oklab, var(--sentinel-danger) 55%, var(--sentinel-border));
+  background: color-mix(in oklab, var(--sentinel-danger) 10%, transparent);
+}
+
+.sentinel-panel-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.sentinel-policy-card {
+  border: 1px solid var(--sentinel-border);
+  border-radius: 12px;
+  padding: 12px;
+  display: grid;
+  gap: 8px;
+  background: color-mix(in oklab, var(--sentinel-surface) 90%, transparent);
+}
+
+.sentinel-policy-card header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.sentinel-policy-card h3 {
+  margin: 0;
+  font-size: 13px;
+}
+
+.sentinel-policy-card p {
+  margin: 0;
+  font-size: 12px;
+  color: var(--sentinel-muted);
+}
+
+.sentinel-inline-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.sentinel-input {
+  border: 1px solid var(--sentinel-border);
+  border-radius: 8px;
+  background: color-mix(in oklab, var(--sentinel-surface-2) 88%, transparent);
+  color: var(--sentinel-ink);
+  font-size: 12px;
+  padding: 7px 9px;
+}
+
+.sentinel-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--sentinel-muted);
+}
+
+.sentinel-violations {
+  margin: 0;
+  padding-left: 16px;
+  display: grid;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--sentinel-danger);
+}
+
 /* ScrollArea thumb for VS Code themes */
 [data-slot="scroll-area-thumb"] {
   background-color: var(--vscode-scrollbarSlider-background);
@@ -555,6 +645,7 @@
 
   .sentinel-grid,
   .sentinel-grid--forge,
+  .sentinel-panel-grid,
   .sentinel-settings-grid,
   .sentinel-metrics--network {
     grid-template-columns: minmax(0, 1fr);

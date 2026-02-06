@@ -220,6 +220,42 @@ async fn handle_request(req: McpRequest, id: Value) -> McpResponse {
                         "inputSchema": { "type": "object", "properties": {} }
                     },
                     {
+                        "name": "governance_status",
+                        "description": "Restituisce stato governance corrente (dependencies/frameworks/endpoints/ports + pending proposal)",
+                        "inputSchema": { "type": "object", "properties": {} }
+                    },
+                    {
+                        "name": "governance_approve",
+                        "description": "Approva la proposal governance pending e aggiorna il manifold",
+                        "inputSchema": {
+                            "type": "object",
+                            "properties": {
+                                "note": { "type": "string" }
+                            }
+                        }
+                    },
+                    {
+                        "name": "governance_reject",
+                        "description": "Rifiuta la proposal governance pending e aggiorna il manifold",
+                        "inputSchema": {
+                            "type": "object",
+                            "properties": {
+                                "reason": { "type": "string" }
+                            }
+                        }
+                    },
+                    {
+                        "name": "governance_seed",
+                        "description": "Genera preview/applica baseline governance dal workspace osservato deterministicamente",
+                        "inputSchema": {
+                            "type": "object",
+                            "properties": {
+                                "apply": { "type": "boolean" },
+                                "lock_required": { "type": "boolean" }
+                            }
+                        }
+                    },
+                    {
                         "name": "safe_write",
                         "description": "Esegue uno scan di sicurezza Layer 7 e valida l'allineamento prima di procedere",
                         "inputSchema": {
@@ -925,6 +961,137 @@ async fn handle_tool_call(params: Option<Value>) -> Option<Value> {
             )
         }
 
+        "governance_status" => {
+            let result_json = match get_manifold() {
+                Ok(manifold) => serde_json::json!({
+                    "required_dependencies": manifold.governance.required_dependencies,
+                    "allowed_dependencies": manifold.governance.allowed_dependencies,
+                    "required_frameworks": manifold.governance.required_frameworks,
+                    "allowed_frameworks": manifold.governance.allowed_frameworks,
+                    "allowed_endpoints": manifold.governance.allowed_endpoints,
+                    "allowed_ports": manifold.governance.allowed_ports,
+                    "pending_proposal": manifold.governance.pending_proposal,
+                    "history_size": manifold.governance.history.len()
+                }),
+                Err(e) => serde_json::json!({ "error": e }),
+            };
+            Some(
+                serde_json::json!({ "content": [{ "type": "text", "text": result_json.to_string() }] }),
+            )
+        }
+
+        "governance_approve" => {
+            let note = arguments
+                .and_then(|a| a.get("note"))
+                .and_then(|v| v.as_str())
+                .map(|v| v.to_string())
+                .filter(|v| !v.trim().is_empty());
+
+            let result_json = match get_manifold() {
+                Ok(mut manifold) => {
+                    match manifold.approve_pending_governance_proposal(note.clone()) {
+                        Ok(id) => match save_manifold(&manifold) {
+                            Ok(_) => serde_json::json!({
+                                "ok": true,
+                                "proposal_id": id,
+                                "message": format!("Governance proposal approved: {}", id)
+                            }),
+                            Err(e) => serde_json::json!({ "ok": false, "error": e }),
+                        },
+                        Err(e) => serde_json::json!({ "ok": false, "error": e.to_string() }),
+                    }
+                }
+                Err(e) => serde_json::json!({ "ok": false, "error": e }),
+            };
+            Some(
+                serde_json::json!({ "content": [{ "type": "text", "text": result_json.to_string() }] }),
+            )
+        }
+
+        "governance_reject" => {
+            let reason = arguments
+                .and_then(|a| a.get("reason"))
+                .and_then(|v| v.as_str())
+                .unwrap_or("Rejected from MCP")
+                .to_string();
+            let result_json = match get_manifold() {
+                Ok(mut manifold) => {
+                    match manifold.reject_pending_governance_proposal(Some(reason.clone())) {
+                        Ok(id) => match save_manifold(&manifold) {
+                            Ok(_) => serde_json::json!({
+                                "ok": true,
+                                "proposal_id": id,
+                                "message": format!("Governance proposal rejected: {}", id)
+                            }),
+                            Err(e) => serde_json::json!({ "ok": false, "error": e }),
+                        },
+                        Err(e) => serde_json::json!({ "ok": false, "error": e.to_string() }),
+                    }
+                }
+                Err(e) => serde_json::json!({ "ok": false, "error": e }),
+            };
+            Some(
+                serde_json::json!({ "content": [{ "type": "text", "text": result_json.to_string() }] }),
+            )
+        }
+
+        "governance_seed" => {
+            let apply = arguments
+                .and_then(|a| a.get("apply"))
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false);
+            let lock_required = arguments
+                .and_then(|a| a.get("lock_required"))
+                .and_then(|v| v.as_bool())
+                .unwrap_or(true);
+
+            let result_json = match get_manifold() {
+                Ok(mut manifold) => {
+                    let root = find_manifold_path()
+                        .and_then(|path| path.parent().map(std::path::Path::to_path_buf))
+                        .unwrap_or_else(|| std::path::PathBuf::from("."));
+                    match sentinel_agent_native::observe_workspace_governance(&root) {
+                        Ok(observed) => {
+                            let diff = governance_seed_diff(&manifold, &observed);
+                            let mut payload = serde_json::json!({
+                                "ok": true,
+                                "apply": apply,
+                                "lock_required": lock_required,
+                                "observed": observed,
+                                "diff": diff,
+                            });
+                            if apply {
+                                manifold.apply_governance_seed(
+                                    observed.dependencies.clone(),
+                                    observed.frameworks.clone(),
+                                    observed.endpoints.clone(),
+                                    observed.ports.clone(),
+                                    lock_required,
+                                );
+                                match save_manifold(&manifold) {
+                                    Ok(_) => {
+                                        payload["message"] = serde_json::json!(
+                                            "Governance baseline seeded and persisted."
+                                        );
+                                    }
+                                    Err(e) => {
+                                        payload["ok"] = serde_json::json!(false);
+                                        payload["error"] = serde_json::json!(e);
+                                    }
+                                }
+                            }
+                            payload
+                        }
+                        Err(e) => serde_json::json!({ "ok": false, "error": e.to_string() }),
+                    }
+                }
+                Err(e) => serde_json::json!({ "ok": false, "error": e }),
+            };
+            Some(
+                serde_json::json!({ "content": [{ "type": "text", "text": result_json.to_string() }] }),
+            )
+        }
+
         "safe_write" => {
             let content = arguments
                 .and_then(|a| a.get("content"))
@@ -1205,4 +1372,46 @@ async fn handle_tool_call(params: Option<Value>) -> Option<Value> {
             serde_json::json!({ "isError": true, "content": [{ "type": "text", "text": "Tool non supportato." }] }),
         ),
     }
+}
+
+fn governance_seed_diff(
+    manifold: &GoalManifold,
+    observed: &sentinel_agent_native::GovernanceObservation,
+) -> serde_json::Value {
+    fn set_of<T: Clone + Ord>(values: &[T]) -> std::collections::BTreeSet<T> {
+        values.iter().cloned().collect()
+    }
+
+    let current_deps = set_of(&manifold.governance.allowed_dependencies);
+    let next_deps = set_of(&observed.dependencies);
+    let current_frameworks = set_of(&manifold.governance.allowed_frameworks);
+    let next_frameworks = set_of(&observed.frameworks);
+    let current_endpoints: std::collections::BTreeSet<String> = manifold
+        .governance
+        .allowed_endpoints
+        .values()
+        .cloned()
+        .collect();
+    let next_endpoints = set_of(&observed.endpoints);
+    let current_ports = set_of(&manifold.governance.allowed_ports);
+    let next_ports = set_of(&observed.ports);
+
+    serde_json::json!({
+        "dependencies": {
+            "add": next_deps.difference(&current_deps).cloned().collect::<Vec<_>>(),
+            "remove": current_deps.difference(&next_deps).cloned().collect::<Vec<_>>()
+        },
+        "frameworks": {
+            "add": next_frameworks.difference(&current_frameworks).cloned().collect::<Vec<_>>(),
+            "remove": current_frameworks.difference(&next_frameworks).cloned().collect::<Vec<_>>()
+        },
+        "endpoints": {
+            "add": next_endpoints.difference(&current_endpoints).cloned().collect::<Vec<_>>(),
+            "remove": current_endpoints.difference(&next_endpoints).cloned().collect::<Vec<_>>()
+        },
+        "ports": {
+            "add": next_ports.difference(&current_ports).cloned().collect::<Vec<_>>(),
+            "remove": current_ports.difference(&next_ports).cloned().collect::<Vec<_>>()
+        }
+    })
 }

@@ -66,12 +66,20 @@ export default function App() {
   const alignment = useStore((s) => s.alignment);
   const goals = useStore((s) => s.goals);
   const messages = useStore((s) => s.messages);
+  const reliability = useStore((s) => s.reliability);
+  const reliabilityThresholds = useStore((s) => s.reliabilityThresholds);
+  const reliabilitySlo = useStore((s) => s.reliabilitySlo);
+  const governance = useStore((s) => s.governance);
+  const policyAction = useStore((s) => s.policyAction);
 
   const [activePage, setActivePage] = useState<PageId>("command");
   const [selectedGoal, setSelectedGoal] = useState<Goal | null>(null);
+  const [rejectReason, setRejectReason] = useState("Policy conflict with current project direction");
+  const [lockRequiredSeed, setLockRequiredSeed] = useState(true);
 
   useEffect(() => {
     vscodeApi.postMessage({ type: "webviewReady" });
+    vscodeApi.postMessage({ type: "refreshRuntimePolicies" });
   }, [vscodeApi]);
 
   const navItems = [
@@ -120,6 +128,10 @@ export default function App() {
     () => navItems.find((item) => item.id === activePage)?.label ?? "Command Center",
     [activePage],
   );
+
+  const requestRuntimeRefresh = () => {
+    vscodeApi.postMessage({ type: "refreshRuntimePolicies" });
+  };
 
   return (
     <div className="sentinel-shell">
@@ -389,21 +401,139 @@ export default function App() {
                   </CardTitle>
                   <CardDescription>Current execution guardrails and user-supervision contract.</CardDescription>
                 </CardHeader>
-                <CardContent className="sentinel-settings-grid">
-                  <div>
-                    <ShieldCheck className="size-4" />
-                    <p>Action Gate</p>
-                    <small>Mandatory approval for sensitive file operations.</small>
+                <CardContent className="space-y-4">
+                  {policyAction && (
+                    <div className={cn("sentinel-policy-banner", policyAction.ok ? "sentinel-policy-banner--ok" : "sentinel-policy-banner--error")}>
+                      <strong>{policyAction.kind}</strong>
+                      <span>{policyAction.message}</span>
+                    </div>
+                  )}
+
+                  <div className="sentinel-settings-grid">
+                    <div>
+                      <ShieldCheck className="size-4" />
+                      <p>Action Gate</p>
+                      <small>Mandatory approval for sensitive file operations.</small>
+                    </div>
+                    <div>
+                      <ShieldAlert className="size-4" />
+                      <p>Governance Lock</p>
+                      <small>Deps/framework/endpoints changes require explicit approval.</small>
+                    </div>
+                    <div>
+                      <CheckCircle2 className="size-4" />
+                      <p>Reliability Thresholds</p>
+                      <small>Hard stop when quality metrics drop below policy.</small>
+                    </div>
                   </div>
-                  <div>
-                    <ShieldAlert className="size-4" />
-                    <p>Governance Lock</p>
-                    <small>Deps/framework/endpoints changes require explicit approval.</small>
-                  </div>
-                  <div>
-                    <CheckCircle2 className="size-4" />
-                    <p>Reliability Thresholds</p>
-                    <small>Hard stop when quality metrics drop below policy.</small>
+
+                  <div className="sentinel-panel-grid">
+                    <section className="sentinel-policy-card">
+                      <header>
+                        <h3>Governance Policy</h3>
+                        <Button size="xs" variant="outline" onClick={requestRuntimeRefresh}>Refresh</Button>
+                      </header>
+                      <p>
+                        Allowed deps: <strong>{governance?.allowed_dependencies?.length ?? 0}</strong> | frameworks:{" "}
+                        <strong>{governance?.allowed_frameworks?.length ?? 0}</strong> | ports:{" "}
+                        <strong>{governance?.allowed_ports?.length ?? 0}</strong>
+                      </p>
+                      <p>
+                        Pending proposal:{" "}
+                        <strong>{governance?.pending_proposal?.id ? governance.pending_proposal.id.slice(0, 8) : "none"}</strong>
+                      </p>
+
+                      <div className="sentinel-inline-actions">
+                        <Button
+                          size="xs"
+                          onClick={() => vscodeApi.postMessage({ type: "governanceApprove", note: "Approved from Runtime Controls" })}
+                          disabled={!governance?.pending_proposal}
+                        >
+                          Approve
+                        </Button>
+                        <Button
+                          size="xs"
+                          variant="destructive"
+                          onClick={() => vscodeApi.postMessage({ type: "governanceReject", reason: rejectReason })}
+                          disabled={!governance?.pending_proposal}
+                        >
+                          Reject
+                        </Button>
+                      </div>
+                      <input
+                        className="sentinel-input"
+                        value={rejectReason}
+                        onChange={(event) => setRejectReason(event.target.value)}
+                        placeholder="Reject reason"
+                      />
+
+                      <div className="sentinel-inline-actions">
+                        <Button
+                          size="xs"
+                          variant="outline"
+                          onClick={() =>
+                            vscodeApi.postMessage({
+                              type: "governanceSeed",
+                              apply: false,
+                              lockRequired: lockRequiredSeed,
+                            })
+                          }
+                        >
+                          Seed Preview
+                        </Button>
+                        <Button
+                          size="xs"
+                          onClick={() =>
+                            vscodeApi.postMessage({
+                              type: "governanceSeed",
+                              apply: true,
+                              lockRequired: lockRequiredSeed,
+                            })
+                          }
+                        >
+                          Apply Seed
+                        </Button>
+                      </div>
+                      <label className="sentinel-toggle">
+                        <input
+                          type="checkbox"
+                          checked={lockRequiredSeed}
+                          onChange={(event) => setLockRequiredSeed(event.target.checked)}
+                        />
+                        <span>Lock required = allowed on seed apply</span>
+                      </label>
+                    </section>
+
+                    <section className="sentinel-policy-card">
+                      <header>
+                        <h3>Reliability SLO</h3>
+                        <Badge variant={reliabilitySlo?.healthy ? "outline" : "destructive"}>
+                          {reliabilitySlo?.healthy ? "Healthy" : "Violated"}
+                        </Badge>
+                      </header>
+                      <p>
+                        Success: <strong>{((reliability?.task_success_rate ?? 0) * 100).toFixed(1)}%</strong> | No regression:{" "}
+                        <strong>{((reliability?.no_regression_rate ?? 0) * 100).toFixed(1)}%</strong>
+                      </p>
+                      <p>
+                        Rollback: <strong>{((reliability?.rollback_rate ?? 0) * 100).toFixed(2)}%</strong> | MTTR:{" "}
+                        <strong>{reliability?.avg_time_to_recover_ms ?? 0}ms</strong>
+                      </p>
+                      <p>
+                        Thresholds: success ≥{" "}
+                        <strong>{(((reliabilityThresholds?.min_task_success_rate ?? 0) as number) * 100).toFixed(0)}%</strong>, rollback ≤{" "}
+                        <strong>{(((reliabilityThresholds?.max_rollback_rate ?? 0) as number) * 100).toFixed(1)}%</strong>
+                      </p>
+                      {reliabilitySlo?.violations?.length ? (
+                        <ul className="sentinel-violations">
+                          {reliabilitySlo.violations.map((violation) => (
+                            <li key={violation}>{violation}</li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="sentinel-empty">No reliability violations.</p>
+                      )}
+                    </section>
                   </div>
                 </CardContent>
               </Card>

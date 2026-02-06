@@ -17,6 +17,9 @@ export function useMCPMessages(vscodeApi: VSCodeAPI): void {
     const updateLastAssistant = useStore((s) => s.updateLastAssistant);
     const appendToolCall = useStore((s) => s.appendToolCall);
     const setAlignment = useStore((s) => s.setAlignment);
+    const setReliability = useStore((s) => s.setReliability);
+    const setGovernance = useStore((s) => s.setGovernance);
+    const setPolicyAction = useStore((s) => s.setPolicyAction);
     const setGoals = useStore((s) => s.setGoals);
 
     useEffect(() => {
@@ -70,10 +73,41 @@ export function useMCPMessages(vscodeApi: VSCodeAPI): void {
                 case 'goalsUpdate':
                     setGoals(msg.goals ?? []);
                     break;
+
+                case 'reliabilityUpdate':
+                    if (msg.reliability && msg.reliability_thresholds && msg.reliability_slo) {
+                        setReliability(msg.reliability, msg.reliability_thresholds, msg.reliability_slo);
+                    }
+                    break;
+
+                case 'governanceUpdate':
+                    if (msg.governance) {
+                        setGovernance(msg.governance);
+                    }
+                    break;
+
+                case 'policyActionResult':
+                    setPolicyAction({
+                        kind: msg.kind ?? 'unknown',
+                        ok: Boolean(msg.ok),
+                        message: msg.message ?? '',
+                        timestamp: Date.now(),
+                    });
+                    break;
             }
         };
 
         window.addEventListener('message', handler);
         return () => window.removeEventListener('message', handler);
-    }, [setConnected, addMessage, updateLastAssistant, appendToolCall, setAlignment, setGoals]);
+    }, [
+        setConnected,
+        addMessage,
+        updateLastAssistant,
+        appendToolCall,
+        setAlignment,
+        setReliability,
+        setGovernance,
+        setPolicyAction,
+        setGoals,
+    ]);
 }

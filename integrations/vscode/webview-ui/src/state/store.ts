@@ -5,6 +5,11 @@ export const useStore = create<AppState>((set) => ({
     connected: false,
     messages: [],
     alignment: null,
+    reliability: null,
+    reliabilityThresholds: null,
+    reliabilitySlo: null,
+    governance: null,
+    policyAction: null,
     goals: [],
     goalsCollapsed: true,
     inputText: '',
@@ -46,6 +51,13 @@ export const useStore = create<AppState>((set) => ({
         }),
 
     setAlignment: (alignment: AlignmentState) => set({ alignment }),
+
+    setReliability: (reliability, reliabilityThresholds, reliabilitySlo) =>
+        set({ reliability, reliabilityThresholds, reliabilitySlo }),
+
+    setGovernance: (governance) => set({ governance }),
+
+    setPolicyAction: (policyAction) => set({ policyAction }),
 
     setGoals: (goals: GoalNodeState[]) => set({ goals }),
 

@@ -47,11 +47,13 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
     if (this.client.connected) {
       this.postMessage({ type: "connected" });
       void this.refreshGoalSnapshot();
+      void this.refreshRuntimePolicySnapshot();
     }
 
     this.client.on("connected", () => {
       this.postMessage({ type: "connected" });
       void this.refreshGoalSnapshot();
+      void this.refreshRuntimePolicySnapshot();
     });
 
     this.client.on("disconnected", () => {
@@ -134,10 +136,27 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
         await this.refreshGoalSnapshot();
         break;
 
+      case "refreshRuntimePolicies":
+        await this.refreshRuntimePolicySnapshot();
+        break;
+
+      case "governanceApprove":
+        await this.handleGovernanceApprove(msg.note);
+        break;
+
+      case "governanceReject":
+        await this.handleGovernanceReject(msg.reason);
+        break;
+
+      case "governanceSeed":
+        await this.handleGovernanceSeed(Boolean(msg.apply), msg.lockRequired !== false);
+        break;
+
       case "webviewReady":
         if (this.client.connected) {
           this.postMessage({ type: "connected" });
           void this.refreshGoalSnapshot();
+          void this.refreshRuntimePolicySnapshot();
         } else {
           this.postMessage({ type: "disconnected" });
         }
@@ -228,6 +247,7 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
 
       // After chat, refresh goals in background to keep UI synced
       void this.refreshGoalSnapshot();
+      void this.refreshRuntimePolicySnapshot();
       
     } catch (err: any) {
       this.outputChannel.appendLine(`Chat tool error: ${err.message}`);
@@ -272,6 +292,127 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
       this.updateGoals(goals);
     } catch (err: any) {
       this.outputChannel.appendLine(`Failed to refresh goals: ${err.message}`);
+    }
+  }
+
+  private async refreshRuntimePolicySnapshot(): Promise<void> {
+    if (!this.client.connected) {
+      return;
+    }
+
+    try {
+      const reliability = (await this.client.callTool("get_reliability", {})) as any;
+      if (reliability && !reliability.error) {
+        this.postMessage({
+          type: "reliabilityUpdate",
+          reliability: reliability.reliability,
+          reliability_thresholds: reliability.reliability_thresholds,
+          reliability_slo: reliability.reliability_slo,
+        });
+      }
+    } catch (err: any) {
+      this.outputChannel.appendLine(`Failed to refresh reliability: ${err.message}`);
+    }
+
+    try {
+      const governance = (await this.client.callTool("governance_status", {})) as any;
+      if (governance && !governance.error) {
+        this.postMessage({
+          type: "governanceUpdate",
+          governance,
+        });
+      }
+    } catch (err: any) {
+      this.outputChannel.appendLine(`Failed to refresh governance: ${err.message}`);
+    }
+  }
+
+  private async handleGovernanceApprove(note?: string): Promise<void> {
+    if (!this.client.connected) return;
+    try {
+      const result = (await this.client.callTool("governance_approve", {
+        note: typeof note === "string" ? note : "",
+      })) as any;
+      this.postMessage({
+        type: "policyActionResult",
+        kind: "governance_approve",
+        ok: true,
+        message: result?.message ?? "Governance proposal approved.",
+      });
+      await this.refreshRuntimePolicySnapshot();
+    } catch (err: any) {
+      this.postMessage({
+        type: "policyActionResult",
+        kind: "governance_approve",
+        ok: false,
+        message: err.message,
+      });
+    }
+  }
+
+  private async handleGovernanceReject(reason?: string): Promise<void> {
+    if (!this.client.connected) return;
+    try {
+      const result = (await this.client.callTool("governance_reject", {
+        reason: typeof reason === "string" ? reason : "Rejected from VSCode UI",
+      })) as any;
+      this.postMessage({
+        type: "policyActionResult",
+        kind: "governance_reject",
+        ok: true,
+        message: result?.message ?? "Governance proposal rejected.",
+      });
+      await this.refreshRuntimePolicySnapshot();
+    } catch (err: any) {
+      this.postMessage({
+        type: "policyActionResult",
+        kind: "governance_reject",
+        ok: false,
+        message: err.message,
+      });
+    }
+  }
+
+  private async handleGovernanceSeed(
+    apply: boolean,
+    lockRequired: boolean,
+  ): Promise<void> {
+    if (!this.client.connected) return;
+    try {
+      const result = (await this.client.callTool("governance_seed", {
+        apply,
+        lock_required: lockRequired,
+      })) as any;
+
+      const message = apply
+        ? result?.message ?? "Governance baseline updated."
+        : `Preview generated: deps+${result?.diff?.dependencies?.add?.length ?? 0} deps-${result?.diff?.dependencies?.remove?.length ?? 0}`;
+      this.postMessage({
+        type: "policyActionResult",
+        kind: "governance_seed",
+        ok: true,
+        message,
+      });
+
+      if (apply) {
+        await this.refreshRuntimePolicySnapshot();
+      } else {
+        this.postMessage({
+          type: "governanceUpdate",
+          governance: {
+            ...(await this.client.callTool("governance_status", {})),
+            seed_preview: result?.diff ?? null,
+            observed: result?.observed ?? null,
+          },
+        });
+      }
+    } catch (err: any) {
+      this.postMessage({
+        type: "policyActionResult",
+        kind: "governance_seed",
+        ok: false,
+        message: err.message,
+      });
     }
   }
 }
