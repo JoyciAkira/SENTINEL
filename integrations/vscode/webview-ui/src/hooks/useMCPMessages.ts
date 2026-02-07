@@ -20,6 +20,8 @@ export function useMCPMessages(vscodeApi: VSCodeAPI): void {
     const setReliability = useStore((s) => s.setReliability);
     const setGovernance = useStore((s) => s.setGovernance);
     const setPolicyAction = useStore((s) => s.setPolicyAction);
+    const addTimelineEvent = useStore((s) => s.addTimelineEvent);
+    const clearTimeline = useStore((s) => s.clearTimeline);
     const setGoals = useStore((s) => s.setGoals);
 
     useEffect(() => {
@@ -34,6 +36,21 @@ export function useMCPMessages(vscodeApi: VSCodeAPI): void {
 
                 case 'disconnected':
                     setConnected(false);
+                    break;
+
+                case 'timelineReset':
+                    clearTimeline();
+                    break;
+
+                case 'timelineEvent':
+                    addTimelineEvent({
+                        id: msg.id ?? crypto.randomUUID(),
+                        turnId: msg.turnId,
+                        stage: msg.stage ?? 'result',
+                        title: msg.title ?? 'Timeline event',
+                        detail: msg.detail,
+                        timestamp: msg.timestamp ?? Date.now(),
+                    });
                     break;
 
                 case 'chatResponse':
@@ -136,6 +153,8 @@ export function useMCPMessages(vscodeApi: VSCodeAPI): void {
         setReliability,
         setGovernance,
         setPolicyAction,
+        addTimelineEvent,
+        clearTimeline,
         setGoals,
     ]);
 }

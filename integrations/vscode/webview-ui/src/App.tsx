@@ -16,6 +16,9 @@ import {
   ShieldCheck,
   Target,
   Wrench,
+  Play,
+  Pause,
+  RotateCcw,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -71,16 +74,33 @@ export default function App() {
   const reliabilitySlo = useStore((s) => s.reliabilitySlo);
   const governance = useStore((s) => s.governance);
   const policyAction = useStore((s) => s.policyAction);
+  const timeline = useStore((s) => s.timeline);
+  const clearTimeline = useStore((s) => s.clearTimeline);
 
   const [activePage, setActivePage] = useState<PageId>("command");
   const [selectedGoal, setSelectedGoal] = useState<Goal | null>(null);
   const [rejectReason, setRejectReason] = useState("Policy conflict with current project direction");
   const [lockRequiredSeed, setLockRequiredSeed] = useState(true);
+  const [timelineReplay, setTimelineReplay] = useState(false);
+  const [timelineCursor, setTimelineCursor] = useState(0);
 
   useEffect(() => {
     vscodeApi.postMessage({ type: "webviewReady" });
     vscodeApi.postMessage({ type: "refreshRuntimePolicies" });
   }, [vscodeApi]);
+
+  useEffect(() => {
+    if (!timelineReplay || timeline.length === 0) return;
+    const timer = setInterval(() => {
+      setTimelineCursor((prev) => {
+        if (prev >= timeline.length - 1) {
+          return 0;
+        }
+        return prev + 1;
+      });
+    }, 850);
+    return () => clearInterval(timer);
+  }, [timelineReplay, timeline.length]);
 
   const navItems = [
     { id: "command", label: "Command Center", icon: LayoutDashboard },
@@ -340,8 +360,73 @@ export default function App() {
                 </CardHeader>
                 <CardContent className="sentinel-chat__body">
                   <QuickPrompts />
-                  <div className="sentinel-chat__messages">
-                    <MessageList />
+                  <div className="sentinel-chat-layout">
+                    <div className="sentinel-chat__messages">
+                      <MessageList />
+                    </div>
+                    <aside className="sentinel-timeline">
+                      <div className="sentinel-timeline__header">
+                        <h4>Task Timeline</h4>
+                        <div className="sentinel-inline-actions">
+                          <Button
+                            size="icon-xs"
+                            variant="outline"
+                            onClick={() => setTimelineReplay((v) => !v)}
+                            disabled={timeline.length === 0}
+                          >
+                            {timelineReplay ? <Pause className="size-3" /> : <Play className="size-3" />}
+                          </Button>
+                          <Button
+                            size="icon-xs"
+                            variant="outline"
+                            onClick={() => setTimelineCursor(0)}
+                            disabled={timeline.length === 0}
+                          >
+                            <RotateCcw className="size-3" />
+                          </Button>
+                          <Button
+                            size="xs"
+                            variant="destructive"
+                            onClick={() => {
+                              clearTimeline();
+                              setTimelineCursor(0);
+                              setTimelineReplay(false);
+                            }}
+                            disabled={timeline.length === 0}
+                          >
+                            Clear
+                          </Button>
+                        </div>
+                      </div>
+                      <div className="sentinel-timeline__body">
+                        {timeline.length === 0 ? (
+                          <p className="sentinel-empty">No timeline events yet.</p>
+                        ) : (
+                          timeline
+                            .slice()
+                            .reverse()
+                            .map((event, idxReverse) => {
+                              const originalIndex = timeline.length - 1 - idxReverse;
+                              const active = originalIndex === timelineCursor;
+                              return (
+                                <button
+                                  key={event.id}
+                                  type="button"
+                                  className={cn("sentinel-timeline__event", active && "sentinel-timeline__event--active")}
+                                  onClick={() => setTimelineCursor(originalIndex)}
+                                >
+                                  <div className="sentinel-timeline__meta">
+                                    <span>{event.stage}</span>
+                                    <small>{new Date(event.timestamp).toLocaleTimeString()}</small>
+                                  </div>
+                                  <strong>{event.title}</strong>
+                                  {event.detail && <p>{event.detail}</p>}
+                                </button>
+                              );
+                            })
+                        )}
+                      </div>
+                    </aside>
                   </div>
                   <ChatInput />
                 </CardContent>

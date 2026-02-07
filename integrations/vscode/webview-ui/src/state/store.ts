@@ -10,6 +10,7 @@ export const useStore = create<AppState>((set) => ({
     reliabilitySlo: null,
     governance: null,
     policyAction: null,
+    timeline: [],
     goals: [],
     goalsCollapsed: true,
     inputText: '',
@@ -59,6 +60,13 @@ export const useStore = create<AppState>((set) => ({
     setGovernance: (governance) => set({ governance }),
 
     setPolicyAction: (policyAction) => set({ policyAction }),
+
+    addTimelineEvent: (event) =>
+        set((state) => ({
+            timeline: [...state.timeline, event].slice(-300),
+        })),
+
+    clearTimeline: () => set({ timeline: [] }),
 
     setGoals: (goals: GoalNodeState[]) => set({ goals }),
 

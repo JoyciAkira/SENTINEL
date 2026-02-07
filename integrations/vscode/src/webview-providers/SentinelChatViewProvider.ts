@@ -66,6 +66,23 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
     this.view?.webview.postMessage(msg);
   }
 
+  private emitTimeline(
+    stage: "received" | "plan" | "tool" | "stream" | "approval" | "result" | "error" | "cancel",
+    title: string,
+    detail?: string,
+    turnId?: string,
+  ): void {
+    this.postMessage({
+      type: "timelineEvent",
+      id: crypto.randomUUID(),
+      stage,
+      title,
+      detail,
+      turnId,
+      timestamp: Date.now(),
+    });
+  }
+
   updateAlignment(report: AlignmentReport): void {
     this.postMessage({
       type: "alignmentUpdate",
@@ -107,6 +124,7 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
         if (typeof msg.messageId === "string" && this.activeStreamId === msg.messageId) {
           this.activeStreamId = null;
           this.postMessage({ type: "chatStreamingStopped", id: msg.messageId });
+          this.emitTimeline("cancel", "Streaming cancelled", "Stopped by user", msg.messageId);
         }
         break;
       case "clearChatMemory":
@@ -194,10 +212,12 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
 
     // Generate a message ID for streaming/updates
     const messageId = crypto.randomUUID();
+    this.emitTimeline("received", "Prompt received", text, messageId);
 
     // ── Command Parsing ──────────────────────────────────────
     if (text.startsWith("/init ")) {
       const description = text.replace("/init ", "").trim();
+      this.emitTimeline("plan", "Slash command /init", description, messageId);
       try {
         this.postMessage({
           type: "chatResponse",
@@ -218,6 +238,7 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
         // Refresh views
         vscode.commands.executeCommand("sentinel.refreshGoals");
         void this.refreshGoalSnapshot();
+        this.emitTimeline("result", "Project initialized", description, messageId);
         return;
       } catch (err: any) {
         this.postMessage({
@@ -225,11 +246,13 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
           id: crypto.randomUUID(),
           content: `❌ **Initialization failed:** ${err.message}`,
         });
+        this.emitTimeline("error", "Initialization failed", err.message, messageId);
         return;
       }
     }
 
     if (text.trim() === "/help") {
+      this.emitTimeline("plan", "Slash command /help", "Help menu requested", messageId);
       this.postMessage({
         type: "chatResponse",
         id: messageId,
@@ -240,6 +263,7 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
     }
 
     if (text.trim() === "/memory-status") {
+      this.emitTimeline("tool", "Memory status", "Querying memory state", messageId);
       const result = (await this.client.callTool("chat_memory_status", {})) as any;
       this.postMessage({
         type: "chatResponse",
@@ -253,6 +277,7 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
 
     if (text.startsWith("/memory-search ")) {
       const query = text.replace("/memory-search ", "").trim();
+      this.emitTimeline("tool", "Memory search", query, messageId);
       const result = (await this.client.callTool("chat_memory_search", {
         query,
         limit: 8,
@@ -269,6 +294,7 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
 
     if (text.startsWith("/memory-export")) {
       const maybePath = text.replace("/memory-export", "").trim();
+      this.emitTimeline("tool", "Memory export", maybePath || "default path", messageId);
       const args: Record<string, unknown> = {};
       if (maybePath) args.path = maybePath;
       const result = (await this.client.callTool("chat_memory_export", args)) as any;
@@ -294,6 +320,7 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
         return;
       }
       const merge = mergeArg ? mergeArg.toLowerCase() !== "merge=false" : true;
+      this.emitTimeline("tool", "Memory import", `${pathArg} (merge=${merge})`, messageId);
       const result = (await this.client.callTool("chat_memory_import", {
         path: pathArg,
         merge,
@@ -309,6 +336,7 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
     }
 
     try {
+      this.emitTimeline("plan", "Inference planned", "Executing chat tool", messageId);
       // Send a "thinking" state
       this.postMessage({
         type: "chatResponse",
@@ -318,6 +346,7 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
       });
 
       // Use the NEW REAL INFERENCE chat tool
+      this.emitTimeline("tool", "MCP tool call", "chat", messageId);
       const result: any = await this.client.callTool("chat", {
         message: text
       });
@@ -349,6 +378,7 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
 
       this.activeStreamId = messageId;
       if (streamChunks.length > 0) {
+        this.emitTimeline("stream", "Streaming started", `${streamChunks.length} chunks`, messageId);
         let partial = "";
         for (const chunk of streamChunks) {
           if (this.activeStreamId !== messageId) break;
@@ -372,6 +402,7 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
         });
       }
       this.activeStreamId = null;
+      this.emitTimeline("result", "Turn completed", "Response delivered", messageId);
 
       // After chat, refresh goals in background to keep UI synced
       void this.refreshGoalSnapshot();
@@ -385,6 +416,7 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
         content: `Error: ${err.message}. Ensure LLM API keys are configured.`,
         streaming: false,
       });
+      this.emitTimeline("error", "Chat tool error", err.message, messageId);
     }
   }
 
@@ -458,6 +490,7 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
   private async handleGovernanceApprove(note?: string): Promise<void> {
     if (!this.client.connected) return;
     try {
+      this.emitTimeline("approval", "Governance approve requested", note ?? "", undefined);
       const result = (await this.client.callTool("governance_approve", {
         note: typeof note === "string" ? note : "",
       })) as any;
@@ -467,6 +500,7 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
         ok: true,
         message: result?.message ?? "Governance proposal approved.",
       });
+      this.emitTimeline("result", "Governance proposal approved", result?.proposal_id, undefined);
       await this.refreshRuntimePolicySnapshot();
     } catch (err: any) {
       this.postMessage({
@@ -475,12 +509,14 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
         ok: false,
         message: err.message,
       });
+      this.emitTimeline("error", "Governance approve failed", err.message, undefined);
     }
   }
 
   private async handleGovernanceReject(reason?: string): Promise<void> {
     if (!this.client.connected) return;
     try {
+      this.emitTimeline("approval", "Governance reject requested", reason ?? "", undefined);
       const result = (await this.client.callTool("governance_reject", {
         reason: typeof reason === "string" ? reason : "Rejected from VSCode UI",
       })) as any;
@@ -490,6 +526,7 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
         ok: true,
         message: result?.message ?? "Governance proposal rejected.",
       });
+      this.emitTimeline("result", "Governance proposal rejected", result?.proposal_id, undefined);
       await this.refreshRuntimePolicySnapshot();
     } catch (err: any) {
       this.postMessage({
@@ -498,6 +535,7 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
         ok: false,
         message: err.message,
       });
+      this.emitTimeline("error", "Governance reject failed", err.message, undefined);
     }
   }
 
@@ -507,6 +545,12 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
   ): Promise<void> {
     if (!this.client.connected) return;
     try {
+      this.emitTimeline(
+        "tool",
+        "Governance seed requested",
+        `apply=${apply} lock_required=${lockRequired}`,
+        undefined,
+      );
       const result = (await this.client.callTool("governance_seed", {
         apply,
         lock_required: lockRequired,
@@ -521,6 +565,7 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
         ok: true,
         message,
       });
+      this.emitTimeline("result", "Governance seed completed", message, undefined);
 
       if (apply) {
         await this.refreshRuntimePolicySnapshot();
@@ -541,12 +586,14 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
         ok: false,
         message: err.message,
       });
+      this.emitTimeline("error", "Governance seed failed", err.message, undefined);
     }
   }
 
   private async handleClearChatMemory(): Promise<void> {
     if (!this.client.connected) return;
     try {
+      this.emitTimeline("tool", "Memory clear", "chat_memory_clear", undefined);
       const result = (await this.client.callTool("chat_memory_clear", {})) as any;
       this.postMessage({
         type: "policyActionResult",

@@ -85,6 +85,15 @@ export interface PolicyActionState {
     timestamp: number;
 }
 
+export interface TimelineEventState {
+    id: string;
+    turnId?: string;
+    stage: 'received' | 'plan' | 'tool' | 'stream' | 'approval' | 'result' | 'error' | 'cancel';
+    title: string;
+    detail?: string;
+    timestamp: number;
+}
+
 export interface GoalNodeState {
     id: string;
     description: string;
@@ -100,6 +109,7 @@ export interface AppState {
     reliabilitySlo: ReliabilitySloState | null;
     governance: GovernanceState | null;
     policyAction: PolicyActionState | null;
+    timeline: TimelineEventState[];
     goals: GoalNodeState[];
     goalsCollapsed: boolean;
     inputText: string;
@@ -121,6 +131,8 @@ export interface AppState {
     ) => void;
     setGovernance: (governance: GovernanceState) => void;
     setPolicyAction: (action: PolicyActionState) => void;
+    addTimelineEvent: (event: TimelineEventState) => void;
+    clearTimeline: () => void;
     setGoals: (goals: GoalNodeState[]) => void;
     toggleGoalsCollapsed: () => void;
     setInputText: (text: string) => void;
