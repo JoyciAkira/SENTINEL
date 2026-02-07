@@ -34,6 +34,7 @@ import GoalTree from "./components/Goals/GoalTree";
 import GoalGraph from "./components/AtomicForge/GoalGraph";
 
 type PageId = "command" | "chat" | "forge" | "network" | "audit" | "settings";
+type TimelineStage = "all" | "received" | "plan" | "tool" | "stream" | "approval" | "result" | "error" | "cancel";
 
 const RISK_LEVELS = [
   { label: "Low", min: 85, className: "sentinel-risk-low" },
@@ -83,24 +84,44 @@ export default function App() {
   const [lockRequiredSeed, setLockRequiredSeed] = useState(true);
   const [timelineReplay, setTimelineReplay] = useState(false);
   const [timelineCursor, setTimelineCursor] = useState(0);
+  const [timelineStageFilter, setTimelineStageFilter] = useState<TimelineStage>("all");
+  const [timelineTurnFilter, setTimelineTurnFilter] = useState("");
 
   useEffect(() => {
     vscodeApi.postMessage({ type: "webviewReady" });
     vscodeApi.postMessage({ type: "refreshRuntimePolicies" });
   }, [vscodeApi]);
 
+  const filteredTimeline = useMemo(() => {
+    const turnPrefix = timelineTurnFilter.trim().toLowerCase();
+    return timeline.filter((event) => {
+      const stageOk = timelineStageFilter === "all" || event.stage === timelineStageFilter;
+      const turnOk =
+        turnPrefix.length === 0 ||
+        (event.turnId?.toLowerCase().includes(turnPrefix) ?? false) ||
+        event.id.toLowerCase().includes(turnPrefix);
+      return stageOk && turnOk;
+    });
+  }, [timeline, timelineStageFilter, timelineTurnFilter]);
+
   useEffect(() => {
-    if (!timelineReplay || timeline.length === 0) return;
+    if (!timelineReplay || filteredTimeline.length === 0) return;
     const timer = setInterval(() => {
       setTimelineCursor((prev) => {
-        if (prev >= timeline.length - 1) {
+        if (prev >= filteredTimeline.length - 1) {
           return 0;
         }
         return prev + 1;
       });
     }, 850);
     return () => clearInterval(timer);
-  }, [timelineReplay, timeline.length]);
+  }, [timelineReplay, filteredTimeline.length]);
+
+  useEffect(() => {
+    if (timelineCursor >= filteredTimeline.length) {
+      setTimelineCursor(Math.max(0, filteredTimeline.length - 1));
+    }
+  }, [timelineCursor, filteredTimeline.length]);
 
   const navItems = [
     { id: "command", label: "Command Center", icon: LayoutDashboard },
@@ -160,6 +181,9 @@ export default function App() {
   const requestRuntimeRefresh = () => {
     vscodeApi.postMessage({ type: "refreshRuntimePolicies" });
   };
+
+  const currentTimelineEvent =
+    filteredTimeline.length > 0 ? filteredTimeline[timelineCursor] : undefined;
 
   return (
     <div className="sentinel-shell">
@@ -372,7 +396,7 @@ export default function App() {
                             size="icon-xs"
                             variant="outline"
                             onClick={() => setTimelineReplay((v) => !v)}
-                            disabled={timeline.length === 0}
+                            disabled={filteredTimeline.length === 0}
                           >
                             {timelineReplay ? <Pause className="size-3" /> : <Play className="size-3" />}
                           </Button>
@@ -380,7 +404,7 @@ export default function App() {
                             size="icon-xs"
                             variant="outline"
                             onClick={() => setTimelineCursor(0)}
-                            disabled={timeline.length === 0}
+                            disabled={filteredTimeline.length === 0}
                           >
                             <RotateCcw className="size-3" />
                           </Button>
@@ -397,16 +421,45 @@ export default function App() {
                             Clear
                           </Button>
                         </div>
+                        <div className="sentinel-timeline__filters">
+                          <select
+                            className="sentinel-select"
+                            value={timelineStageFilter}
+                            onChange={(event) => {
+                              setTimelineStageFilter(event.target.value as TimelineStage);
+                              setTimelineCursor(0);
+                            }}
+                          >
+                            <option value="all">All stages</option>
+                            <option value="received">received</option>
+                            <option value="plan">plan</option>
+                            <option value="tool">tool</option>
+                            <option value="stream">stream</option>
+                            <option value="approval">approval</option>
+                            <option value="result">result</option>
+                            <option value="error">error</option>
+                            <option value="cancel">cancel</option>
+                          </select>
+                          <input
+                            className="sentinel-input"
+                            value={timelineTurnFilter}
+                            onChange={(event) => {
+                              setTimelineTurnFilter(event.target.value);
+                              setTimelineCursor(0);
+                            }}
+                            placeholder="Filter by turnId"
+                          />
+                        </div>
                       </div>
                       <div className="sentinel-timeline__body">
-                        {timeline.length === 0 ? (
+                        {filteredTimeline.length === 0 ? (
                           <p className="sentinel-empty">No timeline events yet.</p>
                         ) : (
-                          timeline
+                          filteredTimeline
                             .slice()
                             .reverse()
                             .map((event, idxReverse) => {
-                              const originalIndex = timeline.length - 1 - idxReverse;
+                              const originalIndex = filteredTimeline.length - 1 - idxReverse;
                               const active = originalIndex === timelineCursor;
                               return (
                                 <button
@@ -426,6 +479,17 @@ export default function App() {
                             })
                         )}
                       </div>
+                      {currentTimelineEvent && (
+                        <div className="sentinel-timeline__active">
+                          <div className="sentinel-timeline__meta">
+                            <span>{currentTimelineEvent.stage}</span>
+                            <small>{new Date(currentTimelineEvent.timestamp).toLocaleTimeString()}</small>
+                          </div>
+                          <strong>{currentTimelineEvent.title}</strong>
+                          {currentTimelineEvent.turnId && <p>turn: {currentTimelineEvent.turnId.slice(0, 8)}</p>}
+                          {currentTimelineEvent.detail && <p>{currentTimelineEvent.detail}</p>}
+                        </div>
+                      )}
                     </aside>
                   </div>
                   <ChatInput />

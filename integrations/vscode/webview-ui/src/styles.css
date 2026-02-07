@@ -465,12 +465,27 @@
   text-transform: uppercase;
 }
 
+.sentinel-timeline__filters {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr);
+  gap: 6px;
+}
+
 .sentinel-timeline__body {
   min-height: 0;
   overflow: auto;
   padding: 8px;
   display: grid;
   gap: 7px;
+}
+
+.sentinel-timeline__active {
+  border-top: 1px solid var(--sentinel-border);
+  padding: 8px 10px;
+  display: grid;
+  gap: 3px;
+  background: color-mix(in oklab, var(--sentinel-surface-2) 82%, transparent);
 }
 
 .sentinel-timeline__event {
@@ -628,6 +643,15 @@
   color: var(--sentinel-ink);
   font-size: 12px;
   padding: 7px 9px;
+}
+
+.sentinel-select {
+  border: 1px solid var(--sentinel-border);
+  border-radius: 8px;
+  background: color-mix(in oklab, var(--sentinel-surface-2) 88%, transparent);
+  color: var(--sentinel-ink);
+  font-size: 12px;
+  padding: 7px 8px;
 }
 
 .sentinel-toggle {
