@@ -13,6 +13,7 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
 
   private view?: vscode.WebviewView;
   private activeStreamId: string | null = null;
+  private warnedMissingRuntimeTools = false;
 
   constructor(
     private extensionUri: vscode.Uri,
@@ -49,12 +50,16 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
       this.postMessage({ type: "connected" });
       void this.refreshGoalSnapshot();
       void this.refreshRuntimePolicySnapshot();
+      void this.refreshRuntimeCapabilitiesSnapshot();
+      void this.refreshAlignmentSnapshot();
     }
 
     this.client.on("connected", () => {
       this.postMessage({ type: "connected" });
       void this.refreshGoalSnapshot();
       void this.refreshRuntimePolicySnapshot();
+      void this.refreshRuntimeCapabilitiesSnapshot();
+      void this.refreshAlignmentSnapshot();
     });
 
     this.client.on("disconnected", () => {
@@ -226,6 +231,8 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
           this.postMessage({ type: "connected" });
           void this.refreshGoalSnapshot();
           void this.refreshRuntimePolicySnapshot();
+          void this.refreshRuntimeCapabilitiesSnapshot();
+          void this.refreshAlignmentSnapshot();
         } else {
           this.postMessage({ type: "disconnected" });
         }
@@ -492,32 +499,118 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
     }
   }
 
+  private async refreshAlignmentSnapshot(): Promise<void> {
+    if (!this.client.connected) return;
+    try {
+      const alignment = (await this.client.callTool("get_alignment", {})) as any;
+      if (alignment && typeof alignment.score === "number") {
+        this.postMessage({
+          type: "alignmentUpdate",
+          score: alignment.score,
+          confidence: alignment.confidence ?? 0,
+          status: alignment.status ?? "UNKNOWN",
+          trend: 0,
+        });
+      }
+    } catch (err: any) {
+      this.outputChannel.appendLine(`Failed to refresh alignment: ${err.message}`);
+    }
+  }
+
+  private async refreshRuntimeCapabilitiesSnapshot(): Promise<void> {
+    if (!this.client.connected) return;
+    try {
+      const toolsResult = await this.client.listTools();
+      const tools = Array.isArray((toolsResult as any)?.tools) ? (toolsResult as any).tools : [];
+      const toolNames = tools
+        .map((tool: any) => (typeof tool?.name === "string" ? tool.name : null))
+        .filter((name: string | null): name is string => Boolean(name));
+
+      const serverInfo = this.client.getServerInfo();
+      this.postMessage({
+        type: "runtimeCapabilities",
+        capabilities: {
+          tool_count: toolNames.length,
+          tools: toolNames,
+          server_name: serverInfo?.name ?? "sentinel-server",
+          server_version: serverInfo?.version ?? "unknown",
+          connected: true,
+        },
+      });
+    } catch (err: any) {
+      this.outputChannel.appendLine(`Failed to refresh runtime capabilities: ${err.message}`);
+      this.postMessage({
+        type: "runtimeCapabilities",
+        capabilities: {
+          tool_count: 0,
+          tools: [],
+          server_name: "sentinel-server",
+          server_version: "unknown",
+          connected: false,
+        },
+      });
+    }
+  }
+
   private async refreshRuntimePolicySnapshot(): Promise<void> {
     if (!this.client.connected) {
       return;
     }
 
+    let supportedTools: Set<string> = new Set();
     try {
-      const reliability = (await this.client.callTool("get_reliability", {})) as any;
-      if (reliability && !reliability.error) {
-        this.postMessage({
-          type: "reliabilityUpdate",
-          reliability: reliability.reliability,
-          reliability_thresholds: reliability.reliability_thresholds,
-          reliability_slo: reliability.reliability_slo,
-        });
+      supportedTools = await this.client.listToolNames();
+    } catch (err: any) {
+      this.outputChannel.appendLine(
+        `Failed to discover MCP tools for runtime policy snapshot: ${err.message}`,
+      );
+    }
+
+    const hasReliability = supportedTools.has("get_reliability");
+    const hasGovernance = supportedTools.has("governance_status");
+    if (!this.warnedMissingRuntimeTools && (!hasReliability || !hasGovernance)) {
+      this.warnedMissingRuntimeTools = true;
+      const missing = [
+        !hasReliability ? "get_reliability" : null,
+        !hasGovernance ? "governance_status" : null,
+      ].filter(Boolean);
+      const message =
+        `Connected backend does not expose runtime policy tools: ${missing.join(", ")}. ` +
+        "Upgrade sentinel-cli (current path may be legacy) to enable Reliability/Governance panels.";
+      this.outputChannel.appendLine(message);
+      this.postMessage({
+        type: "policyActionResult",
+        kind: "runtime_capability",
+        ok: false,
+        message,
+      });
+    }
+
+    try {
+      if (hasReliability) {
+        const reliability = (await this.client.callTool("get_reliability", {})) as any;
+        if (reliability && !reliability.error) {
+          this.postMessage({
+            type: "reliabilityUpdate",
+            reliability: reliability.reliability,
+            reliability_thresholds: reliability.reliability_thresholds,
+            reliability_slo: reliability.reliability_slo,
+          });
+        }
       }
     } catch (err: any) {
       this.outputChannel.appendLine(`Failed to refresh reliability: ${err.message}`);
     }
 
     try {
-      const governance = (await this.client.callTool("governance_status", {})) as any;
-      if (governance && !governance.error) {
-        this.postMessage({
-          type: "governanceUpdate",
-          governance,
-        });
+      if (hasGovernance) {
+        const governance = (await this.client.callTool("governance_status", {})) as any;
+        if (governance && !governance.error) {
+          this.postMessage({
+            type: "governanceUpdate",
+            governance,
+          });
+        }
       }
     } catch (err: any) {
       this.outputChannel.appendLine(`Failed to refresh governance: ${err.message}`);
@@ -526,6 +619,15 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
 
   private async handleGovernanceApprove(note?: string): Promise<void> {
     if (!this.client.connected) return;
+    if (!(await this.client.supportsTool("governance_approve"))) {
+      this.postMessage({
+        type: "policyActionResult",
+        kind: "governance_approve",
+        ok: false,
+        message: "Tool governance_approve non disponibile nel backend corrente.",
+      });
+      return;
+    }
     try {
       this.emitTimeline("approval", "Governance approve requested", note ?? "", undefined);
       const result = (await this.callToolTracked("governance_approve", {
@@ -552,6 +654,15 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
 
   private async handleGovernanceReject(reason?: string): Promise<void> {
     if (!this.client.connected) return;
+    if (!(await this.client.supportsTool("governance_reject"))) {
+      this.postMessage({
+        type: "policyActionResult",
+        kind: "governance_reject",
+        ok: false,
+        message: "Tool governance_reject non disponibile nel backend corrente.",
+      });
+      return;
+    }
     try {
       this.emitTimeline("approval", "Governance reject requested", reason ?? "", undefined);
       const result = (await this.callToolTracked("governance_reject", {
@@ -581,6 +692,15 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
     lockRequired: boolean,
   ): Promise<void> {
     if (!this.client.connected) return;
+    if (!(await this.client.supportsTool("governance_seed"))) {
+      this.postMessage({
+        type: "policyActionResult",
+        kind: "governance_seed",
+        ok: false,
+        message: "Tool governance_seed non disponibile nel backend corrente.",
+      });
+      return;
+    }
     try {
       this.emitTimeline(
         "tool",
@@ -607,10 +727,14 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
       if (apply) {
         await this.refreshRuntimePolicySnapshot();
       } else {
+        let governanceStatus: any = {};
+        if (await this.client.supportsTool("governance_status")) {
+          governanceStatus = await this.client.callTool("governance_status", {});
+        }
         this.postMessage({
           type: "governanceUpdate",
           governance: {
-            ...(await this.client.callTool("governance_status", {})),
+            ...governanceStatus,
             seed_preview: result?.diff ?? null,
             observed: result?.observed ?? null,
           },

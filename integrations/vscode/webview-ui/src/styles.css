@@ -2,7 +2,7 @@
 
 @theme {
   --font-sans:
-    "Space Grotesk", "Avenir Next", "Manrope", "Segoe UI", "Helvetica Neue", sans-serif;
+    "Manrope", "Avenir Next", "Segoe UI", "Helvetica Neue", sans-serif;
   --font-mono: var(--vscode-editor-font-family, "IBM Plex Mono", ui-monospace, monospace);
 
   --color-background: var(--vscode-sideBar-background);
@@ -44,10 +44,10 @@
   --sentinel-border: color-mix(in oklab, var(--vscode-editor-foreground) 18%, transparent);
   --sentinel-surface: color-mix(in oklab, var(--vscode-editor-background) 82%, var(--vscode-sideBar-background));
   --sentinel-surface-2: color-mix(in oklab, var(--vscode-editor-background) 66%, var(--vscode-sideBar-background));
-  --sentinel-accent: color-mix(in oklab, var(--vscode-button-background) 90%, #0e7490);
-  --sentinel-accent-soft: color-mix(in oklab, var(--vscode-button-background) 20%, transparent);
+  --sentinel-accent: #3ecfbe;
+  --sentinel-accent-soft: color-mix(in oklab, #3ecfbe 18%, transparent);
   --sentinel-success: #16a34a;
-  --sentinel-warning: #d97706;
+  --sentinel-warning: #d48a1f;
   --sentinel-danger: #dc2626;
 }
 
@@ -70,9 +70,8 @@
     @apply bg-background text-foreground;
     font-family: var(--font-sans);
     background-image:
-      radial-gradient(circle at 12% 8%, color-mix(in oklab, var(--sentinel-accent) 14%, transparent), transparent 36%),
-      radial-gradient(circle at 90% 12%, color-mix(in oklab, var(--sentinel-accent) 10%, transparent), transparent 34%),
-      linear-gradient(170deg, color-mix(in oklab, var(--vscode-sideBar-background) 88%, black), var(--vscode-editor-background));
+      radial-gradient(circle at 92% 0%, color-mix(in oklab, var(--sentinel-accent) 12%, transparent), transparent 36%),
+      linear-gradient(175deg, color-mix(in oklab, var(--vscode-sideBar-background) 88%, black), var(--vscode-editor-background));
     background-attachment: fixed;
     overflow: hidden;
   }
@@ -82,9 +81,34 @@
   width: 100%;
   height: 100%;
   display: grid;
-  grid-template-columns: 260px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 16px;
+  padding: 10px;
+}
+
+.sentinel-shell--mission {
+  grid-template-columns: 248px minmax(0, 1fr);
   padding: 14px;
+}
+
+.sentinel-shell--chat-first {
+  width: min(100%, 430px);
+  margin: 0 auto;
+}
+
+.sentinel-theme--warm-graphite {
+  --sentinel-accent: #d0a16b;
+  --sentinel-accent-soft: color-mix(in oklab, #d0a16b 18%, transparent);
+  --sentinel-success: #7ac57a;
+  --sentinel-warning: #e2a74a;
+}
+
+.sentinel-theme--pure-vscode {
+  --sentinel-accent: var(--vscode-button-background);
+  --sentinel-accent-soft: color-mix(in oklab, var(--vscode-button-background) 22%, transparent);
+  --sentinel-success: var(--vscode-testing-iconPassed, #16a34a);
+  --sentinel-warning: var(--vscode-editorWarning-foreground, #d48a1f);
+  --sentinel-danger: var(--vscode-editorError-foreground, #dc2626);
 }
 
 .sentinel-rail {
@@ -216,20 +240,24 @@
   overflow: hidden;
 }
 
+.sentinel-shell--chat-first .sentinel-main {
+  border-radius: 12px;
+}
+
 .sentinel-topbar {
-  min-height: 64px;
+  min-height: 56px;
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 12px;
-  padding: 12px 16px;
+  padding: 10px 12px;
   border-bottom: 1px solid var(--sentinel-border);
   background: linear-gradient(170deg, color-mix(in oklab, var(--sentinel-surface) 88%, transparent), color-mix(in oklab, var(--sentinel-surface-2) 82%, transparent));
 }
 
 .sentinel-topbar h1 {
   margin: 0;
-  font-size: 18px;
+  font-size: 15px;
   line-height: 1.2;
   letter-spacing: 0.01em;
 }
@@ -245,7 +273,7 @@
 .sentinel-topbar__metrics {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   flex-wrap: wrap;
   justify-content: flex-end;
 }
@@ -254,9 +282,9 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 600;
-  padding: 6px 10px;
+  padding: 5px 8px;
   border: 1px solid var(--sentinel-border);
   border-radius: 999px;
   background: color-mix(in oklab, var(--sentinel-surface-2) 86%, transparent);
@@ -284,9 +312,9 @@
 }
 
 .sentinel-content__inner {
-  padding: 16px;
+  padding: 10px;
   display: grid;
-  gap: 14px;
+  gap: 10px;
 }
 
 .sentinel-grid {
@@ -414,26 +442,38 @@
 .sentinel-chat {
   display: flex;
   flex-direction: column;
-  min-height: min(720px, calc(100vh - 160px));
+  min-height: calc(100vh - 112px);
 }
 
 .sentinel-chat__body {
   display: grid;
-  gap: 10px;
+  gap: 8px;
   min-height: 0;
+}
+
+.sentinel-chat-composer {
+  position: sticky;
+  bottom: 0;
+  z-index: 3;
+  padding-top: 6px;
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklab, var(--sentinel-surface) 6%, transparent),
+    color-mix(in oklab, var(--sentinel-surface) 92%, transparent) 28%
+  );
 }
 
 .sentinel-chat-layout {
   min-height: 0;
   display: grid;
-  gap: 10px;
-  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 8px;
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .sentinel-chat__messages {
   min-height: 0;
-  height: min(56vh, 560px);
-  border-radius: 12px;
+  height: min(60vh, 620px);
+  border-radius: 10px;
   border: 1px solid var(--sentinel-border);
   background: color-mix(in oklab, var(--sentinel-surface) 88%, transparent);
   overflow: hidden;
@@ -446,6 +486,15 @@
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   min-height: 0;
+  max-height: 280px;
+}
+
+.sentinel-shell--mission .sentinel-chat-layout {
+  grid-template-columns: minmax(0, 1fr) 300px;
+}
+
+.sentinel-shell--mission .sentinel-chat__messages {
+  height: min(56vh, 560px);
 }
 
 .sentinel-timeline__header {
@@ -639,16 +688,22 @@
 .sentinel-input {
   border: 1px solid var(--sentinel-border);
   border-radius: 8px;
-  background: color-mix(in oklab, var(--sentinel-surface-2) 88%, transparent);
+  background: color-mix(in oklab, var(--sentinel-surface) 94%, transparent);
   color: var(--sentinel-ink);
   font-size: 12px;
   padding: 7px 9px;
 }
 
+.sentinel-select--tiny {
+  min-width: 132px;
+  font-size: 10px;
+  padding: 5px 6px;
+}
+
 .sentinel-select {
   border: 1px solid var(--sentinel-border);
   border-radius: 8px;
-  background: color-mix(in oklab, var(--sentinel-surface-2) 88%, transparent);
+  background: color-mix(in oklab, var(--sentinel-surface) 94%, transparent);
   color: var(--sentinel-ink);
   font-size: 12px;
   padding: 7px 8px;
@@ -671,6 +726,145 @@
   color: var(--sentinel-danger);
 }
 
+.sentinel-density--compact .sentinel-topbar {
+  min-height: 52px;
+  padding: 8px 10px;
+}
+
+.sentinel-density--compact .sentinel-topbar h1 {
+  font-size: 14px;
+}
+
+.sentinel-density--compact .sentinel-content__inner {
+  padding: 8px;
+  gap: 8px;
+}
+
+.sentinel-density--compact .sentinel-pill {
+  font-size: 9px;
+  padding: 4px 7px;
+}
+
+.sentinel-density--compact .sentinel-chat__messages {
+  border-radius: 8px;
+}
+
+.sentinel-density--compact .sentinel-timeline {
+  max-height: 240px;
+}
+
+.sentinel-density--compact .sentinel-timeline__event {
+  padding: 6px 7px;
+  gap: 2px;
+}
+
+.sentinel-density--compact .sentinel-timeline__event strong {
+  font-size: 11px;
+}
+
+.sentinel-density--compact .sentinel-timeline__event p {
+  font-size: 10px;
+}
+
+/* Cline-like sidebar refinements */
+.sentinel-main--sidebar {
+  background: color-mix(in oklab, var(--sentinel-surface) 94%, black);
+}
+
+.sentinel-topbar--sidebar .sentinel-topbar__eyebrow {
+  display: none;
+}
+
+.sentinel-topbar--sidebar h1 {
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.sentinel-topbar--sidebar .sentinel-topbar__metrics {
+  gap: 4px;
+}
+
+.sentinel-shell--chat-first .sentinel-topbar--sidebar .sentinel-pill:nth-of-type(n + 2),
+.sentinel-shell--chat-first .sentinel-topbar--sidebar .sentinel-risk-badge {
+  display: none;
+}
+
+.sentinel-shell--chat-first .sentinel-chat {
+  border: none;
+  box-shadow: none;
+  background: transparent;
+}
+
+.sentinel-shell--chat-first .sentinel-chat [data-slot="card-header"] {
+  padding: 2px 0;
+}
+
+.sentinel-shell--chat-first .sentinel-chat [data-slot="card-title"],
+.sentinel-shell--chat-first .sentinel-chat [data-slot="card-description"] {
+  display: none;
+}
+
+.sentinel-shell--chat-first .sentinel-chat__messages {
+  background: color-mix(in oklab, var(--sentinel-surface) 96%, black);
+}
+
+.sentinel-empty-hero {
+  height: 100%;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 12px;
+  text-align: center;
+  padding: 22px 10px;
+}
+
+.sentinel-empty-hero__icon {
+  width: 68px;
+  height: 68px;
+  border-radius: 16px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--sentinel-border);
+  background: color-mix(in oklab, var(--sentinel-surface-2) 88%, black);
+}
+
+.sentinel-empty-hero h3 {
+  margin: 0;
+  max-width: 260px;
+  font-size: 28px;
+  line-height: 1.08;
+  letter-spacing: -0.02em;
+}
+
+.sentinel-empty-hero__recent {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--sentinel-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.sentinel-input--cline {
+  border-top: 1px solid var(--sentinel-border);
+  padding-top: 6px;
+}
+
+.sentinel-input--cline > div:first-child {
+  border-radius: 10px;
+  background: color-mix(in oklab, var(--sentinel-surface-2) 92%, black);
+}
+
+.sentinel-input--cline textarea {
+  min-height: 84px;
+}
+
+.sentinel-input--cline .sentinel-input__left-meta > div {
+  background: color-mix(in oklab, var(--sentinel-accent-soft) 95%, transparent);
+}
+
 /* ScrollArea thumb for VS Code themes */
 [data-slot="scroll-area-thumb"] {
   background-color: var(--vscode-scrollbarSlider-background);
@@ -681,7 +875,7 @@
 }
 
 @media (max-width: 1180px) {
-  .sentinel-shell {
+  .sentinel-shell--mission {
     grid-template-columns: 76px minmax(0, 1fr);
   }
 
@@ -703,9 +897,13 @@
 }
 
 @media (max-width: 900px) {
-  .sentinel-shell {
+  .sentinel-shell,
+  .sentinel-shell--mission,
+  .sentinel-shell--chat-first {
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto minmax(0, 1fr);
+    width: 100%;
+    margin: 0;
     padding: 8px;
     gap: 8px;
   }

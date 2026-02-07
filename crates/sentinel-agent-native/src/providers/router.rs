@@ -79,6 +79,14 @@ pub struct ProviderRouter {
 }
 
 impl ProviderRouter {
+    fn normalize_openrouter_model(model: String) -> String {
+        let trimmed = model.trim().trim_matches('"').trim_matches('\'');
+        if trimmed.eq_ignore_ascii_case("deepseek/deepseek-r1:free") {
+            return "deepseek/deepseek-r1-0528:free".to_string();
+        }
+        trimmed.to_string()
+    }
+
     pub fn from_env() -> Result<Self> {
         if let Some(config) = Self::load_config_from_file()? {
             return Self::from_config(config);
@@ -220,7 +228,8 @@ impl ProviderRouter {
                 let model = model
                     .clone()
                     .or_else(|| std::env::var("OPENROUTER_MODEL").ok())
-                    .unwrap_or_else(|| "deepseek/deepseek-r1:free".to_string());
+                    .unwrap_or_else(|| "deepseek/deepseek-r1-0528:free".to_string());
+                let model = Self::normalize_openrouter_model(model);
                 let mut client = OpenRouterClient::new(api_key, OpenRouterModel::Custom(model));
                 if let Some(value) = *temperature {
                     client = client.with_temperature(value);
@@ -380,7 +389,8 @@ impl ProviderRouter {
                     Err(_) => return Ok(None),
                 };
                 let model = std::env::var("OPENROUTER_MODEL")
-                    .unwrap_or_else(|_| "deepseek/deepseek-r1:free".to_string());
+                    .unwrap_or_else(|_| "deepseek/deepseek-r1-0528:free".to_string());
+                let model = Self::normalize_openrouter_model(model);
                 let client = OpenRouterClient::new(api_key, OpenRouterModel::Custom(model));
                 Ok(Some(ProviderEntry {
                     name: name.to_string(),

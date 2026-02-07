@@ -41,6 +41,9 @@ export class MCPClient extends EventEmitter {
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private disposed: boolean = false;
   private envOverrides: NodeJS.ProcessEnv = {};
+  private toolCache: Set<string> | null = null;
+  private toolCacheUpdatedAt: number = 0;
+  private serverInfo: McpInitializeResult["serverInfo"] | null = null;
 
   constructor(
     private sentinelPath: string,
@@ -58,6 +61,10 @@ export class MCPClient extends EventEmitter {
 
   get initialized(): boolean {
     return this._initialized;
+  }
+
+  getServerInfo(): McpInitializeResult["serverInfo"] | null {
+    return this.serverInfo;
   }
 
   async start(): Promise<void> {
@@ -91,6 +98,7 @@ export class MCPClient extends EventEmitter {
       this.outputChannel.appendLine(
         `MCP connected: ${result.serverInfo.name} v${result.serverInfo.version}`,
       );
+      this.serverInfo = result.serverInfo;
 
       // Send initialized notification
       this.notify("notifications/initialized", {});
@@ -130,6 +138,7 @@ export class MCPClient extends EventEmitter {
   disconnect(): void {
     this.cancelReconnect();
     this._initialized = false;
+    this.serverInfo = null;
     this.transport?.stop();
     this.transport = null;
     this.emit("disconnected");
@@ -192,6 +201,35 @@ export class MCPClient extends EventEmitter {
 
   async listTools(): Promise<McpToolsListResult> {
     return this.request("tools/list", {}) as Promise<McpToolsListResult>;
+  }
+
+  async listToolNames(forceRefresh: boolean = false): Promise<Set<string>> {
+    const now = Date.now();
+    // Keep the cache short-lived so UI adapts quickly after backend upgrades.
+    if (
+      !forceRefresh &&
+      this.toolCache &&
+      now - this.toolCacheUpdatedAt < 10_000
+    ) {
+      return this.toolCache;
+    }
+
+    const result = await this.listTools();
+    const tools = Array.isArray((result as any)?.tools) ? (result as any).tools : [];
+    const names = new Set<string>();
+    for (const tool of tools) {
+      if (tool && typeof tool.name === "string") {
+        names.add(tool.name);
+      }
+    }
+    this.toolCache = names;
+    this.toolCacheUpdatedAt = now;
+    return names;
+  }
+
+  async supportsTool(name: string): Promise<boolean> {
+    const names = await this.listToolNames();
+    return names.has(name);
   }
 
   // ── Core protocol methods ────────────────────────────────

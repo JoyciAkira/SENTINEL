@@ -100,6 +100,14 @@ export interface GoalNodeState {
     status: string;
 }
 
+export interface RuntimeCapabilitiesState {
+    tool_count: number;
+    tools: string[];
+    server_name: string;
+    server_version: string;
+    connected: boolean;
+}
+
 export interface AppState {
     connected: boolean;
     messages: ChatMessage[];
@@ -111,6 +119,7 @@ export interface AppState {
     policyAction: PolicyActionState | null;
     timeline: TimelineEventState[];
     goals: GoalNodeState[];
+    runtimeCapabilities: RuntimeCapabilitiesState | null;
     goalsCollapsed: boolean;
     inputText: string;
 
@@ -134,6 +143,7 @@ export interface AppState {
     addTimelineEvent: (event: TimelineEventState) => void;
     clearTimeline: () => void;
     setGoals: (goals: GoalNodeState[]) => void;
+    setRuntimeCapabilities: (capabilities: RuntimeCapabilitiesState) => void;
     toggleGoalsCollapsed: () => void;
     setInputText: (text: string) => void;
     clearMessages: () => void;

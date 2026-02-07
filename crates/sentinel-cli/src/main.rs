@@ -200,10 +200,15 @@ async fn main() -> anyhow::Result<()> {
                     ))
                 } else {
                     let model_id = std::env::var("OPENROUTER_MODEL")
-                        .unwrap_or_else(|_| "deepseek/deepseek-r1:free".to_string());
+                        .unwrap_or_else(|_| "deepseek/deepseek-r1-0528:free".to_string());
+                    let normalized_model_id = if model_id == "deepseek/deepseek-r1:free" {
+                        "deepseek/deepseek-r1-0528:free".to_string()
+                    } else {
+                        model_id
+                    };
                     Box::new(OpenRouterClient::new(
                         std::env::var("OPENROUTER_API_KEY").unwrap(),
-                        OpenRouterModel::Custom(model_id),
+                        OpenRouterModel::Custom(normalized_model_id),
                     ))
                 };
 

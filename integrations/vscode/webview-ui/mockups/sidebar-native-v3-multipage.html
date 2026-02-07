@@ -1,0 +1,526 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Sentinel Sidebar v3 - Multipage Clickable Mockup</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #111317;
+        --surface: #171b21;
+        --surface-2: #1d232b;
+        --line: #2b333f;
+        --text: #e8edf6;
+        --muted: #9da8b7;
+        --subtle: #748192;
+        --accent: #47cbb5;
+        --accent-soft: rgba(71, 203, 181, 0.16);
+        --ok: #47c77a;
+        --warn: #d89a3a;
+        --danger: #df6277;
+      }
+
+      [data-theme="warm-graphite"] {
+        --bg: #151311;
+        --surface: #1e1915;
+        --surface-2: #26201a;
+        --line: #3a3228;
+        --text: #f0e6da;
+        --muted: #c1ad96;
+        --subtle: #8f7d68;
+        --accent: #d0a16b;
+        --accent-soft: rgba(208, 161, 107, 0.17);
+        --ok: #7ac57a;
+        --warn: #e0ad58;
+        --danger: #d87b87;
+      }
+
+      [data-theme="pure-vscode"] {
+        --bg: var(--vscode-sideBar-background, #1f1f1f);
+        --surface: var(--vscode-editor-background, #252526);
+        --surface-2: color-mix(in oklab, var(--vscode-editor-background, #252526) 90%, white);
+        --line: var(--vscode-widget-border, #454545);
+        --text: var(--vscode-editor-foreground, #d4d4d4);
+        --muted: var(--vscode-descriptionForeground, #999999);
+        --subtle: var(--vscode-disabledForeground, #777777);
+        --accent: var(--vscode-button-background, #0e639c);
+        --accent-soft: color-mix(in oklab, var(--vscode-button-background, #0e639c) 20%, transparent);
+        --ok: var(--vscode-testing-iconPassed, #89d185);
+        --warn: var(--vscode-editorWarning-foreground, #cca700);
+        --danger: var(--vscode-editorError-foreground, #f14c4c);
+      }
+
+      * { box-sizing: border-box; }
+      html, body {
+        margin: 0;
+        height: 100%;
+        overflow: hidden;
+        font-family: Inter, "Segoe UI", system-ui, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+      }
+
+      .app {
+        width: min(100vw, 390px);
+        height: 100vh;
+        margin: 0 auto;
+        border-left: 1px solid #222933;
+        border-right: 1px solid #222933;
+        display: grid;
+        grid-template-rows: auto auto 1fr auto;
+      }
+
+      .top {
+        padding: 10px;
+        border-bottom: 1px solid var(--line);
+        background: var(--surface);
+      }
+
+      .title {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 8px;
+      }
+      .title h1 {
+        margin: 0;
+        font-size: 13px;
+        letter-spacing: .08em;
+      }
+      .title button {
+        border: 1px solid var(--line);
+        background: var(--surface-2);
+        color: var(--text);
+        border-radius: 8px;
+        padding: 5px 8px;
+        font-size: 10px;
+        cursor: pointer;
+      }
+
+      .chips {
+        margin-top: 7px;
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+      }
+      .pill {
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 3px 8px;
+        font-size: 10px;
+        color: var(--muted);
+        background: var(--surface-2);
+      }
+      .pill.ok { color: var(--ok); }
+
+      .tabs {
+        padding: 8px 10px;
+        border-bottom: 1px solid var(--line);
+        background: var(--surface);
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 6px;
+      }
+      .tabs button {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--surface-2);
+        color: var(--muted);
+        font-size: 10px;
+        font-weight: 600;
+        height: 29px;
+        cursor: pointer;
+      }
+      .tabs button.active {
+        color: var(--text);
+        border-color: color-mix(in oklab, var(--accent) 56%, var(--line));
+        background: color-mix(in oklab, var(--accent-soft) 100%, var(--surface-2));
+      }
+
+      .pages {
+        min-height: 0;
+        overflow: auto;
+        padding: 10px;
+        display: grid;
+      }
+
+      .page { display: none; gap: 9px; align-content: start; }
+      .page.active { display: grid; }
+
+      .card {
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: var(--surface);
+        padding: 10px;
+      }
+      .card h3 {
+        margin: 0 0 7px;
+        font-size: 12px;
+      }
+      .card p {
+        margin: 0;
+        font-size: 11px;
+        line-height: 1.5;
+        color: var(--muted);
+      }
+
+      .kv { display: grid; gap: 6px; }
+      .kv .row {
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+        font-size: 11px;
+      }
+      .kv .row span:first-child { color: var(--muted); }
+      .kv .row span:last-child { font-family: ui-monospace, Menlo, monospace; }
+
+      .messages {
+        display: grid;
+        gap: 10px;
+      }
+      .msg .role {
+        font-size: 9px;
+        text-transform: uppercase;
+        letter-spacing: .12em;
+        color: var(--subtle);
+        margin-bottom: 4px;
+      }
+      .bubble {
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: var(--surface);
+        padding: 10px;
+        font-size: 12px;
+        line-height: 1.5;
+      }
+      .msg.user .bubble { background: var(--surface-2); }
+      .details {
+        margin-top: 7px;
+        border-top: 1px dashed color-mix(in oklab, var(--line) 90%, transparent);
+        padding-top: 7px;
+        display: none;
+        gap: 3px;
+        font-size: 10px;
+        color: #bcc7d8;
+      }
+      .details.show { display: grid; }
+      .toggle-link {
+        margin-top: 7px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: color-mix(in oklab, var(--accent-soft) 80%, var(--surface-2));
+        color: var(--text);
+        font-size: 10px;
+        padding: 4px 8px;
+        cursor: pointer;
+      }
+
+      .list { display: grid; gap: 7px; }
+      .item {
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: var(--surface-2);
+        padding: 8px;
+      }
+      .item strong { display: block; font-size: 11px; margin-bottom: 3px; }
+      .item small { color: var(--muted); font-size: 10px; }
+
+      .timeline { display: grid; gap: 7px; }
+      .event {
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: var(--surface-2);
+        padding: 8px;
+      }
+      .event .meta {
+        display: flex;
+        justify-content: space-between;
+        font-size: 10px;
+        color: var(--subtle);
+        margin-bottom: 4px;
+        text-transform: uppercase;
+      }
+      .event strong { display: block; font-size: 11px; margin-bottom: 3px; }
+      .event p { margin: 0; font-size: 10px; color: var(--muted); }
+
+      .controls {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+      .controls button, .controls select, .controls label {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--surface-2);
+        color: var(--text);
+        font-size: 10px;
+        padding: 6px 8px;
+      }
+      .controls select { cursor: pointer; }
+      .controls label { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+
+      .composer {
+        border-top: 1px solid var(--line);
+        background: var(--surface);
+        padding: 10px;
+        display: grid;
+        gap: 7px;
+        position: sticky;
+        bottom: 0;
+      }
+      textarea {
+        width: 100%;
+        min-height: 70px;
+        max-height: 180px;
+        resize: none;
+        border-radius: 10px;
+        border: 1px solid color-mix(in oklab, var(--line) 90%, white);
+        background: var(--surface-2);
+        color: var(--text);
+        padding: 9px;
+        font-size: 12px;
+      }
+      .composer .row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 8px;
+      }
+      .hint { font-size: 10px; color: var(--subtle); }
+      .btns { display: flex; gap: 6px; }
+      .btns button {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        height: 31px;
+        padding: 0 10px;
+        background: var(--surface-2);
+        color: var(--text);
+        font-size: 11px;
+        cursor: pointer;
+      }
+      .btns button.primary {
+        border-color: color-mix(in oklab, var(--accent) 60%, var(--line));
+        background: color-mix(in oklab, var(--accent) 36%, var(--surface-2));
+      }
+
+      .compact .pages { padding: 8px; }
+      .compact .card { padding: 8px; }
+      .compact .bubble { padding: 8px; font-size: 11px; }
+      .compact .event { padding: 7px; }
+      .compact .composer { padding: 8px; }
+      .compact textarea { min-height: 62px; font-size: 11px; }
+    </style>
+  </head>
+  <body data-theme="mono-mint">
+    <main class="app" id="app">
+      <header class="top">
+        <div class="title">
+          <h1>SENTINEL CHAT</h1>
+          <button onclick="toggleMission()">Mission Mode</button>
+        </div>
+        <div class="chips">
+          <span class="pill ok">Connected</span>
+          <span class="pill">Alignment 93%</span>
+          <span class="pill">Risk Low</span>
+          <span class="pill">Policy Guarded</span>
+        </div>
+      </header>
+
+      <nav class="tabs" id="tabs">
+        <button data-page="command" class="active">Command</button>
+        <button data-page="chat">Chat</button>
+        <button data-page="forge">Forge</button>
+        <button data-page="network">Network</button>
+        <button data-page="audit">Audit</button>
+        <button data-page="settings">Settings</button>
+      </nav>
+
+      <section class="pages">
+        <section id="page-command" class="page active">
+          <article class="card">
+            <h3>Operational Snapshot</h3>
+            <div class="kv">
+              <div class="row"><span>Goals completed</span><span>3 / 5</span></div>
+              <div class="row"><span>Pending approvals</span><span>1</span></div>
+              <div class="row"><span>Tool calls</span><span>12</span></div>
+              <div class="row"><span>Drift risk</span><span>6.8%</span></div>
+            </div>
+          </article>
+          <article class="card">
+            <h3>Current Focus</h3>
+            <p>Refactor chat UX for sidebar-native flow while preserving deterministic controls and explainability.</p>
+          </article>
+          <article class="card">
+            <h3>Signals</h3>
+            <div class="list">
+              <div class="item"><strong>Prompt Received</strong><small>10:44:01 • User intent parsed</small></div>
+              <div class="item"><strong>Plan Decomposed</strong><small>10:44:02 • 4 atomic goals</small></div>
+              <div class="item"><strong>Policy Check Passed</strong><small>10:44:03 • no governance conflict</small></div>
+            </div>
+          </article>
+        </section>
+
+        <section id="page-chat" class="page">
+          <article class="card">
+            <h3>Quick Actions</h3>
+            <div class="controls">
+              <button>/init</button>
+              <button>/memory-status</button>
+              <button>Validate</button>
+              <button>Regenerate</button>
+            </div>
+          </article>
+          <article class="card messages">
+            <div class="msg user">
+              <div class="role">User</div>
+              <div class="bubble">Create a home monitoring app with role access and realtime alerts.</div>
+            </div>
+            <div class="msg">
+              <div class="role">Sentinel</div>
+              <div class="bubble">
+                Plan generated with governance lock enabled. I will ask approval before dependency drift.
+                <button class="toggle-link" data-target="chat-details">Show details</button>
+                <div class="details" id="chat-details">
+                  <span>Explainability: intent aligned to active manifold.</span>
+                  <span>Evidence: reliability healthy, no policy violations.</span>
+                  <span>Trace: TRN-C8F7A102-49</span>
+                </div>
+              </div>
+            </div>
+          </article>
+          <article class="card">
+            <h3>Timeline (Compact)</h3>
+            <div class="timeline">
+              <div class="event"><div class="meta"><span>received</span><span>10:44:01</span></div><strong>Prompt accepted</strong><p>User request parsed and contextualized.</p></div>
+              <div class="event"><div class="meta"><span>plan</span><span>10:44:02</span></div><strong>Plan decomposition</strong><p>4 deterministic goals + dependency map.</p></div>
+              <div class="event"><div class="meta"><span>result</span><span>10:44:03</span></div><strong>Ready for execution</strong><p>Awaiting user confirmation.</p></div>
+            </div>
+          </article>
+        </section>
+
+        <section id="page-forge" class="page">
+          <article class="card">
+            <h3>Goal Forge</h3>
+            <p>Dependency topology and sequencing for current mission.</p>
+          </article>
+          <article class="card">
+            <div class="list">
+              <div class="item"><strong>G1 Foundation</strong><small>Status: Completed • Value: 0.93</small></div>
+              <div class="item"><strong>G2 Backend Synthesis</strong><small>Status: InProgress • Depends on G1</small></div>
+              <div class="item"><strong>G3 Frontend Synthesis</strong><small>Status: Pending • Depends on G1</small></div>
+              <div class="item"><strong>G4 Verification</strong><small>Status: Pending • Depends on G2 + G3</small></div>
+            </div>
+          </article>
+        </section>
+
+        <section id="page-network" class="page">
+          <article class="card">
+            <h3>Federation View</h3>
+            <div class="kv">
+              <div class="row"><span>Relay health</span><span>Nominal</span></div>
+              <div class="row"><span>Active agents</span><span>1</span></div>
+              <div class="row"><span>Secure channels</span><span>1/1</span></div>
+              <div class="row"><span>Trust vector</span><span>0.94</span></div>
+            </div>
+          </article>
+        </section>
+
+        <section id="page-audit" class="page">
+          <article class="card">
+            <h3>Execution Log</h3>
+            <div class="list">
+              <div class="item"><strong>TRN-C8F7A102-49</strong><small>User prompt -> plan generation</small></div>
+              <div class="item"><strong>TRN-C8F7A102-50</strong><small>Governance seed check</small></div>
+              <div class="item"><strong>TRN-C8F7A102-51</strong><small>Awaiting dependency approval</small></div>
+            </div>
+          </article>
+        </section>
+
+        <section id="page-settings" class="page">
+          <article class="card">
+            <h3>Appearance Presets</h3>
+            <div class="controls">
+              <select id="themeSelect">
+                <option value="mono-mint">Monochrome Mint</option>
+                <option value="warm-graphite">Warm Graphite</option>
+                <option value="pure-vscode">Pure VSCode</option>
+              </select>
+              <label><input type="checkbox" id="compactToggle" /> Compact density</label>
+            </div>
+          </article>
+          <article class="card">
+            <h3>Runtime Controls</h3>
+            <div class="kv">
+              <div class="row"><span>Action Gate</span><span>Enabled</span></div>
+              <div class="row"><span>Governance Lock</span><span>Enabled</span></div>
+              <div class="row"><span>Reliability SLO</span><span>Healthy</span></div>
+              <div class="row"><span>Pending Proposal</span><span>1</span></div>
+            </div>
+          </article>
+        </section>
+      </section>
+
+      <footer class="composer">
+        <textarea id="composer" placeholder="Ask Sentinel to plan, execute, or verify..."></textarea>
+        <div class="row">
+          <span class="hint">Enter send • Shift+Enter newline • Sticky composer</span>
+          <div class="btns">
+            <button>Stop</button>
+            <button class="primary">Execute</button>
+          </div>
+        </div>
+      </footer>
+    </main>
+
+    <script>
+      const app = document.getElementById("app");
+      const tabs = document.getElementById("tabs");
+      const pages = [...document.querySelectorAll(".page")];
+      const themeSelect = document.getElementById("themeSelect");
+      const compactToggle = document.getElementById("compactToggle");
+      const composer = document.getElementById("composer");
+
+      tabs.addEventListener("click", (e) => {
+        const btn = e.target.closest("button[data-page]");
+        if (!btn) return;
+        tabs.querySelectorAll("button").forEach((b) => b.classList.remove("active"));
+        btn.classList.add("active");
+        const id = btn.dataset.page;
+        pages.forEach((p) => p.classList.toggle("active", p.id === `page-${id}`));
+      });
+
+      document.querySelectorAll(".toggle-link").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const target = document.getElementById(btn.dataset.target);
+          if (!target) return;
+          const show = target.classList.toggle("show");
+          btn.textContent = show ? "Hide details" : "Show details";
+        });
+      });
+
+      themeSelect.addEventListener("change", () => {
+        document.body.setAttribute("data-theme", themeSelect.value);
+      });
+
+      compactToggle.addEventListener("change", () => {
+        app.classList.toggle("compact", compactToggle.checked);
+      });
+
+      function autoResize() {
+        composer.style.height = "auto";
+        const max = Math.min(180, Math.floor(window.innerHeight * 0.28));
+        composer.style.height = Math.min(composer.scrollHeight, max) + "px";
+        composer.style.overflowY = composer.scrollHeight > max ? "auto" : "hidden";
+      }
+
+      composer.addEventListener("input", autoResize);
+      window.addEventListener("resize", autoResize);
+      autoResize();
+
+      window.toggleMission = function () {
+        alert("Mock action: this would open Mission Control panel.");
+      };
+    </script>
+  </body>
+</html>

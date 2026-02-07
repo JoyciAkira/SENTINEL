@@ -1,17 +1,37 @@
-import React, { useRef, useCallback } from "react";
+import React, { useRef, useCallback, useLayoutEffect } from "react";
 import { useStore } from "../../state/store";
 import { useVSCodeAPI } from "../../hooks/useVSCodeAPI";
 import { Send, Command, CornerDownLeft } from "lucide-react";
 import { Button } from "../ui/button";
 import { cn } from "@/lib/utils";
 
-export default function ChatInput() {
+export default function ChatInput({
+  compact = false,
+  clineMode = false,
+}: {
+  compact?: boolean;
+  clineMode?: boolean;
+}) {
   const inputText = useStore((s) => s.inputText);
   const setInputText = useStore((s) => s.setInputText);
   const addMessage = useStore((s) => s.addMessage);
   const connected = useStore((s) => s.connected);
   const vscode = useVSCodeAPI();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const resizeTextarea = useCallback(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    const viewportBasedMax = Math.floor(window.innerHeight * 0.32);
+    const maxHeight = Math.max(120, Math.min(240, viewportBasedMax));
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, maxHeight)}px`;
+    el.style.overflowY = el.scrollHeight > maxHeight ? "auto" : "hidden";
+  }, []);
+
+  useLayoutEffect(() => {
+    resizeTextarea();
+  }, [inputText, resizeTextarea]);
 
   const send = useCallback(() => {
     const text = inputText.trim();
@@ -20,9 +40,7 @@ export default function ChatInput() {
     if (text === "/clear-memory") {
       vscode.postMessage({ type: "clearChatMemory" });
       setInputText("");
-      if (textareaRef.current) {
-        textareaRef.current.style.height = "auto";
-      }
+      requestAnimationFrame(() => resizeTextarea());
       return;
     }
 
@@ -40,11 +58,8 @@ export default function ChatInput() {
 
     setInputText("");
 
-    // Reset textarea height
-    if (textareaRef.current) {
-      textareaRef.current.style.height = "auto";
-    }
-  }, [inputText, connected, addMessage, setInputText, vscode]);
+    requestAnimationFrame(() => resizeTextarea());
+  }, [inputText, connected, addMessage, setInputText, vscode, resizeTextarea]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -55,13 +70,11 @@ export default function ChatInput() {
 
   const handleInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setInputText(e.target.value);
-    const el = e.target;
-    el.style.height = "auto";
-    el.style.height = Math.min(el.scrollHeight, 150) + "px";
+    requestAnimationFrame(() => resizeTextarea());
   };
 
   return (
-    <div className="relative group animate-in slide-in-from-bottom-2 duration-500 delay-150 fill-mode-both">
+    <div className={cn("relative group animate-in slide-in-from-bottom-2 duration-500 delay-150 fill-mode-both", clineMode && "sentinel-input--cline")}>
       <div className={cn(
         "relative flex flex-col rounded-xl border bg-card/50 shadow-sm transition-all overflow-hidden",
         "focus-within:border-primary/30 focus-within:ring-2 focus-within:ring-primary/10",
@@ -75,17 +88,20 @@ export default function ChatInput() {
           placeholder={connected ? "Ask Sentinel anything..." : "Establishing connection..."}
           disabled={!connected}
           rows={1}
-          className="w-full bg-transparent border-none focus:ring-0 text-sm px-4 pt-4 pb-12 resize-none min-h-[56px] placeholder:text-muted-foreground outline-none"
+          className={cn(
+            "w-full bg-transparent border-none focus:ring-0 px-4 pt-3 pb-12 resize-none min-h-[56px] placeholder:text-muted-foreground outline-none",
+            compact ? "text-[12px]" : "text-sm",
+          )}
         />
         
-        <div className="absolute left-3 bottom-3 flex items-center gap-2">
+        <div className={cn("absolute left-3 bottom-3 flex items-center gap-2", clineMode && "sentinel-input__left-meta")}>
            <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-accent/30 border border-border text-[10px] text-muted-foreground font-medium">
               <Command className="size-2.5" />
-              <span>Context Active</span>
+              <span>{clineMode ? "Auto-approve: Read/Edit safe commands" : "Context Active"}</span>
            </div>
         </div>
 
-        <div className="absolute right-3 bottom-3 flex items-center gap-3">
+        <div className={cn("absolute right-3 bottom-3 flex items-center gap-3", clineMode && "sentinel-input__right-meta")}>
           <div className="hidden sm:flex items-center gap-1 text-[10px] text-muted-foreground font-medium mr-1 opacity-50">
             <CornerDownLeft className="size-2.5" />
             <span>Send</span>

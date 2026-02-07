@@ -12,6 +12,7 @@ export const useStore = create<AppState>((set) => ({
     policyAction: null,
     timeline: [],
     goals: [],
+    runtimeCapabilities: null,
     goalsCollapsed: true,
     inputText: '',
 
@@ -69,6 +70,8 @@ export const useStore = create<AppState>((set) => ({
     clearTimeline: () => set({ timeline: [] }),
 
     setGoals: (goals: GoalNodeState[]) => set({ goals }),
+
+    setRuntimeCapabilities: (runtimeCapabilities) => set({ runtimeCapabilities }),
 
     toggleGoalsCollapsed: () =>
         set((state) => ({ goalsCollapsed: !state.goalsCollapsed })),

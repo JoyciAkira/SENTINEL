@@ -23,6 +23,7 @@ export function useMCPMessages(vscodeApi: VSCodeAPI): void {
     const addTimelineEvent = useStore((s) => s.addTimelineEvent);
     const clearTimeline = useStore((s) => s.clearTimeline);
     const setGoals = useStore((s) => s.setGoals);
+    const setRuntimeCapabilities = useStore((s) => s.setRuntimeCapabilities);
 
     useEffect(() => {
         const handler = (event: MessageEvent) => {
@@ -119,6 +120,12 @@ export function useMCPMessages(vscodeApi: VSCodeAPI): void {
                     setGoals(msg.goals ?? []);
                     break;
 
+                case 'runtimeCapabilities':
+                    if (msg.capabilities) {
+                        setRuntimeCapabilities(msg.capabilities);
+                    }
+                    break;
+
                 case 'reliabilityUpdate':
                     if (msg.reliability && msg.reliability_thresholds && msg.reliability_slo) {
                         setReliability(msg.reliability, msg.reliability_thresholds, msg.reliability_slo);
@@ -156,5 +163,6 @@ export function useMCPMessages(vscodeApi: VSCodeAPI): void {
         addTimelineEvent,
         clearTimeline,
         setGoals,
+        setRuntimeCapabilities,
     ]);
 }

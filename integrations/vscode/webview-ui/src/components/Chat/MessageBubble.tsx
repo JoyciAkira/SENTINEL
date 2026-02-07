@@ -5,7 +5,15 @@ import ToolCallCard from "./ToolCallCard";
 import FileApproval from "../Actions/FileApproval";
 import { cn } from "@/lib/utils";
 
-export default function MessageBubble({ message, index }: { message: ChatMessage; index: number }) {
+export default function MessageBubble({
+  message,
+  index,
+  compact = false,
+}: {
+  message: ChatMessage;
+  index: number;
+  compact?: boolean;
+}) {
   const isUser = message.role === "user";
   const [thoughtsExpanded, setThoughtsExpanded] = useState(false);
   const hasThoughts = message.thoughtChain && message.thoughtChain.length > 0;
@@ -17,7 +25,7 @@ export default function MessageBubble({ message, index }: { message: ChatMessage
       isUser ? "justify-end" : "justify-start"
     )} style={{ animationDelay: `${Math.min(index * 50, 300)}ms` }}>
       <div className={cn(
-        "flex max-w-[85%] gap-3",
+        compact ? "flex max-w-[92%] gap-2" : "flex max-w-[85%] gap-3",
         isUser ? "flex-row-reverse" : "flex-row"
       )}>
         {/* AVATAR */}
@@ -33,7 +41,9 @@ export default function MessageBubble({ message, index }: { message: ChatMessage
         {/* CONTENT */}
         <div className={cn("space-y-2 w-full", isUser ? "items-end" : "items-start")}>
           <div className={cn(
-            "px-4 py-3 rounded-2xl shadow-sm text-sm leading-relaxed border",
+            compact
+              ? "px-3 py-2 rounded-xl shadow-sm text-[12px] leading-relaxed border"
+              : "px-4 py-3 rounded-2xl shadow-sm text-sm leading-relaxed border",
             isUser 
               ? "bg-primary/5 border-primary/10 text-foreground rounded-tr-none" 
               : "bg-card border-border text-foreground rounded-tl-none"
