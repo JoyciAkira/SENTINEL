@@ -250,11 +250,24 @@ try:
         data = json.loads(result.stdout)
         if "manifold" in data:
             manifold = data["manifold"]
-            root = manifold.get("root_intent", {})
-            goals = manifold.get("goal_dag", {}).get("nodes", {})
-            invariants = manifold.get("invariants", [])
-            log_pass(f"Goals data: {len(goals)} goals, {len(invariants)} invariants")
-            print(f"  Root intent: {root.get('description', 'N/A')[:60]}")
+            if isinstance(manifold, dict):
+                root = manifold.get("root_intent", {})
+                goals = manifold.get("goal_dag", {}).get("nodes", {})
+                invariants = manifold.get("invariants", [])
+                if isinstance(root, dict):
+                    root_desc = str(root.get("description", "N/A"))
+                elif isinstance(root, str):
+                    root_desc = root
+                else:
+                    root_desc = "N/A"
+                goals_count = len(goals)
+                invariants_count = len(invariants)
+            else:
+                root_desc = str(data.get("compass", {}).get("where_we_must_go", "N/A"))
+                goals_count = int(data.get("goals_total", 0))
+                invariants_count = 0
+            log_pass(f"Goals data: {goals_count} goals, {invariants_count} invariants")
+            print(f"  Root intent: {root_desc[:60]}")
         else:
             log_fail("Missing manifold in CLI status")
     else:
@@ -477,8 +490,12 @@ log_test("Webview assets exist")
 webview_dir = os.path.join(out_dir, "webview")
 if os.path.exists(webview_dir):
     index_html = os.path.join(webview_dir, "index.html")
-    assets_js = os.path.join(webview_dir, "assets", "index.js")
-    if os.path.exists(index_html) and os.path.exists(assets_js):
+    assets_dir = os.path.join(webview_dir, "assets")
+    hashed_js = []
+    if os.path.exists(assets_dir):
+        hashed_js = [name for name in os.listdir(assets_dir) if name.startswith("index-") and name.endswith(".js")]
+    if os.path.exists(index_html) and hashed_js:
+        assets_js = os.path.join(assets_dir, hashed_js[0])
         log_pass("Webview assets present")
         size = os.path.getsize(assets_js)
         print(f"  Bundle size: {size / 1024:.1f} KB")

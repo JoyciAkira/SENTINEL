@@ -642,6 +642,279 @@ fn stream_chunks(content: &str, chunk_len: usize) -> Vec<String> {
     chunks
 }
 
+fn contains_unresolved_placeholders(text: &str) -> bool {
+    text.lines().any(|line| {
+        let trimmed = line.trim();
+        let lower = trimmed.to_ascii_lowercase();
+        lower == "undefined"
+            || lower == "null"
+            || lower == "- undefined"
+            || lower == "* undefined"
+            || lower.ends_with(": undefined")
+            || lower.ends_with(": null")
+            || lower.contains(" `undefined`")
+            || lower.contains(" 'undefined'")
+    })
+}
+
+fn sanitize_chat_response(raw: &str) -> String {
+    let mut in_code_block = false;
+    let mut first_pass: Vec<String> = Vec::new();
+
+    for original in raw.lines() {
+        let trimmed = original.trim();
+        if trimmed.starts_with("```") {
+            in_code_block = !in_code_block;
+            first_pass.push(original.to_string());
+            continue;
+        }
+
+        if in_code_block {
+            first_pass.push(original.to_string());
+            continue;
+        }
+
+        let lower = trimmed.to_ascii_lowercase();
+        if lower == "undefined"
+            || lower == "null"
+            || lower == "- undefined"
+            || lower == "* undefined"
+            || lower.ends_with(": undefined")
+            || lower.ends_with(": null")
+        {
+            continue;
+        }
+
+        let cleaned = original
+            .replace("`undefined`", "dettaglio mancante")
+            .replace("'undefined'", "'dettaglio mancante'")
+            .replace("\"undefined\"", "\"dettaglio mancante\"");
+
+        first_pass.push(cleaned);
+    }
+
+    let mut second_pass: Vec<String> = Vec::new();
+    for (idx, line) in first_pass.iter().enumerate() {
+        let trimmed = line.trim();
+        if trimmed.ends_with(':') {
+            let next_non_empty = first_pass
+                .iter()
+                .skip(idx + 1)
+                .find(|candidate| !candidate.trim().is_empty())
+                .map(|candidate| candidate.trim().to_string());
+            if let Some(next_line) = next_non_empty {
+                if next_line.ends_with(':') {
+                    continue;
+                }
+            } else {
+                continue;
+            }
+        }
+        second_pass.push(line.clone());
+    }
+
+    let compact = second_pass.join("\n");
+    let mut collapsed = String::new();
+    let mut previous_empty = false;
+    for line in compact.lines() {
+        let is_empty = line.trim().is_empty();
+        if is_empty && previous_empty {
+            continue;
+        }
+        collapsed.push_str(line);
+        collapsed.push('\n');
+        previous_empty = is_empty;
+    }
+
+    collapsed.trim().to_string()
+}
+
+fn wants_todo_bootstrap_template(user_message: &str) -> bool {
+    let message = user_message.to_ascii_lowercase();
+    if !(message.contains("todo") && message.contains("app")) {
+        return false;
+    }
+
+    let create_intent = [
+        "crea", "create", "build", "genera", "generate", "setup", "scaffold", "nuova app",
+        "new app", "from scratch", "da zero",
+    ]
+    .iter()
+    .any(|token| message.contains(token));
+
+    let complete_intent = [
+        "completa",
+        "completo",
+        "complete",
+        "full",
+        "full-stack",
+        "end-to-end",
+    ]
+    .iter()
+    .any(|token| message.contains(token));
+
+    create_intent && complete_intent && !is_goal_execution_request(user_message)
+}
+
+fn is_goal_execution_request(user_message: &str) -> bool {
+    let message = user_message.to_ascii_lowercase();
+    let high_confidence_signals = [
+        "solo il primo",
+        "only the first",
+        "niente scaffolding",
+        "no scaffolding",
+        "file changes",
+        "code changes",
+        "test minimi",
+        "minimal tests",
+        "goal pending",
+        "first pending goal",
+    ];
+    if high_confidence_signals
+        .iter()
+        .any(|token| message.contains(token))
+    {
+        return true;
+    }
+
+    let has_goal = message.contains("goal");
+    let has_pending = message.contains("pending");
+    let has_next_step = message.contains("prossimo step") || message.contains("next step");
+    let has_alignment_status = message.contains("alignment status") || message.contains("allineamento");
+
+    (has_goal && has_pending) || (has_goal && has_next_step) || (has_goal && has_alignment_status)
+}
+
+fn deterministic_template_for_common_requests(user_message: &str) -> Option<String> {
+    if wants_todo_bootstrap_template(user_message) {
+        return Some(
+            "Ecco un setup completo e subito eseguibile per una TODO app (React + Express + PostgreSQL).\n\n\
+## 1) Struttura progetto\n\
+```bash\n\
+mkdir -p todo-app/{client,server,database}\n\
+cd todo-app/server && npm init -y\n\
+npm i express cors pg express-validator dotenv\n\
+cd ../client && npm create vite@latest . -- --template react\n\
+npm i\n\
+```\n\n\
+## 2) Database (`database/init.sql`)\n\
+```sql\n\
+CREATE TABLE IF NOT EXISTS todos (\n\
+  id SERIAL PRIMARY KEY,\n\
+  title TEXT NOT NULL,\n\
+  completed BOOLEAN NOT NULL DEFAULT FALSE,\n\
+  created_at TIMESTAMP NOT NULL DEFAULT NOW()\n\
+);\n\
+```\n\n\
+## 3) Backend (`server/index.js`)\n\
+```js\n\
+import express from 'express';\n\
+import cors from 'cors';\n\
+import { Pool } from 'pg';\n\
+\n\
+const app = express();\n\
+app.use(cors());\n\
+app.use(express.json());\n\
+\n\
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });\n\
+\n\
+app.get('/api/todos', async (_req, res) => {\n\
+  const { rows } = await pool.query('SELECT * FROM todos ORDER BY id DESC');\n\
+  res.json(rows);\n\
+});\n\
+\n\
+app.post('/api/todos', async (req, res) => {\n\
+  const title = String(req.body?.title || '').trim();\n\
+  if (!title) return res.status(400).json({ error: 'title required' });\n\
+  const { rows } = await pool.query(\n\
+    'INSERT INTO todos(title) VALUES($1) RETURNING *',\n\
+    [title],\n\
+  );\n\
+  res.status(201).json(rows[0]);\n\
+});\n\
+\n\
+app.patch('/api/todos/:id/toggle', async (req, res) => {\n\
+  const { rows } = await pool.query(\n\
+    'UPDATE todos SET completed = NOT completed WHERE id = $1 RETURNING *',\n\
+    [req.params.id],\n\
+  );\n\
+  if (!rows[0]) return res.status(404).json({ error: 'not found' });\n\
+  res.json(rows[0]);\n\
+});\n\
+\n\
+app.delete('/api/todos/:id', async (req, res) => {\n\
+  await pool.query('DELETE FROM todos WHERE id = $1', [req.params.id]);\n\
+  res.status(204).end();\n\
+});\n\
+\n\
+app.listen(3001, () => console.log('API on :3001'));\n\
+```\n\n\
+## 4) Frontend (`client/src/App.jsx`)\n\
+```jsx\n\
+import { useEffect, useState } from 'react';\n\
+\n\
+const API = 'http://localhost:3001/api/todos';\n\
+\n\
+export default function App() {\n\
+  const [todos, setTodos] = useState([]);\n\
+  const [title, setTitle] = useState('');\n\
+\n\
+  const load = async () => setTodos(await (await fetch(API)).json());\n\
+  useEffect(() => { load(); }, []);\n\
+\n\
+  const createTodo = async () => {\n\
+    if (!title.trim()) return;\n\
+    await fetch(API, {\n\
+      method: 'POST',\n\
+      headers: { 'Content-Type': 'application/json' },\n\
+      body: JSON.stringify({ title }),\n\
+    });\n\
+    setTitle('');\n\
+    load();\n\
+  };\n\
+\n\
+  return (\n\
+    <main style={{ maxWidth: 640, margin: '2rem auto', fontFamily: 'sans-serif' }}>\n\
+      <h1>Todo List</h1>\n\
+      <div style={{ display: 'flex', gap: 8 }}>\n\
+        <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder='New task' />\n\
+        <button onClick={createTodo}>Add</button>\n\
+      </div>\n\
+      <ul>\n\
+        {todos.map((t) => (\n\
+          <li key={t.id} style={{ display: 'flex', gap: 8, marginTop: 8 }}>\n\
+            <button onClick={async () => { await fetch(`${API}/${t.id}/toggle`, { method: 'PATCH' }); load(); }}>\n\
+              {t.completed ? '✓' : '○'}\n\
+            </button>\n\
+            <span style={{ textDecoration: t.completed ? 'line-through' : 'none' }}>{t.title}</span>\n\
+            <button onClick={async () => { await fetch(`${API}/${t.id}`, { method: 'DELETE' }); load(); }}>Delete</button>\n\
+          </li>\n\
+        ))}\n\
+      </ul>\n\
+    </main>\n\
+  );\n\
+}\n\
+```\n\n\
+## 5) Run\n\
+```bash\n\
+# terminale 1\n\
+cd server && node index.js\n\
+\n\
+# terminale 2\n\
+cd client && npm run dev\n\
+```\n\n\
+Se vuoi, nel prossimo step ti preparo anche Docker Compose + auth JWT + test API."
+                .to_string(),
+        );
+    }
+    None
+}
+
+fn should_force_common_template(user_message: &str, response_text: &str) -> bool {
+    // Keep deterministic template as a safety net only when the response is clearly broken.
+    wants_todo_bootstrap_template(user_message) && contains_unresolved_placeholders(response_text)
+}
+
 fn parse_comparison(value: Option<&str>) -> Comparison {
     match value.unwrap_or("<=") {
         "==" => Comparison::Equal,
@@ -1659,7 +1932,11 @@ async fn handle_tool_call(params: Option<Value>) -> Option<Value> {
             }
 
             let memory_store = load_chat_memory();
-            let memory_hits = top_memory_context(&memory_store, message, 5);
+            let strict_goal_execution = is_goal_execution_request(message);
+            let mut memory_hits = top_memory_context(&memory_store, message, 5);
+            if strict_goal_execution {
+                memory_hits.retain(|hit| !wants_todo_bootstrap_template(&hit.user));
+            }
             let memory_context = if memory_hits.is_empty() {
                 "Nessun precedente rilevante.".to_string()
             } else {
@@ -1697,21 +1974,78 @@ async fn handle_tool_call(params: Option<Value>) -> Option<Value> {
                 None
             };
 
-            let system_prompt = build_system_prompt()
+            let mut system_prompt = build_system_prompt()
                 + "\nSei un agente Sentinel. Il tuo compito è aiutare l'utente con l'allineamento degli obiettivi. \
                 Usa un tono professionale, tecnico e deterministico. Rispondi in italiano."
                 + "\nRegole output: prima risposta concreta, poi razionale sintetico. Evita prolissità."
                 + "\nSe trovi rischio governance/reliability, esplicitalo chiaramente.";
+            if strict_goal_execution {
+                system_prompt.push_str(
+                    "\nModalità esecuzione goal: se l'utente richiede solo il goal pending, \
+                    NON proporre scaffolding iniziale o setup completo da zero. \
+                    Produci solo file changes mirati + test minimi nel path richiesto.",
+                );
+            }
 
-            let user_prompt = format!(
-                "Messaggio utente:\n{}\n\nMemoria rilevante:\n{}\n\nRispondi con priorità a: cosa fare adesso, come farlo in sicurezza, quali rischi monitorare.",
-                message, memory_context
-            );
+            let user_prompt = if strict_goal_execution {
+                format!(
+                    "Messaggio utente:\n{}\n\nMemoria rilevante:\n{}\n\n\
+Rispondi con output operativo in questo formato:\n\
+1) File changes (solo file da modificare/creare, niente scaffolding generale)\n\
+2) Test minimi\n\
+3) Comandi di verifica strettamente necessari\n\
+Vincoli: evita testo generico, evita setup da zero, evita ripetere template TODO completo.\n\
+Se l'utente indica una directory progetto (es. todo-app), usa path espliciti sotto quella directory.",
+                    message, memory_context
+                )
+            } else {
+                format!(
+                    "Messaggio utente:\n{}\n\nMemoria rilevante:\n{}\n\nRispondi con priorità a: cosa fare adesso, come farlo in sicurezza, quali rischi monitorare.",
+                    message, memory_context
+                )
+            };
 
-            let response_text = match chat_with_llm(&system_prompt, &user_prompt).await {
+            let llm_response = match chat_with_llm(&system_prompt, &user_prompt).await {
                 Some(content) => content.trim().to_string(),
                 None => "Errore durante l'inferenza dell'agente. Verifica le API key.".to_string(),
             };
+            let mut response_text = sanitize_chat_response(&llm_response);
+
+            if contains_unresolved_placeholders(&response_text) {
+                let repair_prompt = format!(
+                    "Messaggio utente:\n{}\n\nRisposta bozza da correggere:\n{}\n\n\
+Correggi la risposta eliminando placeholder incompleti (es. undefined/null).\n\
+Regole obbligatorie:\n\
+- nessuna riga con 'undefined' o 'null' come valore\n\
+- ogni sezione deve essere concreta e direttamente eseguibile\n\
+- se un dettaglio non è certo, ometti la sezione invece di usare placeholder\n\
+- mantieni risposta tecnica e concisa in italiano.",
+                    message, response_text
+                );
+
+                if let Some(repaired) = chat_with_llm(&system_prompt, &repair_prompt).await {
+                    response_text = sanitize_chat_response(repaired.trim());
+                }
+            }
+
+            if should_force_common_template(message, &response_text) {
+                if let Some(template) = deterministic_template_for_common_requests(message) {
+                    response_text = template;
+                }
+            }
+
+            if response_text.trim().is_empty() || contains_unresolved_placeholders(&response_text) {
+                if let Some(template) = deterministic_template_for_common_requests(message) {
+                    response_text = template;
+                } else {
+                    response_text = "Non posso rispondere con placeholder incompleti. \
+Ti propongo un piano concreto in 3 step: \
+1) definisco stack e struttura progetto, \
+2) genero backend/frontend minimi funzionanti, \
+3) aggiungo test e verifica build."
+                        .to_string();
+                }
+            }
             let stream_chunks = stream_chunks(&response_text, 140);
 
             let (alignment_score, reliability_ok, risk_flag) =
@@ -2208,5 +2542,82 @@ mod tests {
         let text = "a\nb\nc\nd";
         assert_eq!(tail_lines(text, 2), "c\nd");
         assert_eq!(tail_lines(text, 10), text);
+    }
+
+    #[test]
+    fn placeholder_detection_works() {
+        assert!(contains_unresolved_placeholders("Configura DB:\nundefined"));
+        assert!(contains_unresolved_placeholders("x: null"));
+        assert!(!contains_unresolved_placeholders("Setup completo pronto."));
+    }
+
+    #[test]
+    fn sanitize_chat_response_removes_placeholder_lines() {
+        let raw = "Setup progetto:\nundefined\nBackend:\n- endpoint /todos\n";
+        let cleaned = sanitize_chat_response(raw);
+        assert!(!cleaned.to_ascii_lowercase().contains("undefined"));
+        assert!(cleaned.contains("endpoint /todos"));
+    }
+
+    #[test]
+    fn deterministic_template_todo_is_available() {
+        let message = "crea una todo list app completa";
+        let template = deterministic_template_for_common_requests(message)
+            .expect("todo template should be available");
+        assert!(template.contains("server/index.js"));
+        assert!(!template.to_ascii_lowercase().contains("undefined"));
+    }
+
+    #[test]
+    fn deterministic_template_not_used_for_goal_execution_requests() {
+        let message =
+            "Implementa il primo goal pending end-to-end in todo-app, con codice completo + test minimi.";
+        assert!(deterministic_template_for_common_requests(message).is_none());
+    }
+
+    #[test]
+    fn should_force_template_for_incomplete_todo_answer() {
+        let message = "crea una todo list app completa";
+        let partial = "Stack: frontend React, backend Express, database PostgreSQL.";
+        assert!(!should_force_common_template(message, partial));
+
+        let complete = "## 1) Struttura\n```bash\nmkdir -p todo-app/{client,server,database}\n```\n\
+## 2) DB (database/init.sql)\n```sql\nCREATE TABLE todos(id serial primary key);\n```\n\
+## 3) Backend (server/index.js)\n```js\napp.get('/api/todos', ()=>{}); app.post('/api/todos', ()=>{});\n```\n\
+## 4) Frontend (client/src/App.jsx)\n```jsx\nexport default function App(){}\n```\n\
+## 5) Run\n```bash\ncd server && node index.js\ncd client && npm run dev\n```";
+        assert!(!should_force_common_template(message, complete));
+
+        let broken = "Database:\nundefined\nBackend:\n- endpoint /api/todos";
+        assert!(should_force_common_template(message, broken));
+    }
+
+    #[test]
+    fn should_not_force_template_for_goal_execution_requests() {
+        let message =
+            "Implementa il primo goal pending end-to-end in todo-app, con codice completo + test minimi.";
+        let partial = "Piano: implemento endpoint e test minimi nel goal corrente.";
+        assert!(!should_force_common_template(message, partial));
+    }
+
+    #[test]
+    fn detects_goal_execution_requests() {
+        assert!(is_goal_execution_request(
+            "Implementa SOLO il primo goal pending in todo-app. Niente scaffolding iniziale."
+        ));
+        assert!(is_goal_execution_request(
+            "Only the first pending goal, file changes + minimal tests"
+        ));
+        assert!(!is_goal_execution_request("crea una todo list app completa"));
+    }
+
+    #[test]
+    fn avoids_false_positive_goal_execution_requests() {
+        assert!(!is_goal_execution_request(
+            "show status of dependencies and continue with docs update"
+        ));
+        assert!(!is_goal_execution_request(
+            "continue implementation of frontend login flow"
+        ));
     }
 }

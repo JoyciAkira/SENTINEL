@@ -1,4 +1,6 @@
 import * as vscode from "vscode";
+import * as path from "path";
+import { promises as fs } from "fs";
 import { MCPClient } from "../mcp/client";
 import { getWebviewContent } from "./getWebviewContent";
 import type { AlignmentReport } from "../shared/types";
@@ -18,6 +20,34 @@ const DEFAULT_AUGMENT_SETTINGS: AugmentRuntimeSettings = {
   enforceByo: true,
 };
 
+interface ChatSectionPayload {
+  id: string;
+  title: string;
+  content: string;
+  language?: string;
+  pathHint?: string;
+}
+
+interface PendingWritePlanEntry extends ChatSectionPayload {
+  path: string;
+  applied: boolean;
+}
+
+interface ParsedChatPlan {
+  normalizedContent: string;
+  sections: ChatSectionPayload[];
+  fileOperations: Array<{
+    path: string;
+    type: "create" | "edit" | "delete";
+    linesAdded: number;
+    linesRemoved: number;
+    diff: string;
+  }>;
+  writeEntries: PendingWritePlanEntry[];
+}
+
+const COMMON_APP_SUBPATHS = ["database/", "server/", "client/"];
+
 /**
  * WebviewViewProvider for the Sentinel Chat sidebar panel.
  * Implements the Cline-style full sidebar chat experience.
@@ -29,6 +59,7 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
   private activeStreamId: string | null = null;
   private warnedMissingRuntimeTools = false;
   private augmentSettings: AugmentRuntimeSettings = DEFAULT_AUGMENT_SETTINGS;
+  private pendingWritePlans: Map<string, PendingWritePlanEntry[]> = new Map();
 
   constructor(
     private extensionUri: vscode.Uri,
@@ -65,7 +96,16 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
 
     // Handle messages from webview
     webviewView.webview.onDidReceiveMessage((msg) => {
-      this.handleWebviewMessage(msg);
+      void this.handleWebviewMessage(msg).catch((err: any) => {
+        const message = err?.message ?? String(err);
+        this.outputChannel.appendLine(`Webview message handling failed: ${message}`);
+        this.postMessage({
+          type: "policyActionResult",
+          kind: "webview_message_error",
+          ok: false,
+          message,
+        });
+      });
     });
 
     // Notify webview of connection status
@@ -205,9 +245,13 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
         break;
 
       case "fileApproval":
-        this.outputChannel.appendLine(
-          `File ${msg.approved ? "approved" : "rejected"}: ${msg.path}`,
-        );
+        await this.handleFileApproval(msg);
+        break;
+
+      case "applySafeWritePlan":
+        if (typeof msg.messageId === "string") {
+          await this.handleApplySafeWritePlan(msg.messageId);
+        }
         break;
 
       case "mcpRequest":
@@ -281,6 +325,451 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
     }
   }
 
+  private getWorkspaceRoot(): string {
+    return vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? process.cwd();
+  }
+
+  private resolveWorkspacePath(relativePath: string): string {
+    const root = path.resolve(this.getWorkspaceRoot());
+    const normalizedRelative = relativePath.replace(/^\/+/, "");
+    const resolved = path.resolve(root, normalizedRelative);
+    if (resolved !== root && !resolved.startsWith(`${root}${path.sep}`)) {
+      throw new Error(`Unsafe write path blocked: ${relativePath}`);
+    }
+    return resolved;
+  }
+
+  private inferLanguage(pathHint: string | undefined, title: string): string {
+    const lowerTitle = title.toLowerCase();
+    const lowerPath = (pathHint ?? "").toLowerCase();
+
+    if (lowerPath.endsWith(".sql") || lowerTitle.includes("database")) return "sql";
+    if (lowerPath.endsWith(".tsx")) return "tsx";
+    if (lowerPath.endsWith(".ts")) return "ts";
+    if (lowerPath.endsWith(".jsx")) return "jsx";
+    if (lowerPath.endsWith(".js") || lowerTitle.includes("backend")) return "js";
+    if (lowerTitle.includes("frontend") || lowerTitle.includes("react")) return "jsx";
+    if (
+      lowerTitle.includes("struttura") ||
+      lowerTitle.includes("setup") ||
+      lowerTitle.includes("run") ||
+      lowerTitle.includes("comandi")
+    ) {
+      return "bash";
+    }
+    return "text";
+  }
+
+  private inferPath(pathHint: string | undefined, title: string): string | null {
+    if (pathHint && pathHint.trim().length > 0) return pathHint.trim();
+    const lowerTitle = title.toLowerCase();
+    if (lowerTitle.includes("database")) return "database/init.sql";
+    if (lowerTitle.includes("backend")) return "server/index.js";
+    if (lowerTitle.includes("frontend")) return "client/src/App.jsx";
+    return null;
+  }
+
+  private detectProjectBaseDir(content: string): string | null {
+    const mkdirMatch = content.match(/mkdir\s+-p\s+([a-zA-Z0-9._-]+)\/\{/);
+    if (mkdirMatch?.[1]) return mkdirMatch[1];
+
+    const cdMatch = content.match(/cd\s+([a-zA-Z0-9._-]+)\b/);
+    if (cdMatch?.[1]) return cdMatch[1];
+
+    return null;
+  }
+
+  private withProjectBaseDir(filePath: string, baseDir: string | null): string {
+    if (!baseDir) return filePath;
+    const normalized = filePath.replace(/^\/+/, "");
+    if (normalized.startsWith(`${baseDir}/`)) return normalized;
+    if (!COMMON_APP_SUBPATHS.some((prefix) => normalized.startsWith(prefix))) {
+      return normalized;
+    }
+    return `${baseDir}/${normalized}`;
+  }
+
+  private splitNumberedSections(content: string): Array<{
+    headingLine: string;
+    title: string;
+    pathHint?: string;
+    body: string;
+  }> {
+    const headingRegex = /^(?:##\s*)?\d+\)\s+[^\n]+$/gm;
+    const matches = Array.from(content.matchAll(headingRegex));
+    if (matches.length === 0) return [];
+
+    const sections: Array<{
+      headingLine: string;
+      title: string;
+      pathHint?: string;
+      body: string;
+    }> = [];
+
+    for (let index = 0; index < matches.length; index += 1) {
+      const current = matches[index];
+      const next = matches[index + 1];
+      const start = current.index ?? 0;
+      const end = next?.index ?? content.length;
+      const chunk = content.slice(start, end).trim();
+      const [headingLine, ...restLines] = chunk.split(/\r?\n/);
+      const body = restLines.join("\n").trim();
+      const titleWithPath = headingLine.replace(/^(?:##\s*)?\d+\)\s*/, "").trim();
+      const pathMatch = titleWithPath.match(/`([^`]+)`/);
+      const plainPathMatch = titleWithPath.match(/\(([^)]+\.[^)]+)\)/);
+      const pathHint = pathMatch?.[1] ?? plainPathMatch?.[1];
+      const title = titleWithPath
+        .replace(/\s*\(`[^`]+`\)\s*$/, "")
+        .replace(/\s*\(([^)]+\.[^)]+)\)\s*$/, "")
+        .replace(/\s*`[^`]+`\s*$/, "")
+        .trim();
+
+      sections.push({
+        headingLine: headingLine.trim(),
+        title,
+        pathHint,
+        body,
+      });
+    }
+
+    return sections;
+  }
+
+  private chunkText(content: string, maxChunkLength: number = 140): string[] {
+    if (!content.trim()) return [];
+    const chunks: string[] = [];
+    let remaining = content;
+    while (remaining.length > maxChunkLength) {
+      let splitAt = remaining.lastIndexOf("\n", maxChunkLength);
+      if (splitAt < Math.floor(maxChunkLength * 0.5)) {
+        splitAt = remaining.lastIndexOf(" ", maxChunkLength);
+      }
+      if (splitAt < 1) splitAt = maxChunkLength;
+      const part = remaining.slice(0, splitAt).trimEnd();
+      if (part.length > 0) chunks.push(part);
+      remaining = remaining.slice(splitAt).trimStart();
+    }
+    if (remaining.length > 0) chunks.push(remaining);
+    return chunks;
+  }
+
+  private buildChatPlan(content: string): ParsedChatPlan | null {
+    const sections = this.splitNumberedSections(content);
+    if (sections.length === 0) return null;
+    const projectBaseDir = this.detectProjectBaseDir(content);
+
+    const uiSections: ChatSectionPayload[] = [];
+    const fileOperations: Array<{
+      path: string;
+      type: "create" | "edit" | "delete";
+      linesAdded: number;
+      linesRemoved: number;
+      diff: string;
+    }> = [];
+    const writeEntries: PendingWritePlanEntry[] = [];
+    let hadUnfencedSection = false;
+
+    const normalizedSections = sections.map((section, idx) => {
+      const body = section.body.trim();
+      const language = this.inferLanguage(section.pathHint, section.title);
+      const firstCodeBlock = body.match(/```([a-zA-Z0-9_-]*)\n([\s\S]*?)```/m);
+      const code = firstCodeBlock
+        ? firstCodeBlock[2].trim()
+        : body;
+      const effectiveLanguage = firstCodeBlock?.[1]?.trim() || language;
+      const rawInferredPath = this.inferPath(section.pathHint, section.title);
+      const inferredPath = rawInferredPath
+        ? this.withProjectBaseDir(rawInferredPath, projectBaseDir)
+        : null;
+
+      if (body.length > 0) {
+        uiSections.push({
+          id: `${idx + 1}-${section.title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
+          title: section.title,
+          pathHint: inferredPath ?? section.pathHint,
+          language: effectiveLanguage,
+          content: code,
+        });
+      }
+
+      if (inferredPath && code.length > 0) {
+        const lineCount = code.split(/\r?\n/).length;
+        const diff = code
+          .split(/\r?\n/)
+          .map((line) => `+${line}`)
+          .join("\n");
+
+        writeEntries.push({
+          id: `${idx + 1}-${inferredPath.replace(/[^a-zA-Z0-9]+/g, "-")}`,
+          title: section.title,
+          pathHint: inferredPath,
+          language: effectiveLanguage,
+          content: code,
+          path: inferredPath,
+          applied: false,
+        });
+
+        fileOperations.push({
+          path: inferredPath,
+          type: "create",
+          linesAdded: lineCount,
+          linesRemoved: 0,
+          diff,
+        });
+      }
+
+      if (!/```/.test(body) && body.length > 0) {
+        hadUnfencedSection = true;
+      }
+
+      if (body.length === 0) {
+        return section.headingLine;
+      }
+
+      if (/```/.test(body)) {
+        return `${section.headingLine}\n\n${section.body}`.trim();
+      }
+
+      return `${section.headingLine}\n\n\`\`\`${language}\n${body}\n\`\`\``;
+    });
+
+    let normalizedContent = content;
+    if (hadUnfencedSection) {
+      const firstHeading = content.search(/^(?:##\s*)?\d+\)/m);
+      const prefix = firstHeading > 0 ? content.slice(0, firstHeading).trim() : "";
+      normalizedContent = [prefix, ...normalizedSections]
+        .filter((part) => part.trim().length > 0)
+        .join("\n\n")
+        .trim();
+    }
+
+    return {
+      normalizedContent,
+      sections: uiSections,
+      fileOperations,
+      writeEntries,
+    };
+  }
+
+  private async applyWriteEntry(
+    messageId: string,
+    entry: PendingWritePlanEntry,
+  ): Promise<boolean> {
+    try {
+      this.emitTimeline("approval", "safe_write approval", entry.path, messageId);
+      const scan = (await this.callToolTracked(
+        "safe_write",
+        { path: entry.path, content: entry.content },
+        messageId,
+      )) as any;
+      const isSafe = scan?.is_safe !== false;
+      if (!isSafe) {
+        const threats = Array.isArray(scan?.threats)
+          ? scan.threats
+              .map((threat: any) =>
+                typeof threat === "string"
+                  ? threat
+                  : (threat?.description ?? JSON.stringify(threat)),
+              )
+              .join("; ")
+          : "security scan failed";
+        const error = `Blocked by safe_write: ${threats}`;
+        this.postMessage({
+          type: "fileApprovalResult",
+          messageId,
+          path: entry.path,
+          approved: false,
+          error,
+        });
+        this.emitTimeline("error", "safe_write blocked file", error, messageId);
+        return false;
+      }
+
+      const absolutePath = this.resolveWorkspacePath(entry.path);
+      await fs.mkdir(path.dirname(absolutePath), { recursive: true });
+      await fs.writeFile(absolutePath, entry.content, "utf8");
+      entry.applied = true;
+
+      this.postMessage({
+        type: "fileApprovalResult",
+        messageId,
+        path: entry.path,
+        approved: true,
+      });
+      this.emitTimeline("result", "File written", entry.path, messageId);
+      return true;
+    } catch (err: any) {
+      const error = err?.message ?? String(err);
+      this.postMessage({
+        type: "fileApprovalResult",
+        messageId,
+        path: entry.path,
+        approved: false,
+        error,
+      });
+      this.emitTimeline("error", "File write failed", `${entry.path}: ${error}`, messageId);
+      return false;
+    }
+  }
+
+  private async handleFileApproval(msg: any): Promise<void> {
+    const messageId = typeof msg?.messageId === "string" ? msg.messageId : "";
+    const filePath = typeof msg?.path === "string" ? msg.path : "";
+    const approved = Boolean(msg?.approved);
+    if (!messageId || !filePath) return;
+
+    if (!approved) {
+      this.postMessage({
+        type: "fileApprovalResult",
+        messageId,
+        path: filePath,
+        approved: false,
+        error: "Rejected by user",
+      });
+      this.emitTimeline("cancel", "File write rejected", filePath, messageId);
+      return;
+    }
+
+    const plan = this.pendingWritePlans.get(messageId) ?? [];
+    const entry = plan.find((item) => item.path === filePath);
+    if (!entry) {
+      this.postMessage({
+        type: "fileApprovalResult",
+        messageId,
+        path: filePath,
+        approved: false,
+        error: "No pending write plan for this file.",
+      });
+      this.emitTimeline("error", "Missing write plan", filePath, messageId);
+      return;
+    }
+
+    const ok = await this.applyWriteEntry(messageId, entry);
+    if (ok && plan.every((item) => item.applied)) {
+      this.pendingWritePlans.delete(messageId);
+    }
+  }
+
+  private async handleApplySafeWritePlan(messageId: string): Promise<void> {
+    const plan = this.pendingWritePlans.get(messageId) ?? [];
+    if (plan.length === 0) {
+      this.postMessage({
+        type: "policyActionResult",
+        kind: "safe_write_plan",
+        ok: false,
+        message: "No pending safe_write plan for this turn.",
+      });
+      return;
+    }
+
+    let success = 0;
+    let failed = 0;
+    for (const entry of plan) {
+      if (entry.applied) continue;
+      const ok = await this.applyWriteEntry(messageId, entry);
+      if (ok) success += 1;
+      else failed += 1;
+    }
+
+    this.postMessage({
+      type: "policyActionResult",
+      kind: "safe_write_plan",
+      ok: failed === 0,
+      message: `safe_write plan completed: ${success} applied, ${failed} blocked.`,
+    });
+    if (failed === 0) {
+      this.pendingWritePlans.delete(messageId);
+    }
+    this.emitTimeline(
+      failed === 0 ? "result" : "error",
+      "safe_write plan completed",
+      `${success} applied, ${failed} blocked`,
+      messageId,
+    );
+  }
+
+  private async buildExecuteFirstPendingPrompt(messageId: string): Promise<string | null> {
+    if (!(await this.client.supportsTool("get_goal_graph"))) {
+      this.postMessage({
+        type: "chatResponse",
+        id: messageId,
+        content: "Tool get_goal_graph non disponibile: impossibile risolvere il primo goal pending.",
+      });
+      this.emitTimeline("error", "Slash command failed", "get_goal_graph missing", messageId);
+      return null;
+    }
+    if (!(await this.client.supportsTool("chat"))) {
+      this.postMessage({
+        type: "chatResponse",
+        id: messageId,
+        content: "Tool chat non disponibile nel backend corrente.",
+      });
+      this.emitTimeline("error", "Slash command failed", "chat missing", messageId);
+      return null;
+    }
+
+    const graph: any = await this.callToolTracked("get_goal_graph", {}, messageId);
+    const nodes = Array.isArray(graph?.nodes) ? graph.nodes : [];
+    const edges = Array.isArray(graph?.edges) ? graph.edges : [];
+    const pendingNodes = nodes.filter(
+      (node: any) =>
+        node?.id !== "root" &&
+        String(node?.data?.status ?? "").toLowerCase() === "pending",
+    );
+
+    if (pendingNodes.length === 0) {
+      this.postMessage({
+        type: "chatResponse",
+        id: messageId,
+        content: "Nessun goal pending rilevato. Apri Forge e verifica lo stato del manifold.",
+      });
+      this.emitTimeline("result", "No pending goals", "Slash command completed", messageId);
+      return null;
+    }
+
+    const pendingIds = new Set(pendingNodes.map((node: any) => String(node.id)));
+    const inboundPendingDeps = new Map<string, number>();
+    for (const node of pendingNodes) {
+      inboundPendingDeps.set(String(node.id), 0);
+    }
+    for (const edge of edges) {
+      const source = String(edge?.source ?? "");
+      const target = String(edge?.target ?? "");
+      if (pendingIds.has(source) && pendingIds.has(target)) {
+        inboundPendingDeps.set(target, (inboundPendingDeps.get(target) ?? 0) + 1);
+      }
+    }
+
+    const orderedPending = [...pendingNodes].sort((a: any, b: any) => {
+      const aId = String(a?.id ?? "");
+      const bId = String(b?.id ?? "");
+      const depCmp = (inboundPendingDeps.get(aId) ?? 0) - (inboundPendingDeps.get(bId) ?? 0);
+      if (depCmp !== 0) return depCmp;
+      const aValue = Number(a?.data?.value ?? 0);
+      const bValue = Number(b?.data?.value ?? 0);
+      if (aValue !== bValue) return bValue - aValue;
+      return aId.localeCompare(bId);
+    });
+
+    const next = orderedPending[0];
+    const goalId = String(next?.id ?? "");
+    const goalLabel = String(next?.data?.label ?? "").trim();
+
+    const executionPrompt =
+      `Implementa SOLO il primo goal pending del manifold.\n` +
+      `Goal ID: ${goalId}\n` +
+      `Goal descrizione: ${goalLabel || "(vuota)"}\n\n` +
+      `Vincoli obbligatori:\n` +
+      `- niente scaffolding iniziale\n` +
+      `- solo file changes mirati\n` +
+      `- test minimi necessari\n` +
+      `- comandi di verifica strettamente necessari\n` +
+      `- mantieni output con sezioni operative e path espliciti`;
+
+    this.emitTimeline("plan", "First pending goal selected", `${goalId} ${goalLabel}`, messageId);
+    return executionPrompt;
+  }
+
   private async handleChatMessage(text: string): Promise<void> {
     if (!this.client.connected) {
       this.postMessage({
@@ -297,8 +786,83 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
     this.emitTimeline("received", "Prompt received", text, messageId);
 
     // ── Command Parsing ──────────────────────────────────────
-    if (text.startsWith("/init ")) {
-      const description = text.replace("/init ", "").trim();
+    const trimmedText = text.trim();
+    let effectiveText = text;
+
+    if (trimmedText === "/execute-first-pending") {
+      this.emitTimeline(
+        "plan",
+        "Slash command /execute-first-pending",
+        "Resolving first pending goal",
+        messageId,
+      );
+      try {
+        const nextPrompt = await this.buildExecuteFirstPendingPrompt(messageId);
+        if (!nextPrompt) return;
+        effectiveText = nextPrompt;
+      } catch (err: any) {
+        const error = err?.message ?? String(err);
+        this.postMessage({
+          type: "chatResponse",
+          id: messageId,
+          content: `Errore durante /execute-first-pending: ${error}`,
+        });
+        this.emitTimeline("error", "Slash command failed", error, messageId);
+        return;
+      }
+    }
+
+    if (trimmedText === "/init") {
+      this.emitTimeline("plan", "Slash command /init", "Checking project initialization state", messageId);
+      try {
+        const graph: any = await this.callToolTracked("get_goal_graph", {}, messageId);
+        const nodes = Array.isArray(graph?.nodes) ? graph.nodes : [];
+        const rootNode = nodes.find((node: any) => node?.id === "root");
+        const rootLabel = String(rootNode?.data?.label ?? "").trim();
+        const pendingGoals = nodes.filter(
+          (node: any) =>
+            node?.id !== "root" &&
+            String(node?.data?.status ?? "").toLowerCase() === "pending",
+        );
+
+        if (rootLabel.length > 0) {
+          this.postMessage({
+            type: "chatResponse",
+            id: messageId,
+            content:
+              `✅ Project already initialized.\n` +
+              `Root intent: **${rootLabel}**\n` +
+              `Pending goals: **${pendingGoals.length}**\n\n` +
+              `Next step: run **"Implementa SOLO il primo goal pending in todo-app. Niente scaffolding iniziale. Produci solo file changes + test minimi."**`,
+          });
+          this.emitTimeline("result", "Initialization state loaded", rootLabel, messageId);
+          return;
+        }
+      } catch {
+        // Fall back to usage guidance below.
+      }
+
+      this.postMessage({
+        type: "chatResponse",
+        id: messageId,
+        content:
+          "Usage: `/init <project description>`\n\n" +
+          "Example:\n`/init Build a production-ready full-stack todo app with React + Express + PostgreSQL`",
+      });
+      this.emitTimeline("result", "Init usage provided", "Missing project description", messageId);
+      return;
+    }
+
+    if (trimmedText.startsWith("/init ")) {
+      const description = trimmedText.replace("/init", "").trim();
+      if (!description) {
+        this.postMessage({
+          type: "chatResponse",
+          id: messageId,
+          content: "Usage: `/init <project description>`",
+        });
+        return;
+      }
       this.emitTimeline("plan", "Slash command /init", description, messageId);
       try {
         this.postMessage({
@@ -333,18 +897,26 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
       }
     }
 
-    if (text.trim() === "/help") {
+    if (trimmedText === "/help") {
       this.emitTimeline("plan", "Slash command /help", "Help menu requested", messageId);
       this.postMessage({
         type: "chatResponse",
         id: messageId,
         content:
-          "Comandi disponibili:\n- `/init <descrizione>`\n- `/clear-memory`\n- `/memory-status`\n- `/memory-search <query>`\n- `/memory-export [path]`\n- `/memory-import <path> [merge=true|false]`",
+          "Comandi disponibili:\n- `/init <descrizione>`\n- `/execute-first-pending`\n- `/clear-memory`\n- `/memory-status`\n- `/memory-search <query>`\n- `/memory-export [path]`\n- `/memory-import <path> [merge=true|false]`",
       });
       return;
     }
 
-    if (text.trim() === "/memory-status") {
+    if (trimmedText === "/memory-status") {
+      if (!(await this.client.supportsTool("chat_memory_status"))) {
+        this.postMessage({
+          type: "chatResponse",
+          id: messageId,
+          content: "Tool chat_memory_status non disponibile nel backend corrente.",
+        });
+        return;
+      }
       this.emitTimeline("tool", "Memory status", "Querying memory state", messageId);
       const result = (await this.callToolTracked("chat_memory_status", {}, messageId)) as any;
       this.postMessage({
@@ -357,8 +929,16 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
       return;
     }
 
-    if (text.startsWith("/memory-search ")) {
-      const query = text.replace("/memory-search ", "").trim();
+    if (trimmedText.startsWith("/memory-search ")) {
+      if (!(await this.client.supportsTool("chat_memory_search"))) {
+        this.postMessage({
+          type: "chatResponse",
+          id: messageId,
+          content: "Tool chat_memory_search non disponibile nel backend corrente.",
+        });
+        return;
+      }
+      const query = trimmedText.replace("/memory-search ", "").trim();
       this.emitTimeline("tool", "Memory search", query, messageId);
       const result = (await this.callToolTracked("chat_memory_search", {
         query,
@@ -374,8 +954,16 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
       return;
     }
 
-    if (text.startsWith("/memory-export")) {
-      const maybePath = text.replace("/memory-export", "").trim();
+    if (trimmedText.startsWith("/memory-export")) {
+      if (!(await this.client.supportsTool("chat_memory_export"))) {
+        this.postMessage({
+          type: "chatResponse",
+          id: messageId,
+          content: "Tool chat_memory_export non disponibile nel backend corrente.",
+        });
+        return;
+      }
+      const maybePath = trimmedText.replace("/memory-export", "").trim();
       this.emitTimeline("tool", "Memory export", maybePath || "default path", messageId);
       const args: Record<string, unknown> = {};
       if (maybePath) args.path = maybePath;
@@ -390,8 +978,16 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
       return;
     }
 
-    if (text.startsWith("/memory-import ")) {
-      const payload = text.replace("/memory-import ", "").trim();
+    if (trimmedText.startsWith("/memory-import ")) {
+      if (!(await this.client.supportsTool("chat_memory_import"))) {
+        this.postMessage({
+          type: "chatResponse",
+          id: messageId,
+          content: "Tool chat_memory_import non disponibile nel backend corrente.",
+        });
+        return;
+      }
+      const payload = trimmedText.replace("/memory-import ", "").trim();
       const [pathArg, mergeArg] = payload.split(/\s+/);
       if (!pathArg) {
         this.postMessage({
@@ -429,13 +1025,23 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
 
       // Use the NEW REAL INFERENCE chat tool
       const result: any = await this.callToolTracked("chat", {
-        message: text
+        message: effectiveText
       }, messageId);
 
       let content = "No response from Sentinel.";
       let thoughtChain: string[] | undefined = undefined;
       let explainability: Record<string, unknown> | undefined = undefined;
       let streamChunks: string[] = [];
+      let sections: ChatSectionPayload[] | undefined;
+      let fileOperations:
+        | Array<{
+            path: string;
+            type: "create" | "edit" | "delete";
+            linesAdded: number;
+            linesRemoved: number;
+            diff: string;
+          }>
+        | undefined;
 
       if (result && typeof result === "object") {
         const structured = result as Record<string, unknown>;
@@ -474,6 +1080,28 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
         content = result;
       }
 
+      const parsedPlan = this.buildChatPlan(content);
+      if (parsedPlan) {
+        content = parsedPlan.normalizedContent;
+        sections = parsedPlan.sections;
+        fileOperations = parsedPlan.fileOperations;
+        if (parsedPlan.writeEntries.length > 0) {
+          this.pendingWritePlans.set(messageId, parsedPlan.writeEntries);
+          this.emitTimeline(
+            "plan",
+            "safe_write plan prepared",
+            `${parsedPlan.writeEntries.length} files pending approval`,
+            messageId,
+          );
+        } else {
+          this.pendingWritePlans.delete(messageId);
+        }
+      } else {
+        this.pendingWritePlans.delete(messageId);
+      }
+
+      streamChunks = this.chunkText(content, 140);
+
       this.activeStreamId = messageId;
       if (streamChunks.length > 0) {
         this.emitTimeline("stream", "Streaming started", `${streamChunks.length} chunks`, messageId);
@@ -496,6 +1124,8 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
           content,
           thoughtChain,
           explainability,
+          sections,
+          fileOperations,
           streaming: false,
         });
       }

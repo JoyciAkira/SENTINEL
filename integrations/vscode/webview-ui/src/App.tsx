@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Goal } from "@sentinel/sdk";
 import { useStore } from "./state/store";
 import { useVSCodeAPI } from "./hooks/useVSCodeAPI";
@@ -96,6 +96,10 @@ export default function App() {
   const [showChatDetails, setShowChatDetails] = useState(false);
   const [themePreset, setThemePreset] = useState<ThemePreset>("mono-mint");
   const [compactDensity, setCompactDensity] = useState(false);
+  const [chatMessagesHeight, setChatMessagesHeight] = useState(540);
+  const [timelineWidth, setTimelineWidth] = useState(320);
+  const chatHeightRef = useRef(chatMessagesHeight);
+  const timelineWidthRef = useRef(timelineWidth);
 
   useEffect(() => {
     vscodeApi.postMessage({ type: "webviewReady" });
@@ -124,6 +128,29 @@ export default function App() {
   useEffect(() => {
     window.localStorage.setItem("sentinel.ui.compact", compactDensity ? "true" : "false");
   }, [compactDensity]);
+
+  useEffect(() => {
+    const savedChatHeight = Number(window.localStorage.getItem("sentinel.ui.chatHeight") ?? "0");
+    const savedTimelineWidth = Number(window.localStorage.getItem("sentinel.ui.timelineWidth") ?? "0");
+    if (Number.isFinite(savedChatHeight) && savedChatHeight >= 280) {
+      setChatMessagesHeight(savedChatHeight);
+      chatHeightRef.current = savedChatHeight;
+    }
+    if (Number.isFinite(savedTimelineWidth) && savedTimelineWidth >= 220) {
+      setTimelineWidth(savedTimelineWidth);
+      timelineWidthRef.current = savedTimelineWidth;
+    }
+  }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem("sentinel.ui.chatHeight", String(chatMessagesHeight));
+    chatHeightRef.current = chatMessagesHeight;
+  }, [chatMessagesHeight]);
+
+  useEffect(() => {
+    window.localStorage.setItem("sentinel.ui.timelineWidth", String(timelineWidth));
+    timelineWidthRef.current = timelineWidth;
+  }, [timelineWidth]);
 
   const filteredTimeline = useMemo(() => {
     const turnPrefix = timelineTurnFilter.trim().toLowerCase();
@@ -171,6 +198,10 @@ export default function App() {
 
   const completedGoals = useMemo(
     () => goals.filter((goal) => goal.status.toLowerCase() === "completed").length,
+    [goals],
+  );
+  const pendingGoals = useMemo(
+    () => goals.filter((goal) => goal.status.toLowerCase() === "pending"),
     [goals],
   );
 
@@ -233,6 +264,94 @@ export default function App() {
     Array.isArray((worldModel?.required_missing_now as any)?.frameworks)
       ? ((worldModel?.required_missing_now as any).frameworks as unknown[]).length
       : 0;
+  const workflowAssistant = useMemo(() => {
+    const pendingCount = pendingGoals.length;
+    const hasGovernancePending = Boolean(governance?.pending_proposal);
+    const missingRequired = missingRequiredDeps + missingRequiredFrameworks;
+    const qualityFailed = qualityStatus?.latest?.overall_ok === false;
+    const reliabilityViolated = reliabilitySlo?.healthy === false;
+
+    if (hasGovernancePending) {
+      return {
+        title: "Governance approval required",
+        action: "Review pending governance proposal and approve/reject before coding.",
+        command: "Open Runtime > Governance Policy",
+      };
+    }
+    if (missingRequired > 0) {
+      return {
+        title: "Contract drift detected",
+        action: `Resolve ${missingRequired} required governance mismatch(es) before execution.`,
+        command: "Run Governance Seed Preview",
+      };
+    }
+    if (pendingCount > 0) {
+      return {
+        title: "Execute next pending goal",
+        action: `There are ${pendingCount} pending goals. Execute only the first pending item.`,
+        command: "/execute-first-pending",
+      };
+    }
+    if (qualityFailed || reliabilityViolated) {
+      return {
+        title: "Stabilize runtime quality",
+        action: "No pending goals but reliability/quality is degraded. Run harness and inspect violations.",
+        command: "Run Quality Harness",
+      };
+    }
+    return {
+      title: "System ready",
+      action: "No pending blockers detected. Start a new goal or refine constraints.",
+      command: "/init <project description>",
+    };
+  }, [
+    pendingGoals,
+    governance?.pending_proposal,
+    missingRequiredDeps,
+    missingRequiredFrameworks,
+    qualityStatus?.latest?.overall_ok,
+    reliabilitySlo?.healthy,
+  ]);
+
+  const beginChatHeightResize = (event: React.MouseEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    const startY = event.clientY;
+    const startHeight = chatHeightRef.current;
+
+    const onMove = (moveEvent: MouseEvent) => {
+      const delta = moveEvent.clientY - startY;
+      const next = Math.max(280, Math.min(window.innerHeight - 180, startHeight + delta));
+      setChatMessagesHeight(next);
+    };
+
+    const onUp = () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  };
+
+  const beginTimelineResize = (event: React.MouseEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    const startX = event.clientX;
+    const startWidth = timelineWidthRef.current;
+
+    const onMove = (moveEvent: MouseEvent) => {
+      const delta = startX - moveEvent.clientX;
+      const next = Math.max(240, Math.min(540, startWidth + delta));
+      setTimelineWidth(next);
+    };
+
+    const onUp = () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  };
 
   return (
     <div
@@ -243,7 +362,7 @@ export default function App() {
         compactDensity && "sentinel-density--compact",
       )}
     >
-      {!sidebarMode && <aside className="sentinel-rail">
+      {!sidebarMode && <aside className="sentinel-rail sentinel-panel-resizable">
         <div className="sentinel-brand">
           <div className="sentinel-brand__glyph">S</div>
           <div>
@@ -348,7 +467,7 @@ export default function App() {
           <div className="sentinel-content__inner">
             {activePage === "command" && (
               <div className="sentinel-grid">
-                <Card className="sentinel-card sentinel-card--hero">
+                <Card className="sentinel-card sentinel-panel-resizable sentinel-card--hero">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-base">
                       <ShieldCheck className="size-4" />
@@ -391,7 +510,7 @@ export default function App() {
                   </CardContent>
                 </Card>
 
-                <Card className="sentinel-card">
+                <Card className="sentinel-card sentinel-panel-resizable">
                   <CardHeader>
                     <CardTitle className="text-base">Goal Snapshot</CardTitle>
                     <CardDescription>What the agent is doing now and why.</CardDescription>
@@ -412,7 +531,7 @@ export default function App() {
                   </CardContent>
                 </Card>
 
-                <Card className="sentinel-card">
+                <Card className="sentinel-card sentinel-panel-resizable">
                   <CardHeader>
                     <CardTitle className="text-base">Execution Signals</CardTitle>
                     <CardDescription>Latest deterministic events from the active session.</CardDescription>
@@ -441,11 +560,23 @@ export default function App() {
                     )}
                   </CardContent>
                 </Card>
+
+                <Card className="sentinel-card sentinel-panel-resizable">
+                  <CardHeader>
+                    <CardTitle className="text-base">Workflow Assistant</CardTitle>
+                    <CardDescription>Deterministic next action from manifold and runtime state.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    <p className="sentinel-empty">{workflowAssistant.title}</p>
+                    <p>{workflowAssistant.action}</p>
+                    <code>{workflowAssistant.command}</code>
+                  </CardContent>
+                </Card>
               </div>
             )}
 
             {activePage === "chat" && (
-              <Card className="sentinel-card sentinel-chat">
+              <Card className="sentinel-card sentinel-panel-resizable sentinel-chat">
                 <CardHeader>
                   <CardTitle className="text-base">Chat Runtime</CardTitle>
                   <CardDescription>
@@ -494,11 +625,46 @@ export default function App() {
                 </CardHeader>
                 <CardContent className="sentinel-chat__body">
                   {!sidebarMode && <QuickPrompts />}
-                  <div className="sentinel-chat-layout">
-                    <div className="sentinel-chat__messages">
-                      <MessageList compact={compactDensity} clineMode={sidebarMode} />
+                  <div
+                    className="sentinel-chat-layout"
+                    style={
+                      !sidebarMode
+                        ? {
+                            gridTemplateColumns: `minmax(0, 1fr) 8px ${timelineWidth}px`,
+                          }
+                        : undefined
+                    }
+                  >
+                    <div className="sentinel-chat-primary">
+                      <div
+                        className="sentinel-chat__messages"
+                        style={{ height: `${chatMessagesHeight}px` }}
+                      >
+                        <MessageList compact={compactDensity} clineMode={sidebarMode} />
+                      </div>
+                      <div
+                        className="sentinel-resize-handle sentinel-resize-handle--horizontal"
+                        onMouseDown={beginChatHeightResize}
+                        title="Resize messages panel"
+                        role="separator"
+                      />
                     </div>
-                    {(showChatDetails || !sidebarMode) && <aside className="sentinel-timeline">
+                    {!sidebarMode && (
+                      <div
+                        className="sentinel-resize-handle sentinel-resize-handle--vertical"
+                        onMouseDown={beginTimelineResize}
+                        title="Resize timeline panel"
+                        role="separator"
+                      />
+                    )}
+                    {(showChatDetails || !sidebarMode) && <aside
+                      className="sentinel-timeline"
+                      style={
+                        !sidebarMode
+                          ? { height: `${chatMessagesHeight}px`, maxHeight: "none" }
+                          : undefined
+                      }
+                    >
                       <div className="sentinel-timeline__header">
                         <h4>Task Timeline</h4>
                         <div className="sentinel-inline-actions">
@@ -611,7 +777,7 @@ export default function App() {
 
             {activePage === "forge" && (
               <div className="sentinel-grid sentinel-grid--forge">
-                <Card className="sentinel-card">
+                <Card className="sentinel-card sentinel-panel-resizable">
                   <CardHeader>
                     <CardTitle className="text-base">Goal Graph</CardTitle>
                     <CardDescription>Dependency topology and execution ordering.</CardDescription>
@@ -620,7 +786,7 @@ export default function App() {
                     <GoalGraph goals={goals as unknown as Goal[]} onNodeSelect={setSelectedGoal} />
                   </CardContent>
                 </Card>
-                <Card className="sentinel-card">
+                <Card className="sentinel-card sentinel-panel-resizable">
                   <CardHeader>
                     <CardTitle className="text-base">Selected Goal</CardTitle>
                     <CardDescription>
@@ -643,7 +809,7 @@ export default function App() {
             )}
 
             {activePage === "network" && (
-              <Card className="sentinel-card">
+              <Card className="sentinel-card sentinel-panel-resizable">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-base">
                     <Orbit className="size-4" />
@@ -671,7 +837,7 @@ export default function App() {
             )}
 
             {activePage === "audit" && (
-              <Card className="sentinel-card">
+              <Card className="sentinel-card sentinel-panel-resizable">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-base">
                     <History className="size-4" />
@@ -695,7 +861,7 @@ export default function App() {
             )}
 
             {activePage === "settings" && (
-              <Card className="sentinel-card">
+              <Card className="sentinel-card sentinel-panel-resizable">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-base">
                     <Wrench className="size-4" />
@@ -730,7 +896,7 @@ export default function App() {
                   </div>
 
                   <div className="sentinel-panel-grid">
-                    <section className="sentinel-policy-card">
+                    <section className="sentinel-policy-card sentinel-panel-resizable">
                       <header>
                         <h3>Appearance</h3>
                         <Badge variant="outline">Parity+</Badge>
@@ -769,7 +935,7 @@ export default function App() {
                       </label>
                     </section>
 
-                    <section className="sentinel-policy-card">
+                    <section className="sentinel-policy-card sentinel-panel-resizable">
                       <header>
                         <h3>Context Engine (Augment MCP)</h3>
                         <Badge variant={augmentSettings.enabled ? "outline" : "secondary"}>
@@ -825,7 +991,7 @@ export default function App() {
                   </div>
 
                   <div className="sentinel-panel-grid">
-                    <section className="sentinel-policy-card">
+                    <section className="sentinel-policy-card sentinel-panel-resizable">
                       <header>
                         <h3>Governance Policy</h3>
                         <Button size="xs" variant="outline" onClick={requestRuntimeRefresh}>Refresh</Button>
@@ -912,7 +1078,7 @@ export default function App() {
                       </label>
                     </section>
 
-                    <section className="sentinel-policy-card">
+                    <section className="sentinel-policy-card sentinel-panel-resizable">
                       <header>
                         <h3>Reliability SLO</h3>
                         <Badge variant={reliabilitySlo?.healthy ? "outline" : "destructive"}>
@@ -943,7 +1109,7 @@ export default function App() {
                       )}
                     </section>
 
-                    <section className="sentinel-policy-card">
+                    <section className="sentinel-policy-card sentinel-panel-resizable">
                       <header>
                         <h3>Quality Harness</h3>
                         <Button
