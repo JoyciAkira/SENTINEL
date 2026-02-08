@@ -55,6 +55,7 @@ pub enum ContextProviderKind {
     NativeMemory,
     OssVector,
     CodeGraph,
+    MemoryMcp,
     AugmentMcp,
 }
 
@@ -64,6 +65,7 @@ impl ContextProviderKind {
             Self::NativeMemory => "native_memory",
             Self::OssVector => "oss_vector",
             Self::CodeGraph => "code_graph",
+            Self::MemoryMcp => "memory_mcp",
             Self::AugmentMcp => "augment_mcp",
         }
     }
@@ -142,6 +144,7 @@ impl ContextProviderRouter {
         let default_priority = vec![
             ContextProviderKind::OssVector,
             ContextProviderKind::CodeGraph,
+            ContextProviderKind::MemoryMcp,
             ContextProviderKind::NativeMemory,
             ContextProviderKind::AugmentMcp,
         ];
@@ -296,7 +299,8 @@ fn priority_from_env() -> Option<Vec<ContextProviderKind>> {
         let mapped = match key.as_str() {
             "qdrant_mcp" | "qdrant" | "oss_vector" => Some(ContextProviderKind::OssVector),
             "filesystem_mcp" | "git_mcp" | "code_graph" => Some(ContextProviderKind::CodeGraph),
-            "memory_mcp" | "native_memory" | "memory" => Some(ContextProviderKind::NativeMemory),
+            "memory_mcp" | "memory" => Some(ContextProviderKind::MemoryMcp),
+            "native_memory" => Some(ContextProviderKind::NativeMemory),
             "augment_mcp" | "augment" => Some(ContextProviderKind::AugmentMcp),
             _ => None,
         };
@@ -338,7 +342,23 @@ impl ContextProvider for NativeMemoryProvider {
 }
 
 /// Future OSS vector provider placeholder.
-pub struct OssVectorProvider;
+pub struct OssVectorProvider {
+    health: ContextProviderHealth,
+}
+
+impl OssVectorProvider {
+    pub fn unavailable() -> Self {
+        Self {
+            health: ContextProviderHealth::Unavailable,
+        }
+    }
+
+    pub fn healthy() -> Self {
+        Self {
+            health: ContextProviderHealth::Healthy,
+        }
+    }
+}
 
 impl ContextProvider for OssVectorProvider {
     fn kind(&self) -> ContextProviderKind {
@@ -346,12 +366,28 @@ impl ContextProvider for OssVectorProvider {
     }
 
     fn health(&self) -> ContextProviderHealth {
-        ContextProviderHealth::Unavailable
+        self.health
     }
 }
 
 /// Future code graph provider placeholder.
-pub struct CodeGraphProvider;
+pub struct CodeGraphProvider {
+    health: ContextProviderHealth,
+}
+
+impl CodeGraphProvider {
+    pub fn unavailable() -> Self {
+        Self {
+            health: ContextProviderHealth::Unavailable,
+        }
+    }
+
+    pub fn healthy() -> Self {
+        Self {
+            health: ContextProviderHealth::Healthy,
+        }
+    }
+}
 
 impl ContextProvider for CodeGraphProvider {
     fn kind(&self) -> ContextProviderKind {
@@ -359,7 +395,36 @@ impl ContextProvider for CodeGraphProvider {
     }
 
     fn health(&self) -> ContextProviderHealth {
-        ContextProviderHealth::Unavailable
+        self.health
+    }
+}
+
+/// Future memory MCP provider placeholder.
+pub struct MemoryMcpProvider {
+    health: ContextProviderHealth,
+}
+
+impl MemoryMcpProvider {
+    pub fn unavailable() -> Self {
+        Self {
+            health: ContextProviderHealth::Unavailable,
+        }
+    }
+
+    pub fn healthy() -> Self {
+        Self {
+            health: ContextProviderHealth::Healthy,
+        }
+    }
+}
+
+impl ContextProvider for MemoryMcpProvider {
+    fn kind(&self) -> ContextProviderKind {
+        ContextProviderKind::MemoryMcp
+    }
+
+    fn health(&self) -> ContextProviderHealth {
+        self.health
     }
 }
 
@@ -553,6 +618,193 @@ impl AugmentMcpClient {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExternalMcpConfig {
+    pub enabled: bool,
+    pub command: String,
+    pub args: Vec<String>,
+    pub timeout_ms: u64,
+    pub preferred_tools: Vec<String>,
+}
+
+impl ExternalMcpConfig {
+    pub fn from_env(
+        prefix: &str,
+        default_command: &str,
+        default_args: &[&str],
+        default_tools: &[&str],
+    ) -> Self {
+        let enabled = std::env::var(format!("{}_ENABLED", prefix))
+            .map(|v| matches!(v.to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on"))
+            .unwrap_or(true);
+
+        let command = std::env::var(format!("{}_COMMAND", prefix))
+            .ok()
+            .filter(|s| !s.trim().is_empty())
+            .unwrap_or_else(|| default_command.to_string());
+
+        let args = std::env::var(format!("{}_ARGS", prefix))
+            .ok()
+            .map(|v| {
+                v.split_whitespace()
+                    .map(|s| s.trim().to_string())
+                    .filter(|s| !s.is_empty())
+                    .collect::<Vec<_>>()
+            })
+            .filter(|v| !v.is_empty())
+            .unwrap_or_else(|| default_args.iter().map(|s| (*s).to_string()).collect());
+
+        let timeout_ms = std::env::var(format!("{}_TIMEOUT_MS", prefix))
+            .ok()
+            .and_then(|v| v.parse::<u64>().ok())
+            .unwrap_or(2500)
+            .max(500);
+
+        let preferred_tools = std::env::var(format!("{}_TOOLS", prefix))
+            .ok()
+            .map(|v| {
+                v.split(',')
+                    .map(|s| s.trim().to_string())
+                    .filter(|s| !s.is_empty())
+                    .collect::<Vec<_>>()
+            })
+            .filter(|v| !v.is_empty())
+            .unwrap_or_else(|| default_tools.iter().map(|s| (*s).to_string()).collect());
+
+        Self {
+            enabled,
+            command,
+            args,
+            timeout_ms,
+            preferred_tools,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct ExternalMcpClient {
+    pub name: String,
+    pub config: ExternalMcpConfig,
+}
+
+impl ExternalMcpClient {
+    pub fn new(name: impl Into<String>, config: ExternalMcpConfig) -> Self {
+        Self {
+            name: name.into(),
+            config,
+        }
+    }
+
+    pub fn is_available(&self) -> bool {
+        self.config.enabled && command_exists(&self.config.command)
+    }
+
+    pub async fn retrieve(
+        &self,
+        query: &str,
+        workspace: &Path,
+        limit: usize,
+    ) -> anyhow::Result<Vec<ExternalContextChunk>> {
+        if !self.config.enabled {
+            anyhow::bail!("{}_disabled", self.name);
+        }
+
+        let mut child = Command::new(&self.config.command)
+            .args(&self.config.args)
+            .current_dir(workspace)
+            .stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::null())
+            .spawn()?;
+
+        let mut stdin = child
+            .stdin
+            .take()
+            .ok_or_else(|| anyhow::anyhow!("{}_no_stdin", self.name))?;
+        let stdout = child
+            .stdout
+            .take()
+            .ok_or_else(|| anyhow::anyhow!("{}_no_stdout", self.name))?;
+        let mut reader = BufReader::new(stdout);
+
+        let init = serde_json::json!({
+            "jsonrpc":"2.0",
+            "id":1,
+            "method":"initialize",
+            "params":{
+                "protocolVersion":"2024-11-05",
+                "capabilities":{},
+                "clientInfo":{"name":"sentinel-agent-native","version":"0.1.0"}
+            }
+        });
+        stdin
+            .write_all((init.to_string() + "\n").as_bytes())
+            .await?;
+        stdin.flush().await?;
+        let _ = read_json_line(&mut reader, self.config.timeout_ms).await?;
+
+        let initialized = serde_json::json!({
+            "jsonrpc":"2.0",
+            "method":"notifications/initialized",
+            "params":{}
+        });
+        stdin
+            .write_all((initialized.to_string() + "\n").as_bytes())
+            .await?;
+        stdin.flush().await?;
+
+        let list_tools = serde_json::json!({
+            "jsonrpc":"2.0",
+            "id":2,
+            "method":"tools/list",
+            "params":{}
+        });
+        stdin
+            .write_all((list_tools.to_string() + "\n").as_bytes())
+            .await?;
+        stdin.flush().await?;
+        let tools_resp = read_json_line(&mut reader, self.config.timeout_ms).await?;
+        let available_tools = extract_tool_names(&tools_resp);
+        let selected_tool = self
+            .config
+            .preferred_tools
+            .iter()
+            .find(|name| available_tools.iter().any(|t| t == *name))
+            .cloned()
+            .or_else(|| {
+                available_tools
+                    .iter()
+                    .find(|name| {
+                        let lower = name.to_ascii_lowercase();
+                        lower.contains("search")
+                            || lower.contains("query")
+                            || lower.contains("retrieve")
+                            || lower.contains("find")
+                    })
+                    .cloned()
+            })
+            .ok_or_else(|| anyhow::anyhow!("{}_no_compatible_tools", self.name))?;
+
+        let tool_call = serde_json::json!({
+            "jsonrpc":"2.0",
+            "id":3,
+            "method":"tools/call",
+            "params":{
+                "name": selected_tool,
+                "arguments": build_tool_arguments(&selected_tool, query, workspace, limit)
+            }
+        });
+        stdin
+            .write_all((tool_call.to_string() + "\n").as_bytes())
+            .await?;
+        stdin.flush().await?;
+        let response = read_json_line(&mut reader, self.config.timeout_ms).await?;
+        let _ = child.kill().await;
+
+        parse_retrieval_chunks(&response)
+    }
+}
+
 async fn read_json_line(
     reader: &mut BufReader<tokio::process::ChildStdout>,
     timeout_ms: u64,
@@ -597,6 +849,38 @@ fn parse_retrieval_chunks(response: &Value) -> anyhow::Result<Vec<ExternalContex
     }
 
     Ok(out)
+}
+
+fn extract_tool_names(response: &Value) -> Vec<String> {
+    response
+        .get("result")
+        .and_then(|v| v.get("tools"))
+        .and_then(|v| v.as_array())
+        .map(|tools| {
+            tools
+                .iter()
+                .filter_map(|tool| tool.get("name").and_then(|v| v.as_str()))
+                .map(|name| name.to_string())
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default()
+}
+
+fn build_tool_arguments(tool: &str, query: &str, workspace: &Path, limit: usize) -> Value {
+    match tool {
+        "codebase-retrieval" => serde_json::json!({
+            "query": query,
+            "directory_path": workspace.to_string_lossy(),
+            "top_k": limit.max(1),
+        }),
+        _ => serde_json::json!({
+            "query": query,
+            "limit": limit.max(1),
+            "top_k": limit.max(1),
+            "directory_path": workspace.to_string_lossy(),
+            "path": workspace.to_string_lossy(),
+        }),
+    }
 }
 
 fn command_exists(command: &str) -> bool {
@@ -697,5 +981,30 @@ mod tests {
         let chunks = parse_retrieval_chunks(&payload).unwrap();
         assert_eq!(chunks.len(), 2);
         assert_eq!(chunks[0].text, "chunk-a");
+    }
+
+    #[test]
+    fn extract_tool_names_reads_tools_list() {
+        let payload = serde_json::json!({
+            "result": {
+                "tools": [
+                    {"name":"search"},
+                    {"name":"codebase-retrieval"}
+                ]
+            }
+        });
+
+        let names = extract_tool_names(&payload);
+        assert_eq!(
+            names,
+            vec!["search".to_string(), "codebase-retrieval".to_string()]
+        );
+    }
+
+    #[test]
+    fn build_tool_arguments_special_case_codebase_retrieval() {
+        let args = build_tool_arguments("codebase-retrieval", "auth flow", Path::new("."), 5);
+        assert!(args.get("top_k").is_some());
+        assert!(args.get("directory_path").is_some());
     }
 }

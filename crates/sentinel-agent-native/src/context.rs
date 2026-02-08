@@ -60,7 +60,8 @@
 use crate::context_provider::{
     AugmentMcpClient, AugmentMcpConfig, AugmentMcpProvider, CodeGraphProvider, ContextProviderKind,
     ContextProviderPolicy, ContextProviderRouter, ContextRoutingEvent, ContextRoutingStats,
-    NativeMemoryProvider, OssVectorProvider,
+    ExternalMcpClient, ExternalMcpConfig, MemoryMcpProvider, NativeMemoryProvider,
+    OssVectorProvider,
 };
 use anyhow::{Context, Result};
 use chrono::Utc;
@@ -98,6 +99,10 @@ pub struct ContextManager {
     /// Context provider router (commercial-safe policy enforcement + fallback).
     pub provider_router: ContextProviderRouter,
     pub augment_client: AugmentMcpClient,
+    pub qdrant_client: ExternalMcpClient,
+    pub filesystem_client: ExternalMcpClient,
+    pub git_client: ExternalMcpClient,
+    pub memory_mcp_client: ExternalMcpClient,
 }
 
 /// Cached context result
@@ -167,7 +172,49 @@ impl ContextManager {
     pub fn new(memory_manifold: Arc<Mutex<MemoryManifold>>) -> Self {
         tracing::info!("Initializing Context Manager");
         let augment_client = AugmentMcpClient::new(AugmentMcpConfig::from_env());
-        let provider_router = default_context_provider_router(augment_client.is_available());
+        let qdrant_client = ExternalMcpClient::new(
+            "qdrant_mcp",
+            ExternalMcpConfig::from_env(
+                "SENTINEL_QDRANT_MCP",
+                "npx",
+                &["-y", "@qdrant/mcp-server-qdrant"],
+                &["search", "query", "codebase-retrieval"],
+            ),
+        );
+        let filesystem_client = ExternalMcpClient::new(
+            "filesystem_mcp",
+            ExternalMcpConfig::from_env(
+                "SENTINEL_FILESYSTEM_MCP",
+                "npx",
+                &["-y", "@modelcontextprotocol/server-filesystem", "."],
+                &["search_files", "search", "find"],
+            ),
+        );
+        let git_client = ExternalMcpClient::new(
+            "git_mcp",
+            ExternalMcpConfig::from_env(
+                "SENTINEL_GIT_MCP",
+                "npx",
+                &["-y", "@modelcontextprotocol/server-git", "."],
+                &["search_commits", "search", "query"],
+            ),
+        );
+        let memory_mcp_client = ExternalMcpClient::new(
+            "memory_mcp",
+            ExternalMcpConfig::from_env(
+                "SENTINEL_MEMORY_MCP",
+                "npx",
+                &["-y", "@modelcontextprotocol/server-memory"],
+                &["search_memory", "search", "query"],
+            ),
+        );
+
+        let provider_router = default_context_provider_router(
+            augment_client.is_available(),
+            qdrant_client.is_available(),
+            filesystem_client.is_available() || git_client.is_available(),
+            memory_mcp_client.is_available(),
+        );
 
         Self {
             memory_manifold,
@@ -175,6 +222,10 @@ impl ContextManager {
             stats: ContextStats::default(),
             provider_router,
             augment_client,
+            qdrant_client,
+            filesystem_client,
+            git_client,
+            memory_mcp_client,
         }
     }
 
@@ -289,7 +340,12 @@ impl ContextManager {
 
     pub fn set_augment_mcp_config(&mut self, config: AugmentMcpConfig) {
         let client = AugmentMcpClient::new(config);
-        self.provider_router = default_context_provider_router(client.is_available());
+        self.provider_router = default_context_provider_router(
+            client.is_available(),
+            self.qdrant_client.is_available(),
+            self.filesystem_client.is_available() || self.git_client.is_available(),
+            self.memory_mcp_client.is_available(),
+        );
         self.augment_client = client;
     }
 
@@ -311,60 +367,197 @@ impl ContextManager {
         limit: usize,
         selected_provider: ContextProviderKind,
     ) -> Result<Vec<MemoryQueryResult>> {
-        if selected_provider == ContextProviderKind::AugmentMcp
-            && self.augment_client.is_available()
-        {
-            let workspace = std::env::current_dir().context("Failed to resolve workspace path")?;
-            match self
-                .augment_client
-                .retrieve(&query.text, &workspace, limit.min(8))
-                .await
-            {
-                Ok(chunks) => {
-                    let mut external = Vec::new();
-                    for chunk in chunks {
-                        let memory = MemoryItem::builder()
-                            .content(chunk.text)
-                            .memory_type(MemoryType::Observation)
-                            .confidence(chunk.score.clamp(0.0, 1.0))
-                            .origin(MemoryOrigin::ExternalSync)
-                            .tag("augment_mcp".to_string())
-                            .build()
-                            .map_err(anyhow::Error::msg)?;
-                        external.push(MemoryQueryResult {
-                            item: memory,
-                            score: chunk.score,
-                            source: MemorySource::Semantic,
-                        });
-                    }
-                    if !external.is_empty() {
-                        return Ok(external);
+        let workspace = std::env::current_dir().context("Failed to resolve workspace path")?;
+
+        let chain: Vec<ContextProviderKind> = match selected_provider {
+            ContextProviderKind::OssVector => vec![
+                ContextProviderKind::OssVector,
+                ContextProviderKind::CodeGraph,
+                ContextProviderKind::MemoryMcp,
+                ContextProviderKind::AugmentMcp,
+                ContextProviderKind::NativeMemory,
+            ],
+            ContextProviderKind::CodeGraph => vec![
+                ContextProviderKind::CodeGraph,
+                ContextProviderKind::MemoryMcp,
+                ContextProviderKind::AugmentMcp,
+                ContextProviderKind::NativeMemory,
+            ],
+            ContextProviderKind::MemoryMcp => vec![
+                ContextProviderKind::MemoryMcp,
+                ContextProviderKind::AugmentMcp,
+                ContextProviderKind::NativeMemory,
+            ],
+            ContextProviderKind::AugmentMcp => vec![
+                ContextProviderKind::AugmentMcp,
+                ContextProviderKind::NativeMemory,
+            ],
+            ContextProviderKind::NativeMemory => vec![ContextProviderKind::NativeMemory],
+        };
+
+        for provider in chain {
+            match provider {
+                ContextProviderKind::OssVector => {
+                    if self.qdrant_client.is_available() {
+                        if let Ok(results) = self
+                            .external_client_to_results(
+                                &self.qdrant_client,
+                                &query.text,
+                                &workspace,
+                                limit.min(8),
+                                "qdrant_mcp",
+                            )
+                            .await
+                        {
+                            return Ok(results);
+                        }
+                        self.stats.routing_fallbacks += 1;
+                        self.stats.last_fallback_reason =
+                            Some("qdrant_mcp_runtime_failure".to_string());
                     }
                 }
-                Err(err) => {
-                    tracing::warn!(
-                        "augment_mcp retrieval failed, switching to native semantic memory: {}",
-                        err
-                    );
-                    self.stats.routing_fallbacks += 1;
-                    self.stats.last_fallback_reason = Some("augment_runtime_failure".to_string());
+                ContextProviderKind::CodeGraph => {
+                    if self.filesystem_client.is_available() {
+                        if let Ok(results) = self
+                            .external_client_to_results(
+                                &self.filesystem_client,
+                                &query.text,
+                                &workspace,
+                                limit.min(6),
+                                "filesystem_mcp",
+                            )
+                            .await
+                        {
+                            return Ok(results);
+                        }
+                        self.stats.routing_fallbacks += 1;
+                        self.stats.last_fallback_reason =
+                            Some("filesystem_mcp_runtime_failure".to_string());
+                    }
+                    if self.git_client.is_available() {
+                        if let Ok(results) = self
+                            .external_client_to_results(
+                                &self.git_client,
+                                &query.text,
+                                &workspace,
+                                limit.min(6),
+                                "git_mcp",
+                            )
+                            .await
+                        {
+                            return Ok(results);
+                        }
+                        self.stats.routing_fallbacks += 1;
+                        self.stats.last_fallback_reason =
+                            Some("git_mcp_runtime_failure".to_string());
+                    }
+                }
+                ContextProviderKind::MemoryMcp => {
+                    if self.memory_mcp_client.is_available() {
+                        if let Ok(results) = self
+                            .external_client_to_results(
+                                &self.memory_mcp_client,
+                                &query.text,
+                                &workspace,
+                                limit.min(8),
+                                "memory_mcp",
+                            )
+                            .await
+                        {
+                            return Ok(results);
+                        }
+                        self.stats.routing_fallbacks += 1;
+                        self.stats.last_fallback_reason =
+                            Some("memory_mcp_runtime_failure".to_string());
+                    }
+                }
+                ContextProviderKind::AugmentMcp => {
+                    if self.augment_client.is_available() {
+                        match self
+                            .augment_client
+                            .retrieve(&query.text, &workspace, limit.min(8))
+                            .await
+                        {
+                            Ok(chunks) => {
+                                let mut external = Vec::new();
+                                for chunk in chunks {
+                                    let memory = MemoryItem::builder()
+                                        .content(chunk.text)
+                                        .memory_type(MemoryType::Observation)
+                                        .confidence(chunk.score.clamp(0.0, 1.0))
+                                        .origin(MemoryOrigin::ExternalSync)
+                                        .tag("augment_mcp".to_string())
+                                        .build()
+                                        .map_err(anyhow::Error::msg)?;
+                                    external.push(MemoryQueryResult {
+                                        item: memory,
+                                        score: chunk.score,
+                                        source: MemorySource::Semantic,
+                                    });
+                                }
+                                if !external.is_empty() {
+                                    return Ok(external);
+                                }
+                            }
+                            Err(err) => {
+                                tracing::warn!(
+                                    "augment_mcp retrieval failed, switching provider: {}",
+                                    err
+                                );
+                                self.stats.routing_fallbacks += 1;
+                                self.stats.last_fallback_reason =
+                                    Some("augment_runtime_failure".to_string());
+                            }
+                        }
+                    }
+                }
+                ContextProviderKind::NativeMemory => {
+                    let mut manifold = self.memory_manifold.lock().await;
+                    let concept_ids = manifold.semantic.query(&query.text, limit);
+                    let mut results = Vec::new();
+                    for id in concept_ids {
+                        if let Some(item) = manifold.episodic.get(&id) {
+                            results.push(MemoryQueryResult {
+                                item: item.clone(),
+                                score: 0.5,
+                                source: MemorySource::Semantic,
+                            });
+                        }
+                    }
+                    return Ok(results);
                 }
             }
         }
 
-        let mut manifold = self.memory_manifold.lock().await;
-        let concept_ids = manifold.semantic.query(&query.text, limit);
-        let mut results = Vec::new();
-        for id in concept_ids {
-            if let Some(item) = manifold.episodic.get(&id) {
-                results.push(MemoryQueryResult {
-                    item: item.clone(),
-                    score: 0.5,
-                    source: MemorySource::Semantic,
-                });
-            }
+        Ok(vec![])
+    }
+
+    async fn external_client_to_results(
+        &self,
+        client: &ExternalMcpClient,
+        query: &str,
+        workspace: &std::path::Path,
+        limit: usize,
+        tag: &str,
+    ) -> Result<Vec<MemoryQueryResult>> {
+        let chunks = client.retrieve(query, workspace, limit).await?;
+        let mut external = Vec::new();
+        for chunk in chunks {
+            let memory = MemoryItem::builder()
+                .content(chunk.text)
+                .memory_type(MemoryType::Observation)
+                .confidence(chunk.score.clamp(0.0, 1.0))
+                .origin(MemoryOrigin::ExternalSync)
+                .tag(tag.to_string())
+                .build()
+                .map_err(anyhow::Error::msg)?;
+            external.push(MemoryQueryResult {
+                item: memory,
+                score: chunk.score,
+                source: MemorySource::Semantic,
+            });
         }
-        Ok(results)
+        Ok(external)
     }
 
     /// Query working memory (instant, 10-item LRU cache)
@@ -782,15 +975,33 @@ impl ContextManager {
     }
 }
 
-fn default_context_provider_router(augment_available: bool) -> ContextProviderRouter {
+fn default_context_provider_router(
+    augment_available: bool,
+    qdrant_available: bool,
+    code_graph_available: bool,
+    memory_mcp_available: bool,
+) -> ContextProviderRouter {
     let mut router = ContextProviderRouter::new();
     if augment_available {
         router.register_provider(Box::new(AugmentMcpProvider::healthy()));
     } else {
         router.register_provider(Box::new(AugmentMcpProvider::unavailable()));
     }
-    router.register_provider(Box::new(OssVectorProvider));
-    router.register_provider(Box::new(CodeGraphProvider));
+    if qdrant_available {
+        router.register_provider(Box::new(OssVectorProvider::healthy()));
+    } else {
+        router.register_provider(Box::new(OssVectorProvider::unavailable()));
+    }
+    if code_graph_available {
+        router.register_provider(Box::new(CodeGraphProvider::healthy()));
+    } else {
+        router.register_provider(Box::new(CodeGraphProvider::unavailable()));
+    }
+    if memory_mcp_available {
+        router.register_provider(Box::new(MemoryMcpProvider::healthy()));
+    } else {
+        router.register_provider(Box::new(MemoryMcpProvider::unavailable()));
+    }
     router.register_provider(Box::new(NativeMemoryProvider));
     router
 }
