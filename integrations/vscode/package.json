@@ -47,7 +47,7 @@
         {
           "id": "sentinel-explorer",
           "title": "Sentinel",
-          "icon": "$(shield)"
+          "icon": "media/sentinel.svg"
         }
       ]
     },

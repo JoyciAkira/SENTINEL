@@ -7,8 +7,10 @@ use sentinel_core::goal_manifold::goal::Goal;
 use sentinel_core::goal_manifold::predicate::Predicate;
 use sentinel_core::types::Comparison;
 use sentinel_core::{security::SecurityScanner, AlignmentField, GoalManifold, ProjectState};
+use ed25519_dalek::{Signer, SigningKey};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::io::Write;
 use std::path::PathBuf;
 use std::process::Command;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
@@ -95,6 +97,52 @@ struct ChatMemoryTurn {
     assistant: String,
     intent_summary: String,
     evidence: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct ReplayLedgerEntry {
+    version: u32,
+    turn_id: String,
+    timestamp: i64,
+    user_message: String,
+    response_hash: String,
+    strict_goal_execution: bool,
+    memory_hit_ids: Vec<String>,
+    evidence_hash: String,
+    constitutional_spec_hash: String,
+    counterfactual_hash: String,
+    policy_simulation_hash: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct TeamMemoryGraphNode {
+    id: String,
+    timestamp: i64,
+    intent_summary: String,
+    provenance_hash: String,
+    lamport: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct TeamMemoryGraphEdge {
+    source: String,
+    target: String,
+    weight: f64,
+    relation: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct TeamMemoryGraph {
+    version: u32,
+    generated_at: i64,
+    node_count: usize,
+    edge_count: usize,
+    nodes: Vec<TeamMemoryGraphNode>,
+    edges: Vec<TeamMemoryGraphEdge>,
+    graph_hash: String,
+    signer_public_key: String,
+    signature: String,
+    signature_scheme: String,
 }
 
 /// Avvia il server MCP su stdin/stdout
@@ -584,6 +632,347 @@ fn load_chat_memory_from_path(path: &std::path::Path) -> Result<ChatMemoryStore,
         store.version = 1;
     }
     Ok(store)
+}
+
+fn workspace_root() -> PathBuf {
+    find_manifold_path()
+        .and_then(|path| path.parent().map(|parent| parent.to_path_buf()))
+        .or_else(|| std::env::current_dir().ok())
+        .unwrap_or_else(|| PathBuf::from("."))
+}
+
+fn innovation_root(root: &std::path::Path) -> PathBuf {
+    root.join(".sentinel").join("innovation")
+}
+
+fn stable_hash_hex(input: &str) -> String {
+    blake3::hash(input.as_bytes()).to_hex().to_string()
+}
+
+fn persist_json(path: &std::path::Path, value: &serde_json::Value) -> Result<(), String> {
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)
+            .map_err(|e| format!("Errore creazione directory '{}': {}", parent.display(), e))?;
+    }
+    let content = serde_json::to_string_pretty(value)
+        .map_err(|e| format!("Errore serializzazione JSON '{}': {}", path.display(), e))?;
+    std::fs::write(path, content).map_err(|e| format!("Errore scrittura '{}': {}", path.display(), e))
+}
+
+fn compile_constitutional_spec(message: &str, strict_goal_execution: bool) -> serde_json::Value {
+    let lower = message.to_ascii_lowercase();
+    let mut include = Vec::new();
+    let mut exclude = Vec::new();
+    let mut constraints = Vec::new();
+
+    if lower.contains("test") {
+        include.push("minimal_tests".to_string());
+    }
+    if lower.contains("file change") || lower.contains("code change") {
+        include.push("targeted_file_changes".to_string());
+    }
+    if lower.contains("todo-app") {
+        include.push("workspace_scope:todo-app".to_string());
+    }
+    if lower.contains("no scaffolding") || lower.contains("niente scaffolding") {
+        exclude.push("bootstrap_scaffolding".to_string());
+        constraints.push("no_scaffolding".to_string());
+    }
+    if lower.contains("only the first") || lower.contains("solo il primo") {
+        constraints.push("first_pending_goal_only".to_string());
+    }
+    if strict_goal_execution {
+        constraints.push("strict_goal_execution_mode".to_string());
+    }
+
+    let mut invariants = vec![
+        "deterministic_output".to_string(),
+        "explicit_paths".to_string(),
+        "fail_safe_behavior".to_string(),
+        "contract_preserving".to_string(),
+    ];
+    if strict_goal_execution {
+        invariants.push("minimal_blast_radius".to_string());
+    }
+
+    serde_json::json!({
+        "version": 1,
+        "objective": message,
+        "scope": {
+            "include": include,
+            "exclude": exclude
+        },
+        "constraints": constraints,
+        "invariants": invariants,
+        "success_signals": [
+            "safe_write_plan_generated_or_skipped",
+            "verification_commands_present",
+            "explainability_evidence_present"
+        ]
+    })
+}
+
+fn persist_constitutional_spec(
+    root: &std::path::Path,
+    turn_id: &str,
+    spec: &serde_json::Value,
+) -> Result<PathBuf, String> {
+    let path = innovation_root(root)
+        .join("constitutional_spec")
+        .join(format!("spec-{}.json", &turn_id[..turn_id.len().min(12)]));
+    persist_json(&path, spec)?;
+    Ok(path)
+}
+
+fn build_counterfactual_plans(
+    strict_goal_execution: bool,
+    reliability_healthy: Option<bool>,
+    governance_pending: Option<&String>,
+) -> serde_json::Value {
+    let has_pending_governance = governance_pending.is_some();
+    let reliability_ok = reliability_healthy.unwrap_or(false);
+    let recommended = if has_pending_governance || !reliability_ok {
+        "conservative"
+    } else if strict_goal_execution {
+        "balanced"
+    } else {
+        "balanced"
+    };
+
+    let plans = vec![
+        serde_json::json!({
+            "id": "conservative",
+            "title": "Conservative patch",
+            "strategy": "Edit only strictly required files, preserve behavior, add minimal guard tests.",
+            "risk": "low",
+            "estimated_files_touched": "1-2",
+            "expected_rollback_rate": "<2%"
+        }),
+        serde_json::json!({
+            "id": "balanced",
+            "title": "Balanced implementation",
+            "strategy": "Implement requested scope + focused refactor where needed for maintainability.",
+            "risk": "medium",
+            "estimated_files_touched": "2-5",
+            "expected_rollback_rate": "2-5%"
+        }),
+        serde_json::json!({
+            "id": "aggressive",
+            "title": "Aggressive redesign",
+            "strategy": "Broader restructuring for long-term optimization and abstraction cleanup.",
+            "risk": "high",
+            "estimated_files_touched": "5+",
+            "expected_rollback_rate": ">5%"
+        }),
+    ];
+
+    serde_json::json!({
+        "version": 1,
+        "recommended_plan_id": recommended,
+        "recommended_reason": if recommended == "conservative" {
+            "Governance/reliability signals suggest minimizing blast radius."
+        } else {
+            "Current signals allow incremental delivery with moderate scope."
+        },
+        "plans": plans
+    })
+}
+
+fn scale_thresholds(
+    base: &reliability::ReliabilityThresholds,
+    min_multiplier: f64,
+    max_multiplier: f64,
+) -> reliability::ReliabilityThresholds {
+    reliability::ReliabilityThresholds {
+        min_task_success_rate: (base.min_task_success_rate * min_multiplier).clamp(0.0, 1.0),
+        min_no_regression_rate: (base.min_no_regression_rate * min_multiplier).clamp(0.0, 1.0),
+        max_rollback_rate: (base.max_rollback_rate * max_multiplier).clamp(0.0, 1.0),
+        max_invariant_violation_rate: (base.max_invariant_violation_rate * max_multiplier)
+            .clamp(0.0, 1.0),
+    }
+}
+
+fn simulate_policy_modes(
+    snapshot: Option<&sentinel_core::ReliabilitySnapshot>,
+    base_thresholds: &reliability::ReliabilityThresholds,
+) -> serde_json::Value {
+    let Some(snapshot) = snapshot else {
+        return serde_json::json!({
+            "available": false,
+            "reason": "reliability_snapshot_unavailable"
+        });
+    };
+
+    let strict_thresholds = scale_thresholds(base_thresholds, 1.0, 1.0);
+    let balanced_thresholds = scale_thresholds(base_thresholds, 0.92, 1.2);
+    let aggressive_thresholds = scale_thresholds(base_thresholds, 0.84, 1.45);
+
+    let modes = [
+        ("strict", strict_thresholds),
+        ("balanced", balanced_thresholds),
+        ("aggressive", aggressive_thresholds),
+    ]
+    .into_iter()
+    .map(|(name, thresholds)| {
+        let eval = reliability::evaluate_snapshot(snapshot, &thresholds);
+        serde_json::json!({
+            "mode": name,
+            "healthy": eval.healthy,
+            "violations": eval.violations,
+            "thresholds": thresholds
+        })
+    })
+    .collect::<Vec<_>>();
+
+    serde_json::json!({
+        "available": true,
+        "snapshot": {
+            "task_success_rate": snapshot.task_success_rate,
+            "no_regression_rate": snapshot.no_regression_rate,
+            "rollback_rate": snapshot.rollback_rate,
+            "invariant_violation_rate": snapshot.invariant_violation_rate
+        },
+        "modes": modes
+    })
+}
+
+fn derive_workspace_signing_key(root: &std::path::Path, manifold: Option<&GoalManifold>) -> SigningKey {
+    let material = format!(
+        "{}::{}",
+        root.display(),
+        manifold
+            .map(|m| m.integrity_hash.to_hex())
+            .unwrap_or_else(|| "no-manifold".to_string())
+    );
+    let mut seed = [0u8; 32];
+    seed.copy_from_slice(blake3::hash(material.as_bytes()).as_bytes());
+    SigningKey::from_bytes(&seed)
+}
+
+fn term_overlap(a: &str, b: &str) -> usize {
+    let left = normalize_terms(a);
+    let right = normalize_terms(b);
+    left.intersection(&right).count()
+}
+
+fn build_team_memory_graph(
+    store: &ChatMemoryStore,
+    root: &std::path::Path,
+    manifold: Option<&GoalManifold>,
+) -> TeamMemoryGraph {
+    let recent: Vec<ChatMemoryTurn> = if store.turns.len() > 120 {
+        store.turns[store.turns.len() - 120..].to_vec()
+    } else {
+        store.turns.clone()
+    };
+
+    let nodes: Vec<TeamMemoryGraphNode> = recent
+        .iter()
+        .map(|turn| TeamMemoryGraphNode {
+            id: turn.id.clone(),
+            timestamp: turn.timestamp,
+            intent_summary: turn.intent_summary.clone(),
+            provenance_hash: stable_hash_hex(&format!(
+                "{}|{}|{}",
+                turn.id, turn.user, turn.assistant
+            )),
+            lamport: turn.timestamp,
+        })
+        .collect();
+
+    let mut edges: Vec<TeamMemoryGraphEdge> = Vec::new();
+    for pair in recent.windows(2) {
+        if let [left, right] = pair {
+            edges.push(TeamMemoryGraphEdge {
+                source: left.id.clone(),
+                target: right.id.clone(),
+                weight: 1.0,
+                relation: "temporal".to_string(),
+            });
+        }
+    }
+
+    let n = recent.len();
+    for i in 0..n {
+        let max_j = (i + 25).min(n);
+        for j in (i + 1)..max_j {
+            let overlap = term_overlap(&recent[i].intent_summary, &recent[j].intent_summary);
+            if overlap >= 2 {
+                edges.push(TeamMemoryGraphEdge {
+                    source: recent[i].id.clone(),
+                    target: recent[j].id.clone(),
+                    weight: (overlap as f64).min(6.0),
+                    relation: "semantic_overlap".to_string(),
+                });
+            }
+        }
+    }
+
+    if edges.len() > 320 {
+        edges.truncate(320);
+    }
+
+    let unsigned = serde_json::json!({
+        "version": 1,
+        "generated_at": chrono::Utc::now().timestamp_millis(),
+        "nodes": nodes,
+        "edges": edges
+    });
+    let graph_hash = stable_hash_hex(&unsigned.to_string());
+    let signing_key = derive_workspace_signing_key(root, manifold);
+    let signature = signing_key.sign(graph_hash.as_bytes());
+
+    TeamMemoryGraph {
+        version: 1,
+        generated_at: chrono::Utc::now().timestamp_millis(),
+        node_count: unsigned["nodes"].as_array().map_or(0, |v| v.len()),
+        edge_count: unsigned["edges"].as_array().map_or(0, |v| v.len()),
+        nodes: serde_json::from_value(unsigned["nodes"].clone()).unwrap_or_default(),
+        edges: serde_json::from_value(unsigned["edges"].clone()).unwrap_or_default(),
+        graph_hash,
+        signer_public_key: hex::encode(signing_key.verifying_key().to_bytes()),
+        signature: hex::encode(signature.to_bytes()),
+        signature_scheme: "ed25519-blake3-v1".to_string(),
+    }
+}
+
+fn persist_team_memory_graph(
+    root: &std::path::Path,
+    graph: &TeamMemoryGraph,
+) -> Result<PathBuf, String> {
+    let path = innovation_root(root).join("team_memory_graph.json");
+    let value = serde_json::to_value(graph)
+        .map_err(|e| format!("Errore serializzazione team memory graph: {}", e))?;
+    persist_json(&path, &value)?;
+    Ok(path)
+}
+
+fn persist_replay_ledger_entry(
+    root: &std::path::Path,
+    entry: &ReplayLedgerEntry,
+) -> Result<PathBuf, String> {
+    let dir = innovation_root(root).join("replay_ledger");
+    std::fs::create_dir_all(&dir)
+        .map_err(|e| format!("Errore creazione replay ledger '{}': {}", dir.display(), e))?;
+
+    let short_id = &entry.turn_id[..entry.turn_id.len().min(12)];
+    let path = dir.join(format!("replay-{}-{}.json", entry.timestamp, short_id));
+    let entry_json = serde_json::to_value(entry)
+        .map_err(|e| format!("Errore serializzazione replay ledger: {}", e))?;
+    persist_json(&path, &entry_json)?;
+
+    let index_path = dir.join("index.jsonl");
+    let mut file = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&index_path)
+        .map_err(|e| format!("Errore apertura replay index '{}': {}", index_path.display(), e))?;
+    let row = serde_json::to_string(&entry_json)
+        .map_err(|e| format!("Errore serializzazione replay row: {}", e))?;
+    writeln!(file, "{}", row)
+        .map_err(|e| format!("Errore scrittura replay index '{}': {}", index_path.display(), e))?;
+
+    Ok(path)
 }
 
 fn normalize_terms(input: &str) -> std::collections::BTreeSet<String> {
@@ -2047,13 +2436,14 @@ Ti propongo un piano concreto in 3 step: \
                 }
             }
             let stream_chunks = stream_chunks(&response_text, 140);
+            let reliability_config = find_manifold_path()
+                .map(|path| reliability::load_reliability_config(&path))
+                .unwrap_or_default();
 
             let (alignment_score, reliability_ok, risk_flag) =
-                if let Some((alignment, reliability, _)) = reliability_snapshot {
-                    let config = find_manifold_path()
-                        .map(|path| reliability::load_reliability_config(&path))
-                        .unwrap_or_default();
-                    let slo = reliability::evaluate_snapshot(&reliability, &config.thresholds);
+                if let Some((alignment, reliability, _)) = reliability_snapshot.as_ref() {
+                    let slo =
+                        reliability::evaluate_snapshot(reliability, &reliability_config.thresholds);
                     (
                         Some(alignment.score),
                         Some(slo.healthy),
@@ -2100,6 +2490,67 @@ Ti propongo un piano concreto in 3 step: \
             }
             let _ = save_chat_memory(&next_store);
 
+            let root = workspace_root();
+            let constitutional_spec = compile_constitutional_spec(message, strict_goal_execution);
+            let constitutional_spec_hash = stable_hash_hex(&constitutional_spec.to_string());
+            let constitutional_spec_path = persist_constitutional_spec(&root, &turn.id, &constitutional_spec)
+                .ok()
+                .map(|path| path.to_string_lossy().to_string());
+
+            let counterfactual_plans = build_counterfactual_plans(
+                strict_goal_execution,
+                reliability_ok,
+                governance_pending.as_ref(),
+            );
+            let counterfactual_hash = stable_hash_hex(&counterfactual_plans.to_string());
+
+            let policy_simulation = simulate_policy_modes(
+                reliability_snapshot.as_ref().map(|(_, snapshot, _)| snapshot),
+                &reliability_config.thresholds,
+            );
+            let policy_simulation_hash = stable_hash_hex(&policy_simulation.to_string());
+
+            let team_memory_graph = build_team_memory_graph(&next_store, &root, manifold.as_ref());
+            let team_memory_graph_hash = team_memory_graph.graph_hash.clone();
+            let team_memory_graph_path = persist_team_memory_graph(&root, &team_memory_graph)
+                .ok()
+                .map(|path| path.to_string_lossy().to_string());
+
+            let replay_entry = ReplayLedgerEntry {
+                version: 1,
+                turn_id: turn.id.clone(),
+                timestamp: turn.timestamp,
+                user_message: message.to_string(),
+                response_hash: stable_hash_hex(&response_text),
+                strict_goal_execution,
+                memory_hit_ids: memory_hits.iter().map(|hit| hit.id.clone()).collect(),
+                evidence_hash: stable_hash_hex(&evidence.join("|")),
+                constitutional_spec_hash: constitutional_spec_hash.clone(),
+                counterfactual_hash: counterfactual_hash.clone(),
+                policy_simulation_hash: policy_simulation_hash.clone(),
+            };
+            let replay_ledger_path = persist_replay_ledger_entry(&root, &replay_entry)
+                .ok()
+                .map(|path| path.to_string_lossy().to_string());
+
+            let innovation_payload = serde_json::json!({
+                "version": 1,
+                "constitutional_spec": constitutional_spec,
+                "constitutional_spec_hash": constitutional_spec_hash,
+                "constitutional_spec_path": constitutional_spec_path,
+                "counterfactual_plans": counterfactual_plans,
+                "counterfactual_hash": counterfactual_hash,
+                "policy_simulation": policy_simulation,
+                "policy_simulation_hash": policy_simulation_hash,
+                "team_memory_graph": team_memory_graph,
+                "team_memory_graph_hash": team_memory_graph_hash,
+                "team_memory_graph_path": team_memory_graph_path,
+                "replay_ledger": {
+                    "entry": replay_entry,
+                    "path": replay_ledger_path
+                }
+            });
+
             let payload = serde_json::json!({
                 "answer": response_text,
                 "stream_chunks": stream_chunks,
@@ -2125,7 +2576,8 @@ Ti propongo un piano concreto in 3 step: \
                             "intent_summary": hit.intent_summary
                         })
                     }).collect::<Vec<_>>()
-                }
+                },
+                "innovation": innovation_payload
             });
 
             Some(serde_json::json!({
@@ -2463,6 +2915,14 @@ mod tests {
     use super::*;
     use std::time::{SystemTime, UNIX_EPOCH};
 
+    fn unique_temp_root(prefix: &str) -> PathBuf {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("clock should be monotonic")
+            .as_nanos();
+        std::env::temp_dir().join(format!("{}_{}", prefix, unique))
+    }
+
     #[test]
     fn stream_chunks_preserves_content() {
         let text = "Sentinel generates deterministic output with explainability blocks.";
@@ -2501,12 +2961,117 @@ mod tests {
     }
 
     #[test]
+    fn constitutional_spec_includes_strict_constraints() {
+        let spec = compile_constitutional_spec(
+            "Implementa solo il primo goal pending in todo-app. no scaffolding, test minimi",
+            true,
+        );
+        let constraints = spec
+            .get("constraints")
+            .and_then(|v| v.as_array())
+            .expect("constraints should be present");
+
+        let contains = |needle: &str| constraints.iter().any(|v| v.as_str() == Some(needle));
+        assert!(contains("first_pending_goal_only"));
+        assert!(contains("no_scaffolding"));
+        assert!(contains("strict_goal_execution_mode"));
+    }
+
+    #[test]
+    fn counterfactual_plans_choose_conservative_when_signals_are_risky() {
+        let governance_pending = "proposal-1".to_string();
+        let plans = build_counterfactual_plans(true, Some(false), Some(&governance_pending));
+        assert_eq!(
+            plans.get("recommended_plan_id").and_then(|v| v.as_str()),
+            Some("conservative")
+        );
+    }
+
+    #[test]
+    fn simulate_policy_modes_reports_available_modes_with_snapshot() {
+        let snapshot = sentinel_core::ReliabilitySnapshot {
+            task_success_rate: 0.94,
+            no_regression_rate: 0.93,
+            rollback_rate: 0.04,
+            avg_time_to_recover_ms: 180.0,
+            invariant_violation_rate: 0.01,
+        };
+        let thresholds = reliability::ReliabilityThresholds::default();
+        let simulation = simulate_policy_modes(Some(&snapshot), &thresholds);
+        assert_eq!(simulation.get("available").and_then(|v| v.as_bool()), Some(true));
+        assert_eq!(
+            simulation
+                .get("modes")
+                .and_then(|v| v.as_array())
+                .map(std::vec::Vec::len),
+            Some(3)
+        );
+    }
+
+    #[test]
+    fn team_memory_graph_is_signed_and_bounded() {
+        let root = unique_temp_root("sentinel_team_graph_test");
+        std::fs::create_dir_all(&root).expect("temp dir should be created");
+        let turns = (0..130)
+            .map(|idx| ChatMemoryTurn {
+                id: format!("turn-{}", idx),
+                timestamp: idx as i64,
+                user: format!("implement auth middleware {}", idx),
+                assistant: "done".to_string(),
+                intent_summary: "auth middleware token".to_string(),
+                evidence: vec![],
+            })
+            .collect::<Vec<_>>();
+
+        let store = ChatMemoryStore { version: 1, turns };
+        let graph = build_team_memory_graph(&store, &root, None);
+
+        assert_eq!(graph.signature_scheme, "ed25519-blake3-v1");
+        assert_eq!(graph.node_count, 120);
+        assert!(graph.edge_count <= 320);
+        assert_eq!(graph.signer_public_key.len(), 64);
+        assert_eq!(graph.signature.len(), 128);
+
+        std::fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn replay_ledger_entry_is_persisted_with_index() {
+        let root = unique_temp_root("sentinel_replay_ledger_test");
+        std::fs::create_dir_all(&root).expect("temp dir should be created");
+        let entry = ReplayLedgerEntry {
+            version: 1,
+            turn_id: "turn-1".to_string(),
+            timestamp: 1_700_000_000_000,
+            user_message: "implement only first pending goal".to_string(),
+            response_hash: stable_hash_hex("response"),
+            strict_goal_execution: true,
+            memory_hit_ids: vec!["a".to_string(), "b".to_string()],
+            evidence_hash: stable_hash_hex("evidence"),
+            constitutional_spec_hash: stable_hash_hex("spec"),
+            counterfactual_hash: stable_hash_hex("counterfactual"),
+            policy_simulation_hash: stable_hash_hex("policy"),
+        };
+
+        let path =
+            persist_replay_ledger_entry(&root, &entry).expect("replay ledger should persist");
+        assert!(path.exists());
+
+        let index_path = root
+            .join(".sentinel")
+            .join("innovation")
+            .join("replay_ledger")
+            .join("index.jsonl");
+        let index_content =
+            std::fs::read_to_string(index_path).expect("index file should be readable");
+        assert!(index_content.contains("\"turn_id\":\"turn-1\""));
+
+        std::fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
     fn list_quality_reports_returns_latest_first() {
-        let unique = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("clock should be monotonic")
-            .as_nanos();
-        let root = std::env::temp_dir().join(format!("sentinel_quality_test_{}", unique));
+        let root = unique_temp_root("sentinel_quality_test");
         let dir = root.join(".sentinel").join("quality");
         std::fs::create_dir_all(&dir).expect("should create quality dir");
 

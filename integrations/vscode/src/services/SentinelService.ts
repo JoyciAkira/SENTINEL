@@ -17,16 +17,31 @@ export class SentinelService {
             this.log(`Initializing Sentinel Client with binary: ${binaryPath}`);
             this.log(`Workspace: ${workspaceRoot}`);
 
-            this.client = new SentinelClient(binaryPath, workspaceRoot);
-            
-            // Verify connection
-            const manifold = await this.client.status();
-            this.log(`✅ Connected. Root Intent: ${manifold.root_intent.description}`);
+            try {
+                this.client = new SentinelClient(binaryPath, workspaceRoot);
+            } catch (clientError: any) {
+                this.client = undefined;
+                this.log(`⚠️ SDK client bootstrap skipped: ${clientError?.message || String(clientError)}`);
+                this.log(`⚠️ Continuing in MCP-first mode.`);
+                return true;
+            }
+
+            // Verify connection with best-effort probing.
+            // MCP is the authoritative transport; SDK probe should never block activation.
+            try {
+                const manifold = await this.client.status();
+                const rootIntent = this.extractRootIntentDescription(manifold);
+                this.log(`✅ Connected. Root Intent: ${rootIntent}`);
+            } catch (probeError: any) {
+                this.log(`⚠️ SDK status probe skipped: ${probeError?.message || String(probeError)}`);
+                this.log(`⚠️ Continuing in MCP-first mode.`);
+            }
             return true;
         } catch (error: any) {
             this.log(`❌ Initialization Failed: ${error.message}`);
-            vscode.window.showErrorMessage(`Sentinel Init Failed: ${error.message}`);
-            return false;
+            this.log(`⚠️ Continuing in MCP-first mode.`);
+            // Do not block extension activation on SDK probe errors.
+            return true;
         }
     }
 
@@ -53,7 +68,9 @@ export class SentinelService {
     private async findBinaryPath(): Promise<string> {
         // 1. Check configuration
         const config = vscode.workspace.getConfiguration('sentinel');
-        const configPath = config.get<string>('binaryPath');
+        const configPath =
+            config.get<string>('path') ||
+            config.get<string>('binaryPath');
         if (configPath && fs.existsSync(configPath)) return configPath;
 
         // 2. Check local dev build (target/release) - Good for dogfooding
@@ -89,6 +106,14 @@ export class SentinelService {
 
         // 4. Fallback to PATH
         return 'sentinel';
+    }
+
+    private extractRootIntentDescription(manifold: any): string {
+        const description = manifold?.root_intent?.description;
+        if (typeof description === 'string' && description.trim().length > 0) {
+            return description;
+        }
+        return 'N/A';
     }
 }
 

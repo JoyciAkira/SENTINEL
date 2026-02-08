@@ -1031,6 +1031,7 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
       let content = "No response from Sentinel.";
       let thoughtChain: string[] | undefined = undefined;
       let explainability: Record<string, unknown> | undefined = undefined;
+      let innovation: Record<string, unknown> | undefined = undefined;
       let streamChunks: string[] = [];
       let sections: ChatSectionPayload[] | undefined;
       let fileOperations:
@@ -1055,6 +1056,9 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
         }
         if (structured.explainability && typeof structured.explainability === "object") {
           explainability = { ...(structured.explainability as Record<string, unknown>) };
+        }
+        if (structured.innovation && typeof structured.innovation === "object") {
+          innovation = { ...(structured.innovation as Record<string, unknown>) };
         }
         const contextProvider =
           typeof structured.context_provider === "string"
@@ -1125,6 +1129,7 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
           thoughtChain,
           explainability,
           sections,
+          innovation,
           fileOperations,
           streaming: false,
         });

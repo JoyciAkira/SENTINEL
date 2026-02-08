@@ -32,3 +32,6 @@ uuid = { workspace = true }
 chrono = { workspace = true }
 log = "0.4"
 tui-logger = "0.11"
+blake3 = { workspace = true }
+ed25519-dalek = { workspace = true }
+hex = "0.4"

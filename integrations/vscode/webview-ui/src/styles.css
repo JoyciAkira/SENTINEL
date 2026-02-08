@@ -92,8 +92,34 @@
 }
 
 .sentinel-shell--chat-first {
-  width: min(100%, 430px);
-  margin: 0 auto;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+}
+
+.sentinel-panel-resizable {
+  position: relative;
+  resize: vertical;
+  overflow: auto;
+  min-height: 140px;
+}
+
+.sentinel-panel-resizable::after {
+  content: "⋮⋮";
+  position: absolute;
+  right: 8px;
+  bottom: 4px;
+  font-size: 10px;
+  letter-spacing: -1px;
+  color: var(--sentinel-muted);
+  opacity: 0.65;
+  pointer-events: none;
+}
+
+.sentinel-selectable-content,
+.sentinel-selectable-content * {
+  user-select: text !important;
+  -webkit-user-select: text !important;
 }
 
 .sentinel-theme--warm-graphite {
@@ -442,10 +468,12 @@
 .sentinel-chat {
   display: flex;
   flex-direction: column;
-  min-height: calc(100vh - 112px);
+  min-height: 0;
+  height: 100%;
 }
 
 .sentinel-chat__body {
+  flex: 1;
   display: grid;
   gap: 8px;
   min-height: 0;
@@ -470,13 +498,26 @@
   grid-template-columns: minmax(0, 1fr);
 }
 
+.sentinel-chat-primary {
+  min-height: 0;
+  display: grid;
+  grid-template-rows: minmax(0, auto) 8px;
+  gap: 6px;
+}
+
 .sentinel-chat__messages {
   min-height: 0;
-  height: min(60vh, 620px);
+  height: min(62vh, 680px);
   border-radius: 10px;
   border: 1px solid var(--sentinel-border);
   background: color-mix(in oklab, var(--sentinel-surface) 88%, transparent);
   overflow: hidden;
+}
+
+.sentinel-chat__messages,
+.sentinel-chat__messages * {
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .sentinel-timeline {
@@ -494,7 +535,32 @@
 }
 
 .sentinel-shell--mission .sentinel-chat__messages {
-  height: min(56vh, 560px);
+  height: min(60vh, 640px);
+}
+
+.sentinel-resize-handle {
+  border: 1px solid var(--sentinel-border);
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--sentinel-surface-2) 86%, transparent);
+  transition: border-color 140ms ease, background 140ms ease;
+}
+
+.sentinel-resize-handle:hover {
+  border-color: color-mix(in oklab, var(--sentinel-accent) 40%, var(--sentinel-border));
+  background: color-mix(in oklab, var(--sentinel-accent-soft) 64%, var(--sentinel-surface-2));
+}
+
+.sentinel-resize-handle--horizontal {
+  width: 100%;
+  height: 8px;
+  cursor: row-resize;
+}
+
+.sentinel-resize-handle--vertical {
+  width: 8px;
+  min-height: 220px;
+  cursor: col-resize;
+  align-self: stretch;
 }
 
 .sentinel-timeline__header {
@@ -970,6 +1036,10 @@
 
   .sentinel-chat__messages {
     height: 42vh;
+  }
+
+  .sentinel-panel-resizable {
+    resize: none;
   }
 }
 

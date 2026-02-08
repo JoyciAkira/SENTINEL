@@ -37,20 +37,25 @@ export default function FileApproval({ operation, messageId }: { operation: File
 
   if (operation.approved !== undefined) {
     return (
-      <div className={cn(
-        "flex items-center gap-3 px-3 py-2 rounded-lg border bg-accent/20",
-        operation.approved ? "border-primary/20" : "border-destructive/20"
-      )}>
+      <div className="space-y-1">
         <div className={cn(
-          "p-1 rounded-md",
-          operation.approved ? "bg-primary/10 text-primary" : "bg-destructive/10 text-destructive"
+          "flex items-center gap-3 px-3 py-2 rounded-lg border bg-accent/20",
+          operation.approved ? "border-primary/20" : "border-destructive/20"
         )}>
-          {operation.approved ? <Check className="size-3" /> : <X className="size-3" />}
+          <div className={cn(
+            "p-1 rounded-md",
+            operation.approved ? "bg-primary/10 text-primary" : "bg-destructive/10 text-destructive"
+          )}>
+            {operation.approved ? <Check className="size-3" /> : <X className="size-3" />}
+          </div>
+          <span className="text-xs font-medium truncate flex-1">{operation.path}</span>
+          <Badge variant="outline" className="text-[10px]">
+            {operation.approved ? 'APPROVED' : 'REJECTED'}
+          </Badge>
         </div>
-        <span className="text-xs font-medium truncate flex-1">{operation.path}</span>
-        <Badge variant="outline" className="text-[10px]">
-          {operation.approved ? 'APPROVED' : 'REJECTED'}
-        </Badge>
+        {!operation.approved && operation.error ? (
+          <div className="text-[10px] text-destructive px-1">{operation.error}</div>
+        ) : null}
       </div>
     );
   }

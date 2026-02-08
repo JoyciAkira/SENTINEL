@@ -27,7 +27,14 @@ export const useStore = create<AppState>((set) => ({
     addMessage: (msg: ChatMessage) =>
         set((state) => ({ messages: [...state.messages, msg] })),
 
-    updateLastAssistant: (content: string, thoughts?: string[], explainability?) =>
+    updateLastAssistant: (
+        content: string,
+        thoughts?: string[],
+        explainability?,
+        sections?,
+        innovation?,
+        fileOperations?,
+    ) =>
         set((state) => {
             const msgs = [...state.messages];
             for (let i = msgs.length - 1; i >= 0; i--) {
@@ -37,11 +44,42 @@ export const useStore = create<AppState>((set) => ({
                         content, 
                         thoughtChain: thoughts || msgs[i].thoughtChain, // Preserve existing thoughts if not provided
                         explainability: explainability || msgs[i].explainability,
+                        sections: sections || msgs[i].sections,
+                        innovation: innovation || msgs[i].innovation,
+                        fileOperations: fileOperations || msgs[i].fileOperations,
                         streaming: false 
                     };
                     break;
                 }
             }
+            return { messages: msgs };
+        }),
+
+    updateFileOperationApproval: (
+        messageId: string,
+        path: string,
+        approved: boolean,
+        error?: string,
+    ) =>
+        set((state) => {
+            const msgs = state.messages.map((message) => {
+                if (message.id !== messageId || !message.fileOperations) {
+                    return message;
+                }
+                return {
+                    ...message,
+                    fileOperations: message.fileOperations.map((operation) => {
+                        if (operation.path !== path) {
+                            return operation;
+                        }
+                        return {
+                            ...operation,
+                            approved,
+                            error: error ?? operation.error,
+                        };
+                    }),
+                };
+            });
             return { messages: msgs };
         }),
 

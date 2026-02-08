@@ -96,7 +96,7 @@ export default function App() {
   const [showChatDetails, setShowChatDetails] = useState(false);
   const [themePreset, setThemePreset] = useState<ThemePreset>("mono-mint");
   const [compactDensity, setCompactDensity] = useState(false);
-  const [chatMessagesHeight, setChatMessagesHeight] = useState(540);
+  const [chatMessagesHeight, setChatMessagesHeight] = useState(620);
   const [timelineWidth, setTimelineWidth] = useState(320);
   const chatHeightRef = useRef(chatMessagesHeight);
   const timelineWidthRef = useRef(timelineWidth);
@@ -443,22 +443,26 @@ export default function App() {
               <Activity className="size-3.5" />
               <span>Confidence {alignmentConfidence}%</span>
             </div>
-            <select
-              className="sentinel-select sentinel-select--tiny"
-              value={themePreset}
-              onChange={(event) => setThemePreset(event.target.value as ThemePreset)}
-            >
-              <option value="mono-mint">Monochrome Mint</option>
-              <option value="warm-graphite">Warm Graphite</option>
-              <option value="pure-vscode">Pure VSCode</option>
-            </select>
-            <Button
-              size="xs"
-              variant={compactDensity ? "secondary" : "outline"}
-              onClick={() => setCompactDensity((prev) => !prev)}
-            >
-              Density: {compactDensity ? "Compact" : "Comfort"}
-            </Button>
+            {!sidebarMode && (
+              <select
+                className="sentinel-select sentinel-select--tiny"
+                value={themePreset}
+                onChange={(event) => setThemePreset(event.target.value as ThemePreset)}
+              >
+                <option value="mono-mint">Monochrome Mint</option>
+                <option value="warm-graphite">Warm Graphite</option>
+                <option value="pure-vscode">Pure VSCode</option>
+              </select>
+            )}
+            {!sidebarMode && (
+              <Button
+                size="xs"
+                variant={compactDensity ? "secondary" : "outline"}
+                onClick={() => setCompactDensity((prev) => !prev)}
+              >
+                Density: {compactDensity ? "Compact" : "Comfort"}
+              </Button>
+            )}
             <Badge className={cn("sentinel-risk-badge", risk.className)}>{alignmentStatus}</Badge>
           </div>
         </header>
@@ -638,16 +642,22 @@ export default function App() {
                     <div className="sentinel-chat-primary">
                       <div
                         className="sentinel-chat__messages"
-                        style={{ height: `${chatMessagesHeight}px` }}
+                        style={
+                          sidebarMode
+                            ? { height: "68vh", minHeight: "520px" }
+                            : { height: `${chatMessagesHeight}px` }
+                        }
                       >
                         <MessageList compact={compactDensity} clineMode={sidebarMode} />
                       </div>
-                      <div
-                        className="sentinel-resize-handle sentinel-resize-handle--horizontal"
-                        onMouseDown={beginChatHeightResize}
-                        title="Resize messages panel"
-                        role="separator"
-                      />
+                      {!sidebarMode && (
+                        <div
+                          className="sentinel-resize-handle sentinel-resize-handle--horizontal"
+                          onMouseDown={beginChatHeightResize}
+                          title="Resize messages panel"
+                          role="separator"
+                        />
+                      )}
                     </div>
                     {!sidebarMode && (
                       <div

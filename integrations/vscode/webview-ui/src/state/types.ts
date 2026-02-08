@@ -2,6 +2,8 @@ export interface ChatMessage {
     id: string;
     role: 'user' | 'assistant';
     content: string; // The visible response
+    sections?: ChatSection[];
+    innovation?: InnovationPayload;
     thoughtChain?: string[]; // Internal reasoning steps (NEW)
     explainability?: {
         intent_summary?: string;
@@ -32,7 +34,64 @@ export interface FileOperation {
     linesAdded?: number;
     linesRemoved?: number;
     approved?: boolean;
+    error?: string;
     diff?: string;
+}
+
+export interface ChatSection {
+    id: string;
+    title: string;
+    content: string;
+    language?: string;
+    pathHint?: string;
+}
+
+export interface InnovationPlan {
+    id?: string;
+    title?: string;
+    strategy?: string;
+    risk?: string;
+}
+
+export interface InnovationPayload {
+    version?: number;
+    constitutional_spec_hash?: string;
+    counterfactual_hash?: string;
+    policy_simulation_hash?: string;
+    constitutional_spec_path?: string | null;
+    team_memory_graph_path?: string | null;
+    constitutional_spec?: {
+        objective?: string;
+        constraints?: string[];
+        invariants?: string[];
+    };
+    counterfactual_plans?: {
+        recommended_plan_id?: string;
+        recommended_reason?: string;
+        plans?: InnovationPlan[];
+    };
+    policy_simulation?: {
+        available?: boolean;
+        reason?: string;
+        modes?: Array<{
+            mode?: string;
+            healthy?: boolean;
+            violations?: string[];
+        }>;
+    };
+    team_memory_graph?: {
+        node_count?: number;
+        edge_count?: number;
+        graph_hash?: string;
+        signature_scheme?: string;
+    };
+    replay_ledger?: {
+        path?: string | null;
+        entry?: {
+            turn_id?: string;
+            strict_goal_execution?: boolean;
+        };
+    };
 }
 
 export interface AlignmentState {
@@ -168,6 +227,15 @@ export interface AppState {
         content: string,
         thoughts?: string[],
         explainability?: ChatMessage["explainability"],
+        sections?: ChatSection[],
+        innovation?: InnovationPayload,
+        fileOperations?: FileOperation[],
+    ) => void;
+    updateFileOperationApproval: (
+        messageId: string,
+        path: string,
+        approved: boolean,
+        error?: string,
     ) => void;
     appendToolCall: (messageId: string, tool: ToolCallInfo) => void;
     setAlignment: (alignment: AlignmentState) => void;

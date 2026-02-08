@@ -4830,9 +4830,12 @@ name = "sentinel-cli"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "blake3",
  "chrono",
  "clap",
  "crossterm",
+ "ed25519-dalek",
+ "hex",
  "log",
  "lsp-types",
  "ratatui 0.26.3",

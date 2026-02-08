@@ -4,6 +4,8 @@ import { renderMarkdown } from "../../utils/markdown";
 import ToolCallCard from "./ToolCallCard";
 import FileApproval from "../Actions/FileApproval";
 import { cn } from "@/lib/utils";
+import { useVSCodeAPI } from "../../hooks/useVSCodeAPI";
+import { Button } from "../ui/button";
 
 export default function MessageBubble({
   message,
@@ -16,8 +18,62 @@ export default function MessageBubble({
 }) {
   const isUser = message.role === "user";
   const [thoughtsExpanded, setThoughtsExpanded] = useState(false);
+  const [innovationExpanded, setInnovationExpanded] = useState(false);
+  const [copiedSectionId, setCopiedSectionId] = useState<string | null>(null);
+  const [copiedMessage, setCopiedMessage] = useState(false);
+  const [applyingPlan, setApplyingPlan] = useState(false);
+  const vscode = useVSCodeAPI();
   const hasThoughts = message.thoughtChain && message.thoughtChain.length > 0;
   const hasExplainability = Boolean(message.explainability);
+  const hasInnovation = Boolean(message.innovation);
+  const pendingOperationsCount =
+    message.fileOperations?.filter((operation) => operation.approved === undefined).length ?? 0;
+  const hasSections = !isUser && (message.sections?.length ?? 0) > 0;
+
+  const copyText = async (text: string) => {
+    if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return;
+    }
+    const textarea = document.createElement("textarea");
+    textarea.value = text;
+    textarea.style.position = "fixed";
+    textarea.style.opacity = "0";
+    document.body.appendChild(textarea);
+    textarea.select();
+    document.execCommand("copy");
+    document.body.removeChild(textarea);
+  };
+
+  const handleCopySection = async (sectionId: string, content: string) => {
+    try {
+      await copyText(content);
+      setCopiedSectionId(sectionId);
+      setTimeout(() => setCopiedSectionId((current) => (current === sectionId ? null : current)), 1200);
+    } catch {
+      setCopiedSectionId(null);
+    }
+  };
+
+  const handleCopyMessage = async () => {
+    try {
+      await copyText(message.content);
+      setCopiedMessage(true);
+      setTimeout(() => setCopiedMessage(false), 1200);
+    } catch {
+      setCopiedMessage(false);
+    }
+  };
+
+  const handleApplyPlan = () => {
+    if (pendingOperationsCount === 0) return;
+    setApplyingPlan(true);
+    vscode.postMessage({
+      type: "applySafeWritePlan",
+      messageId: message.id,
+    });
+    setTimeout(() => setApplyingPlan(false), 1500);
+  };
 
   return (
     <div className={cn(
@@ -49,19 +105,37 @@ export default function MessageBubble({
               : "bg-card border-border text-foreground rounded-tl-none"
           )}>
             {!isUser && (
-              <div className="text-[10px] font-bold uppercase tracking-widest text-primary mb-1.5 opacity-80 flex justify-between items-center">
+              <div className="text-[10px] font-bold uppercase tracking-widest text-primary mb-1.5 opacity-80 flex justify-between items-center gap-2">
                 <span>Sentinel AI</span>
-                {hasThoughts && (
-                  <button 
-                    onClick={() => setThoughtsExpanded(!thoughtsExpanded)}
-                    className="text-[9px] hover:underline normal-case font-normal opacity-60"
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="xs"
+                    variant="outline"
+                    onClick={handleCopyMessage}
+                    className="h-6 text-[9px] normal-case"
                   >
-                    {thoughtsExpanded ? "Hide thoughts" : "Show thoughts"}
-                  </button>
-                )}
-                {hasExplainability && (
-                  <span className="text-[9px] normal-case opacity-60">Explainable turn</span>
-                )}
+                    {copiedMessage ? "Copied" : "Copy"}
+                  </Button>
+                  {hasThoughts && (
+                    <button 
+                      onClick={() => setThoughtsExpanded(!thoughtsExpanded)}
+                      className="text-[9px] hover:underline normal-case font-normal opacity-60"
+                    >
+                      {thoughtsExpanded ? "Hide thoughts" : "Show thoughts"}
+                    </button>
+                  )}
+                  {hasExplainability && (
+                    <span className="text-[9px] normal-case opacity-60">Explainable turn</span>
+                  )}
+                  {hasInnovation && (
+                    <button
+                      onClick={() => setInnovationExpanded((prev) => !prev)}
+                      className="text-[9px] hover:underline normal-case font-normal opacity-60"
+                    >
+                      {innovationExpanded ? "Hide innovation" : "Show innovation"}
+                    </button>
+                  )}
+                </div>
               </div>
             )}
 
@@ -75,7 +149,7 @@ export default function MessageBubble({
             )}
 
             <div 
-              className="prose prose-sm dark:prose-invert max-w-none prose-p:leading-relaxed prose-pre:bg-muted prose-pre:border prose-pre:rounded-lg"
+              className="prose prose-sm dark:prose-invert max-w-none prose-p:leading-relaxed prose-pre:bg-muted prose-pre:border prose-pre:rounded-lg sentinel-selectable-content"
               dangerouslySetInnerHTML={{ __html: renderMarkdown(message.content) }} 
             />
             
@@ -128,9 +202,99 @@ export default function MessageBubble({
             </div>
           )}
 
+          {!isUser && message.innovation && (
+            <div className="text-[11px] border rounded-lg p-2 bg-card/60 space-y-1">
+              <div className="font-semibold text-[10px] uppercase tracking-wider text-muted-foreground">
+                Innovation Trace
+              </div>
+              <div>
+                <span className="text-muted-foreground">Recommended plan:</span>{" "}
+                {message.innovation.counterfactual_plans?.recommended_plan_id ?? "n/a"}
+              </div>
+              <div>
+                <span className="text-muted-foreground">Policy simulation:</span>{" "}
+                {message.innovation.policy_simulation?.available === false
+                  ? "unavailable"
+                  : "available"}
+              </div>
+              <div>
+                <span className="text-muted-foreground">Team graph:</span>{" "}
+                {message.innovation.team_memory_graph?.node_count ?? 0} nodes /{" "}
+                {message.innovation.team_memory_graph?.edge_count ?? 0} edges
+              </div>
+              {innovationExpanded && (
+                <>
+                  {message.innovation.constitutional_spec?.constraints?.length ? (
+                    <div className="text-muted-foreground">
+                      Constraints: {message.innovation.constitutional_spec.constraints.join(" | ")}
+                    </div>
+                  ) : null}
+                  {message.innovation.policy_simulation?.modes?.length ? (
+                    <div className="text-muted-foreground">
+                      Modes:{" "}
+                      {message.innovation.policy_simulation.modes
+                        .map((mode) =>
+                          `${mode.mode ?? "unknown"}=${mode.healthy ? "ok" : "violated"}`,
+                        )
+                        .join(" | ")}
+                    </div>
+                  ) : null}
+                  {message.innovation.replay_ledger?.entry?.turn_id ? (
+                    <div className="text-muted-foreground">
+                      Replay turn: {message.innovation.replay_ledger.entry.turn_id.slice(0, 12)}
+                    </div>
+                  ) : null}
+                </>
+              )}
+            </div>
+          )}
+
+          {hasSections && (
+            <div className="rounded-lg border bg-card/60 p-2 space-y-1.5">
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+                Implementation Sections
+              </div>
+              {message.sections!.map((section) => (
+                <div
+                  key={section.id}
+                  className="flex items-center justify-between gap-2 rounded-md border border-border/70 px-2 py-1.5"
+                >
+                  <div className="min-w-0">
+                    <div className="text-[11px] font-medium truncate">{section.title}</div>
+                    {section.pathHint ? (
+                      <div className="text-[10px] text-muted-foreground truncate">{section.pathHint}</div>
+                    ) : null}
+                  </div>
+                  <Button
+                    size="xs"
+                    variant="outline"
+                    onClick={() => handleCopySection(section.id, section.content)}
+                    className="h-6"
+                  >
+                    {copiedSectionId === section.id ? "Copied" : "Copy section"}
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+
           {/* TOOL CALLS & ACTIONS */}
           {(message.toolCalls || message.fileOperations) && (
             <div className="space-y-2 mt-2 w-full">
+              {!isUser && pendingOperationsCount > 0 && (
+                <div className="flex justify-end">
+                  <Button
+                    size="sm"
+                    onClick={handleApplyPlan}
+                    disabled={applyingPlan}
+                    className="h-8"
+                  >
+                    {applyingPlan
+                      ? "Applying..."
+                      : `Apply safe_write plan (${pendingOperationsCount})`}
+                  </Button>
+                </div>
+              )}
               {message.toolCalls?.map((tool, i) => (
                 <div key={`tool-${i}`} className="animate-in fade-in slide-in-from-left-2 duration-300 fill-mode-both" style={{ animationDelay: '150ms' }}>
                    <ToolCallCard tool={tool} />

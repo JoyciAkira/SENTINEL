@@ -226,7 +226,10 @@ export function activate(context: vscode.ExtensionContext) {
   // ── 6. Commands ──────────────────────────────────────────
   context.subscriptions.push(
     vscode.commands.registerCommand(CMD_OPEN_CHAT, () => {
-      vscode.commands.executeCommand("sentinel-chat.focus");
+      void vscode.commands.executeCommand("sentinel-chat.focus").then(
+        () => undefined,
+        () => vscode.commands.executeCommand("workbench.view.extension.sentinel-explorer"),
+      );
     }),
 
     vscode.commands.registerCommand(CMD_CODEX_LOGIN, async () => {

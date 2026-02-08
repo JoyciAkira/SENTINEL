@@ -21,6 +21,10 @@ import type {
   StrategyRecommendation,
 } from "../shared/types";
 
+const REQUEST_TIMEOUT_DEFAULT_MS = 30_000;
+const REQUEST_TIMEOUT_TOOLS_CALL_MS = 180_000;
+const REQUEST_TIMEOUT_CHAT_TOOL_MS = 600_000;
+
 /**
  * MCP Client singleton that manages the connection to `sentinel mcp`.
  * Handles request/response correlation, reconnection, and convenience methods.
@@ -165,7 +169,7 @@ export class MCPClient extends EventEmitter {
     content: string,
   ): Promise<SecurityScanResult> {
     return this.callTool("safe_write", {
-      file_path: filePath,
+      path: filePath,
       content,
     }) as Promise<SecurityScanResult>;
   }
@@ -238,10 +242,15 @@ export class MCPClient extends EventEmitter {
     name: string,
     args: Record<string, unknown>,
   ): Promise<unknown> {
+    const timeoutMs =
+      name === "chat"
+        ? REQUEST_TIMEOUT_CHAT_TOOL_MS
+        : REQUEST_TIMEOUT_TOOLS_CALL_MS;
+
     const result = (await this.request("tools/call", {
       name,
       arguments: args,
-    } as Record<string, unknown>)) as McpToolCallResult;
+    } as Record<string, unknown>, timeoutMs)) as McpToolCallResult;
 
     if (result.isError) {
       const errorText = result.content?.[0]?.text ?? "Unknown MCP tool error";
@@ -261,6 +270,7 @@ export class MCPClient extends EventEmitter {
   private request(
     method: string,
     params: Record<string, unknown>,
+    timeoutMs: number = REQUEST_TIMEOUT_DEFAULT_MS,
   ): Promise<unknown> {
     return new Promise((resolve, reject) => {
       if (!this.transport?.connected) {
@@ -279,7 +289,7 @@ export class MCPClient extends EventEmitter {
       const timer = setTimeout(() => {
         this.pendingRequests.delete(id);
         reject(new Error(`MCP request timeout: ${method}`));
-      }, 30_000);
+      }, timeoutMs);
 
       this.pendingRequests.set(id, { resolve, reject, timer });
       this.transport.send(req);

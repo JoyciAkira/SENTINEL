@@ -26,6 +26,7 @@ export function useMCPMessages(vscodeApi: VSCodeAPI): void {
     const setRuntimeCapabilities = useStore((s) => s.setRuntimeCapabilities);
     const setAugmentSettings = useStore((s) => s.setAugmentSettings);
     const setQualityStatus = useStore((s) => s.setQualityStatus);
+    const updateFileOperationApproval = useStore((s) => s.updateFileOperationApproval);
 
     useEffect(() => {
         const handler = (event: MessageEvent) => {
@@ -64,6 +65,8 @@ export function useMCPMessages(vscodeApi: VSCodeAPI): void {
                             content: msg.content ?? '',
                             timestamp: Date.now(),
                             toolCalls: msg.toolCalls,
+                            sections: msg.sections,
+                            fileOperations: msg.fileOperations,
                             streaming: true,
                         });
                     } else {
@@ -71,7 +74,14 @@ export function useMCPMessages(vscodeApi: VSCodeAPI): void {
                             .getState()
                             .messages.some((m) => m.id === msg.id && m.role === 'assistant');
                         if (existing) {
-                            updateLastAssistant(msg.content ?? '', msg.thoughtChain, msg.explainability);
+                            updateLastAssistant(
+                                msg.content ?? '',
+                                msg.thoughtChain,
+                                msg.explainability,
+                                msg.sections,
+                                msg.innovation,
+                                msg.fileOperations,
+                            );
                         } else {
                             addMessage({
                                 id: msg.id ?? crypto.randomUUID(),
@@ -81,6 +91,9 @@ export function useMCPMessages(vscodeApi: VSCodeAPI): void {
                                 toolCalls: msg.toolCalls,
                                 thoughtChain: msg.thoughtChain,
                                 explainability: msg.explainability,
+                                sections: msg.sections,
+                                innovation: msg.innovation,
+                                fileOperations: msg.fileOperations,
                                 streaming: false,
                             });
                         }
@@ -160,6 +173,17 @@ export function useMCPMessages(vscodeApi: VSCodeAPI): void {
                         setQualityStatus(msg.quality);
                     }
                     break;
+
+                case 'fileApprovalResult':
+                    if (typeof msg.messageId === 'string' && typeof msg.path === 'string') {
+                        updateFileOperationApproval(
+                            msg.messageId,
+                            msg.path,
+                            Boolean(msg.approved),
+                            typeof msg.error === 'string' ? msg.error : undefined,
+                        );
+                    }
+                    break;
             }
         };
 
@@ -180,5 +204,6 @@ export function useMCPMessages(vscodeApi: VSCodeAPI): void {
         setRuntimeCapabilities,
         setAugmentSettings,
         setQualityStatus,
+        updateFileOperationApproval,
     ]);
 }
