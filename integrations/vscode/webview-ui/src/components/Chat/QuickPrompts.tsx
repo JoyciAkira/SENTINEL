@@ -10,6 +10,11 @@ const PROMPTS = [
   { label: "List Goals", text: "What are the active goals?", icon: Target },
   { label: "Verify Action", text: "Validate my next changes", icon: Terminal },
   { label: "Execute First Pending", text: "/execute-first-pending", icon: PlayCircle },
+  {
+    label: "Orchestrate",
+    text: "/orchestrate Harden auth + payments flow --parallel=2 --count=4 --modes=plan,build,review",
+    icon: DraftingCompass,
+  },
   { label: "Memory Status", text: "/memory-status", icon: Brain },
   { label: "Refine AppSpec", text: "/appspec-refine", icon: Wand2 },
   { label: "AppSpec Plan", text: "/appspec-plan", icon: DraftingCompass },

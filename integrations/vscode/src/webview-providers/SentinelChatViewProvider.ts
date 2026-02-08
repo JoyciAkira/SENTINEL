@@ -106,6 +106,18 @@ interface AppSpecPayload {
 }
 
 const COMMON_APP_SUBPATHS = ["database/", "server/", "client/"];
+const ORCHESTRATE_ALLOWED_MODES = new Set(["plan", "build", "review", "deploy"]);
+
+interface ParsedOrchestrationCommand {
+  task: string;
+  maxParallel: number;
+  subtaskCount: number;
+  modes?: string[];
+}
+
+type ParsedOrchestrationCommandResult =
+  | { ok: true; value: ParsedOrchestrationCommand }
+  | { ok: false; error: string };
 
 /**
  * WebviewViewProvider for the Sentinel Chat sidebar panel.
@@ -1299,6 +1311,153 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
     return executionPrompt;
   }
 
+  private parseOrchestrationCommand(trimmedText: string): ParsedOrchestrationCommandResult {
+    const body = trimmedText.replace(/^\/orchestrate\b/i, "").trim();
+    if (!body) {
+      return {
+        ok: false,
+        error:
+          "Usage: /orchestrate <task> [--parallel=1..4] [--count=2..6] [--modes=plan,build,review,deploy]",
+      };
+    }
+
+    const optionRegex = /--(parallel|count|modes)=("[^"]*"|'[^']*'|[^\s]+)/gi;
+    let task = body;
+    let maxParallel = 2;
+    let subtaskCount = 4;
+    let modes: string[] | undefined;
+
+    for (const match of body.matchAll(optionRegex)) {
+      const optionName = String(match[1] ?? "").toLowerCase();
+      const rawValue = String(match[2] ?? "").trim();
+      const normalizedValue = rawValue.replace(/^['"]|['"]$/g, "").trim();
+
+      if (optionName === "parallel") {
+        const parsed = Number.parseInt(normalizedValue, 10);
+        if (!Number.isInteger(parsed) || parsed < 1 || parsed > 4) {
+          return {
+            ok: false,
+            error: "Invalid --parallel value. Allowed range: 1..4.",
+          };
+        }
+        maxParallel = parsed;
+      } else if (optionName === "count") {
+        const parsed = Number.parseInt(normalizedValue, 10);
+        if (!Number.isInteger(parsed) || parsed < 2 || parsed > 6) {
+          return {
+            ok: false,
+            error: "Invalid --count value. Allowed range: 2..6.",
+          };
+        }
+        subtaskCount = parsed;
+      } else if (optionName === "modes") {
+        const parsedModes = normalizedValue
+          .split(",")
+          .map((value) => value.trim().toLowerCase())
+          .filter((value) => value.length > 0);
+
+        if (parsedModes.length === 0) {
+          return {
+            ok: false,
+            error: "Invalid --modes value. Provide at least one mode.",
+          };
+        }
+
+        const invalid = parsedModes.filter((mode) => !ORCHESTRATE_ALLOWED_MODES.has(mode));
+        if (invalid.length > 0) {
+          return {
+            ok: false,
+            error: `Invalid mode(s): ${invalid.join(", ")}. Allowed: plan, build, review, deploy.`,
+          };
+        }
+
+        modes = Array.from(new Set(parsedModes));
+      }
+
+      task = task.replace(String(match[0]), " ");
+    }
+
+    task = task.replace(/\s+/g, " ").trim();
+    if (!task) {
+      return {
+        ok: false,
+        error: "Missing orchestration task description.",
+      };
+    }
+
+    return {
+      ok: true,
+      value: {
+        task,
+        maxParallel,
+        subtaskCount,
+        modes,
+      },
+    };
+  }
+
+  private formatOrchestrationResult(result: unknown): string {
+    if (!this.isRecord(result)) {
+      return "Orchestration completed, but result format is invalid.";
+    }
+
+    const orchestrationId =
+      typeof result.orchestration_id === "string" ? result.orchestration_id : "n/a";
+    const task = typeof result.task === "string" ? result.task : "n/a";
+    const maxParallel =
+      typeof result.max_parallel === "number" ? String(result.max_parallel) : "n/a";
+    const plannedSubtasks =
+      typeof result.planned_subtasks === "number" ? result.planned_subtasks : 0;
+
+    const modes = Array.isArray(result.modes)
+      ? result.modes
+          .map((mode) => (typeof mode === "string" ? mode : ""))
+          .filter((mode) => mode.length > 0)
+      : [];
+
+    const summary = this.isRecord(result.summary) ? result.summary : null;
+    const completed =
+      typeof summary?.completed === "number" ? summary.completed : 0;
+    const failed = typeof summary?.failed === "number" ? summary.failed : 0;
+    const approvalRequired =
+      typeof summary?.approval_required_subtasks === "number"
+        ? summary.approval_required_subtasks
+        : 0;
+    const recommendedNext =
+      typeof summary?.recommended_next === "string"
+        ? summary.recommended_next
+        : "Review orchestration outputs and continue with the safest next action.";
+
+    const subtasks = Array.isArray(result.subtasks)
+      ? result.subtasks
+          .filter((entry): entry is Record<string, unknown> => this.isRecord(entry))
+          .slice(0, 6)
+      : [];
+    const subtaskLines = subtasks.map((entry, index) => {
+      const mode = typeof entry.mode === "string" ? entry.mode : "unknown";
+      const title = typeof entry.title === "string" ? entry.title : "Untitled subtask";
+      const status = typeof entry.status === "string" ? entry.status : "unknown";
+      const risk = typeof entry.risk === "string" ? entry.risk : "unknown";
+      const summaryText =
+        typeof entry.summary === "string" ? this.clip(entry.summary, 120) : "No summary.";
+      return `${index + 1}. [${mode}] ${title} - ${status}, risk=${risk}\n   ${summaryText}`;
+    });
+
+    const lines = [
+      `Orchestration ID: ${orchestrationId}`,
+      `Task: ${task}`,
+      `Plan: ${plannedSubtasks} subtasks | parallel=${maxParallel} | modes=${modes.join(", ") || "default"}`,
+      `Outcome: completed=${completed}, failed=${failed}, approvals=${approvalRequired}`,
+      `Next: ${recommendedNext}`,
+    ];
+    if (subtaskLines.length > 0) {
+      lines.push("Subtasks:");
+      lines.push(...subtaskLines);
+    }
+
+    return lines.join("\n");
+  }
+
   private async handleChatMessage(text: string): Promise<void> {
     if (!this.client.connected) {
       this.postMessage({
@@ -1454,13 +1613,71 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
       effectiveText = this.buildAppSpecPlanPrompt(this.lastAppSpecDraft);
     }
 
+    if (/^\/orchestrate(?:\s|$)/i.test(trimmedText)) {
+      if (!(await this.client.supportsTool("orchestrate_task"))) {
+        this.postMessage({
+          type: "chatResponse",
+          id: messageId,
+          content: "Tool orchestrate_task non disponibile nel backend corrente.",
+        });
+        this.emitTimeline("error", "Slash command failed", "orchestrate_task missing", messageId);
+        return;
+      }
+
+      const parsed = this.parseOrchestrationCommand(trimmedText);
+      if (!parsed.ok) {
+        this.postMessage({
+          type: "chatResponse",
+          id: messageId,
+          content: parsed.error,
+        });
+        this.emitTimeline("error", "Slash command failed", parsed.error, messageId);
+        return;
+      }
+
+      const args: Record<string, unknown> = {
+        task: parsed.value.task,
+        max_parallel: parsed.value.maxParallel,
+        subtask_count: parsed.value.subtaskCount,
+      };
+      if (parsed.value.modes && parsed.value.modes.length > 0) {
+        args.modes = parsed.value.modes;
+      }
+
+      this.emitTimeline(
+        "plan",
+        "Slash command /orchestrate",
+        `${parsed.value.subtaskCount} subtasks • parallel ${parsed.value.maxParallel}`,
+        messageId,
+      );
+
+      try {
+        const result = await this.callToolTracked("orchestrate_task", args, messageId);
+        this.postMessage({
+          type: "chatResponse",
+          id: messageId,
+          content: this.formatOrchestrationResult(result),
+        });
+        this.emitTimeline("result", "Orchestration completed", this.clip(parsed.value.task, 80), messageId);
+      } catch (err: any) {
+        const error = err?.message ?? String(err);
+        this.postMessage({
+          type: "chatResponse",
+          id: messageId,
+          content: `Errore durante /orchestrate: ${error}`,
+        });
+        this.emitTimeline("error", "Orchestration failed", error, messageId);
+      }
+      return;
+    }
+
     if (trimmedText === "/help") {
       this.emitTimeline("plan", "Slash command /help", "Help menu requested", messageId);
       this.postMessage({
         type: "chatResponse",
         id: messageId,
         content:
-          "Comandi disponibili:\n- `/init <descrizione>`\n- `/execute-first-pending`\n- `/appspec-refine`\n- `/appspec-plan`\n- `/clear-memory`\n- `/memory-status`\n- `/memory-search <query>`\n- `/memory-export [path]`\n- `/memory-import <path> [merge=true|false]`",
+          "Comandi disponibili:\n- `/init <descrizione>`\n- `/execute-first-pending`\n- `/orchestrate <task> [--parallel=1..4] [--count=2..6] [--modes=plan,build,review,deploy]`\n- `/appspec-refine`\n- `/appspec-plan`\n- `/clear-memory`\n- `/memory-status`\n- `/memory-search <query>`\n- `/memory-export [path]`\n- `/memory-import <path> [merge=true|false]`",
       });
       return;
     }

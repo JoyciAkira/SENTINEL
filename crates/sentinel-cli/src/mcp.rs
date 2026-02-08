@@ -13,6 +13,7 @@ use serde_json::Value;
 use std::io::Write;
 use std::path::PathBuf;
 use std::process::Command;
+use std::sync::Arc;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 
 use crate::reliability;
@@ -143,6 +144,30 @@ struct TeamMemoryGraph {
     signer_public_key: String,
     signature: String,
     signature_scheme: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct OrchestrationTask {
+    id: String,
+    index: usize,
+    title: String,
+    mode: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct OrchestrationTaskResult {
+    id: String,
+    index: usize,
+    title: String,
+    mode: String,
+    status: String,
+    summary: String,
+    risk: String,
+    approval_needed: Vec<String>,
+    next_step: String,
+    output_hash: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    error: Option<String>,
 }
 
 /// Avvia il server MCP su stdin/stdout
@@ -405,6 +430,23 @@ async fn handle_request(req: McpRequest, id: Value) -> McpResponse {
                                 "goal_id": { "type": "string", "description": "L'UUID del goal da scomporre" }
                             },
                             "required": ["goal_id"]
+                        }
+                    },
+                    {
+                        "name": "orchestrate_task",
+                        "description": "Orchestra un task complesso in subtask (plan/build/review/deploy) con parallelismo bounded e output summary-only",
+                        "inputSchema": {
+                            "type": "object",
+                            "properties": {
+                                "task": { "type": "string", "description": "Descrizione del task da orchestrare" },
+                                "modes": {
+                                    "type": "array",
+                                    "items": { "type": "string", "enum": ["plan", "build", "review", "deploy"] }
+                                },
+                                "max_parallel": { "type": "integer", "minimum": 1, "maximum": 4 },
+                                "subtask_count": { "type": "integer", "minimum": 2, "maximum": 6 }
+                            },
+                            "required": ["task"]
                         }
                     },
                     {
@@ -1440,6 +1482,339 @@ Your output must be deterministic, concise, and machine-parseable when requested
         .to_string()
 }
 
+const ORCHESTRATION_ALLOWED_MODES: [&str; 4] = ["plan", "build", "review", "deploy"];
+
+fn normalize_orchestration_mode(raw: &str) -> Option<String> {
+    let normalized = raw.trim().to_ascii_lowercase();
+    if ORCHESTRATION_ALLOWED_MODES
+        .iter()
+        .any(|mode| *mode == normalized)
+    {
+        return Some(normalized);
+    }
+    None
+}
+
+fn parse_orchestration_modes(raw_modes: Option<&Value>) -> Vec<String> {
+    let mut modes = raw_modes
+        .and_then(|value| value.as_array())
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(|item| item.as_str())
+                .filter_map(normalize_orchestration_mode)
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+
+    if modes.is_empty() {
+        modes = ORCHESTRATION_ALLOWED_MODES
+            .iter()
+            .map(|mode| (*mode).to_string())
+            .collect();
+    }
+    modes.sort();
+    modes.dedup();
+    modes
+}
+
+fn parse_orchestration_parallel(raw: Option<u64>) -> usize {
+    raw.unwrap_or(2).clamp(1, 4) as usize
+}
+
+fn parse_orchestration_subtask_count(raw: Option<u64>) -> usize {
+    raw.unwrap_or(4).clamp(2, 6) as usize
+}
+
+fn extract_json_array_fragment(content: &str) -> Option<String> {
+    let start = content.find('[')?;
+    let end = content.rfind(']')?;
+    Some(content[start..=end].to_string())
+}
+
+fn extract_json_object_fragment(content: &str) -> Option<String> {
+    let start = content.find('{')?;
+    let end = content.rfind('}')?;
+    Some(content[start..=end].to_string())
+}
+
+fn parse_orchestration_plan_from_llm(
+    content: &str,
+    modes: &[String],
+    max_subtasks: usize,
+) -> Option<Vec<OrchestrationTask>> {
+    let json_fragment = extract_json_array_fragment(content)?;
+    let payload: Value = serde_json::from_str(&json_fragment).ok()?;
+    let items = payload.as_array()?;
+    if items.is_empty() {
+        return None;
+    }
+
+    let mut tasks = Vec::new();
+    for (idx, item) in items.iter().enumerate() {
+        if tasks.len() >= max_subtasks {
+            break;
+        }
+
+        let title = if let Some(text) = item.as_str() {
+            text.trim().to_string()
+        } else if let Some(object) = item.as_object() {
+            object
+                .get("title")
+                .and_then(|value| value.as_str())
+                .map(|value| value.trim().to_string())
+                .unwrap_or_default()
+        } else {
+            String::new()
+        };
+
+        if title.is_empty() {
+            continue;
+        }
+
+        let requested_mode = item
+            .as_object()
+            .and_then(|object| object.get("mode"))
+            .and_then(|value| value.as_str())
+            .and_then(normalize_orchestration_mode);
+
+        let mode = requested_mode.unwrap_or_else(|| {
+            let fallback = idx % modes.len();
+            modes[fallback].clone()
+        });
+
+        tasks.push(OrchestrationTask {
+            id: format!("task-{:02}", idx + 1),
+            index: idx,
+            title,
+            mode,
+        });
+    }
+
+    if tasks.is_empty() {
+        return None;
+    }
+    Some(tasks)
+}
+
+fn fallback_orchestration_plan(
+    root_task: &str,
+    modes: &[String],
+    subtask_count: usize,
+) -> Vec<OrchestrationTask> {
+    let mut tasks = Vec::new();
+    for idx in 0..subtask_count {
+        let mode = modes[idx % modes.len()].clone();
+        let title = match mode.as_str() {
+            "plan" => format!("Define deterministic scope and constraints for: {}", root_task),
+            "build" => format!(
+                "Implement minimal contract-preserving changes for: {}",
+                root_task
+            ),
+            "review" => format!("Run regression/policy review for: {}", root_task),
+            "deploy" => format!("Prepare rollout and rollback checklist for: {}", root_task),
+            _ => format!("Execute {} subtask for: {}", mode, root_task),
+        };
+        tasks.push(OrchestrationTask {
+            id: format!("task-{:02}", idx + 1),
+            index: idx,
+            title,
+            mode,
+        });
+    }
+    tasks
+}
+
+async fn execute_orchestration_subtask(
+    root_task: String,
+    task: OrchestrationTask,
+) -> OrchestrationTaskResult {
+    let system_prompt = build_system_prompt()
+        + "\nYou are a specialized sub-agent in Sentinel Orchestrator."
+        + "\nReturn ONLY compact JSON object with keys: summary, risk, approval_needed, next_step."
+        + "\nNo markdown and no extra prose.";
+
+    let user_prompt = format!(
+        "Root task: {}\nSubtask mode: {}\nSubtask title: {}\n\
+Constraints:\n- deterministic and bounded\n- contract preserving by default\n- surface only actionable summary\n\
+Output schema JSON:\n{{\"summary\":\"...\",\"risk\":\"low|medium|high\",\"approval_needed\":[\"...\"],\"next_step\":\"...\"}}",
+        root_task, task.mode, task.title
+    );
+
+    let llm_response = chat_with_llm(&system_prompt, &user_prompt).await;
+    let raw = llm_response.unwrap_or_else(|| {
+        "{\"summary\":\"LLM unavailable for this subtask.\",\"risk\":\"high\",\"approval_needed\":[\"manual review\"],\"next_step\":\"Retry when model is available.\"}".to_string()
+    });
+
+    let parsed = extract_json_object_fragment(&raw)
+        .and_then(|json| serde_json::from_str::<Value>(&json).ok());
+
+    let (status, summary, risk, approval_needed, next_step, error) = if let Some(payload) = parsed
+    {
+        let summary = payload
+            .get("summary")
+            .and_then(|value| value.as_str())
+            .unwrap_or("No summary provided.")
+            .trim()
+            .to_string();
+        let risk = payload
+            .get("risk")
+            .and_then(|value| value.as_str())
+            .unwrap_or("medium")
+            .to_ascii_lowercase();
+        let approval_needed = payload
+            .get("approval_needed")
+            .and_then(|value| value.as_array())
+            .map(|items| {
+                items
+                    .iter()
+                    .filter_map(|item| item.as_str())
+                    .map(|item| item.trim().to_string())
+                    .filter(|item| !item.is_empty())
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+        let next_step = payload
+            .get("next_step")
+            .and_then(|value| value.as_str())
+            .unwrap_or("Continue with next orchestrated subtask.")
+            .trim()
+            .to_string();
+        (
+            "completed".to_string(),
+            summary,
+            if matches!(risk.as_str(), "low" | "medium" | "high") {
+                risk
+            } else {
+                "medium".to_string()
+            },
+            approval_needed,
+            next_step,
+            None,
+        )
+    } else {
+        (
+            "failed".to_string(),
+            "Unable to parse structured subtask output.".to_string(),
+            "high".to_string(),
+            vec!["manual validation required".to_string()],
+            "Retry subtask with stricter output contract.".to_string(),
+            Some("invalid_subtask_output".to_string()),
+        )
+    };
+
+    let output_hash = stable_hash_hex(&format!(
+        "{}|{}|{}|{}|{}",
+        task.id, status, summary, risk, next_step
+    ));
+
+    OrchestrationTaskResult {
+        id: task.id,
+        index: task.index,
+        title: task.title,
+        mode: task.mode,
+        status,
+        summary,
+        risk,
+        approval_needed,
+        next_step,
+        output_hash,
+        error,
+    }
+}
+
+async fn run_orchestrated_task(
+    task: String,
+    modes: Vec<String>,
+    max_parallel: usize,
+    subtask_count: usize,
+) -> Value {
+    let decompose_prompt = format!(
+        "Decompose this software task into {} deterministic subtasks.\n\
+Allowed modes: {}.\n\
+Return ONLY JSON array where each item is {{\"title\":\"...\",\"mode\":\"...\"}}.\n\
+Task: {}",
+        subtask_count,
+        modes.join(", "),
+        task
+    );
+    let decomposition = chat_with_llm(&build_system_prompt(), &decompose_prompt).await;
+    let planned_tasks = decomposition
+        .as_deref()
+        .and_then(|raw| parse_orchestration_plan_from_llm(raw, &modes, subtask_count))
+        .unwrap_or_else(|| fallback_orchestration_plan(&task, &modes, subtask_count));
+
+    let planned_count = planned_tasks.len();
+    let semaphore = Arc::new(tokio::sync::Semaphore::new(max_parallel));
+    let mut join_set = tokio::task::JoinSet::new();
+
+    for subtask in planned_tasks {
+        let permit = semaphore
+            .clone()
+            .acquire_owned()
+            .await
+            .expect("semaphore should be available");
+        let root_task = task.clone();
+        join_set.spawn(async move {
+            let _permit_guard = permit;
+            execute_orchestration_subtask(root_task, subtask).await
+        });
+    }
+
+    let mut results = Vec::new();
+    while let Some(joined) = join_set.join_next().await {
+        match joined {
+            Ok(result) => results.push(result),
+            Err(err) => {
+                results.push(OrchestrationTaskResult {
+                    id: format!("task-{:02}", results.len() + 1),
+                    index: results.len(),
+                    title: "Unresolved subtask".to_string(),
+                    mode: "review".to_string(),
+                    status: "failed".to_string(),
+                    summary: "Subtask panicked or was cancelled.".to_string(),
+                    risk: "high".to_string(),
+                    approval_needed: vec!["manual review".to_string()],
+                    next_step: "Rerun orchestration after inspecting runtime errors.".to_string(),
+                    output_hash: stable_hash_hex("subtask_join_error"),
+                    error: Some(err.to_string()),
+                });
+            }
+        }
+    }
+
+    results.sort_by_key(|result| result.index);
+    let failed = results
+        .iter()
+        .filter(|result| result.status != "completed")
+        .count();
+    let approval_required = results
+        .iter()
+        .filter(|result| !result.approval_needed.is_empty())
+        .count();
+    let completed = results.len().saturating_sub(failed);
+    let orchestration_id = uuid::Uuid::new_v4().to_string();
+
+    serde_json::json!({
+        "orchestration_id": orchestration_id,
+        "task": task,
+        "modes": modes,
+        "max_parallel": max_parallel,
+        "planned_subtasks": planned_count,
+        "subtasks": results,
+        "summary": {
+            "completed": completed,
+            "failed": failed,
+            "approval_required_subtasks": approval_required,
+            "recommended_next": if failed == 0 {
+                "Execute approved actions and continue with deployment gates."
+            } else {
+                "Address failed subtasks first, then rerun orchestration."
+            }
+        }
+    })
+}
+
 async fn chat_with_llm(system_prompt: &str, user_prompt: &str) -> Option<String> {
     use sentinel_agent_native::llm_integration::LLMChatClient;
     use sentinel_agent_native::providers::ProviderRouter;
@@ -2307,6 +2682,37 @@ async fn handle_tool_call(params: Option<Value>) -> Option<Value> {
             Some(serde_json::json!({ "content": [{ "type": "text", "text": response_text }] }))
         }
 
+        "orchestrate_task" => {
+            let task = arguments
+                .and_then(|a| a.get("task"))
+                .and_then(|v| v.as_str())
+                .map(|value| value.trim().to_string())
+                .unwrap_or_default();
+            if task.is_empty() {
+                return Some(serde_json::json!({
+                    "isError": true,
+                    "content": [{ "type": "text", "text": "task è obbligatorio." }]
+                }));
+            }
+
+            let modes = parse_orchestration_modes(arguments.and_then(|a| a.get("modes")));
+            let max_parallel = parse_orchestration_parallel(
+                arguments
+                    .and_then(|a| a.get("max_parallel"))
+                    .and_then(|v| v.as_u64()),
+            );
+            let subtask_count = parse_orchestration_subtask_count(
+                arguments
+                    .and_then(|a| a.get("subtask_count"))
+                    .and_then(|v| v.as_u64()),
+            );
+
+            let payload = run_orchestrated_task(task, modes, max_parallel, subtask_count).await;
+            Some(serde_json::json!({
+                "content": [{ "type": "text", "text": payload.to_string() }]
+            }))
+        }
+
         "chat" => {
             let message = arguments
                 .and_then(|a| a.get("message"))
@@ -3005,6 +3411,72 @@ mod tests {
                 .and_then(|v| v.as_array())
                 .map(std::vec::Vec::len),
             Some(3)
+        );
+    }
+
+    #[test]
+    fn orchestration_modes_are_normalized_and_deduplicated() {
+        let raw = serde_json::json!(["PLAN", "build", "review", "build", "invalid"]);
+        let parsed = parse_orchestration_modes(Some(&raw));
+        assert_eq!(
+            parsed,
+            vec![
+                "build".to_string(),
+                "plan".to_string(),
+                "review".to_string()
+            ]
+        );
+
+        let default_modes = parse_orchestration_modes(None);
+        assert_eq!(default_modes.len(), ORCHESTRATION_ALLOWED_MODES.len());
+        for mode in ORCHESTRATION_ALLOWED_MODES {
+            assert!(default_modes.contains(&mode.to_string()));
+        }
+    }
+
+    #[test]
+    fn orchestration_limits_are_bounded() {
+        assert_eq!(parse_orchestration_parallel(None), 2);
+        assert_eq!(parse_orchestration_parallel(Some(0)), 1);
+        assert_eq!(parse_orchestration_parallel(Some(9)), 4);
+
+        assert_eq!(parse_orchestration_subtask_count(None), 4);
+        assert_eq!(parse_orchestration_subtask_count(Some(1)), 2);
+        assert_eq!(parse_orchestration_subtask_count(Some(10)), 6);
+    }
+
+    #[test]
+    fn orchestration_plan_parser_handles_structured_and_string_items() {
+        let content = r#"
+            [
+              {"title":"Define acceptance criteria","mode":"plan"},
+              {"title":"Implement minimal diff","mode":"invalid_mode"},
+              "Run focused regression checks"
+            ]
+        "#;
+        let modes = vec!["plan".to_string(), "build".to_string(), "review".to_string()];
+        let tasks = parse_orchestration_plan_from_llm(content, &modes, 3)
+            .expect("plan should be parsed");
+
+        assert_eq!(tasks.len(), 3);
+        assert_eq!(tasks[0].title, "Define acceptance criteria");
+        assert_eq!(tasks[0].mode, "plan");
+        assert_eq!(tasks[1].mode, "build");
+        assert_eq!(tasks[2].mode, "review");
+    }
+
+    #[test]
+    fn fallback_orchestration_plan_respects_requested_count() {
+        let modes = vec!["plan".to_string(), "build".to_string()];
+        let tasks = fallback_orchestration_plan("Improve runtime safety", &modes, 5);
+        assert_eq!(tasks.len(), 5);
+        assert_eq!(tasks[0].mode, "plan");
+        assert_eq!(tasks[1].mode, "build");
+        assert_eq!(tasks[2].mode, "plan");
+        assert!(
+            tasks
+                .iter()
+                .all(|task| task.title.contains("Improve runtime safety"))
         );
     }
 
