@@ -510,6 +510,36 @@
   padding-top: 8px;
 }
 
+.sentinel-kpi-strip {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.sentinel-kpi-strip span {
+  border: 1px solid var(--sentinel-border);
+  border-radius: 10px;
+  background: color-mix(in oklab, var(--sentinel-surface-2) 90%, transparent);
+  padding: 6px;
+  font-size: 10px;
+  color: var(--sentinel-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  display: grid;
+  gap: 4px;
+}
+
+.sentinel-kpi-strip strong {
+  color: var(--sentinel-ink);
+  font-size: 12px;
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+.sentinel-kpi-strip--runtime {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .sentinel-guided-flow {
   display: grid;
   gap: 8px;
@@ -1406,6 +1436,11 @@
 
   .sentinel-chat__messages {
     height: 42vh;
+  }
+
+  .sentinel-kpi-strip,
+  .sentinel-kpi-strip--runtime {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .sentinel-guided-flow {

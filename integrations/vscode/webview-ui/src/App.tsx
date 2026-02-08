@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
 import { Goal } from "@sentinel/sdk";
 import { useStore } from "./state/store";
 import { useVSCodeAPI } from "./hooks/useVSCodeAPI";
@@ -32,9 +32,9 @@ import { ScrollArea } from "./components/ui/scroll-area";
 import MessageList from "./components/Chat/MessageList";
 import ChatInput from "./components/Chat/ChatInput";
 import QuickPrompts from "./components/Chat/QuickPrompts";
-import GoalTree from "./components/Goals/GoalTree";
-import GoalGraph from "./components/AtomicForge/GoalGraph";
-import AppSpecPreview from "./components/AppSpec/AppSpecPreview";
+const GoalTree = lazy(() => import("./components/Goals/GoalTree"));
+const GoalGraph = lazy(() => import("./components/AtomicForge/GoalGraph"));
+const AppSpecPreview = lazy(() => import("./components/AppSpec/AppSpecPreview"));
 
 type PageId = "command" | "chat" | "forge" | "network" | "audit" | "settings";
 type TimelineStage = "all" | "received" | "plan" | "tool" | "stream" | "approval" | "result" | "error" | "cancel";
@@ -66,6 +66,16 @@ function shortFingerprint(id: string, timestamp: number): string {
   const compactId = id.replace(/-/g, "").slice(0, 8).toUpperCase();
   const compactTs = (timestamp % 100000).toString().padStart(5, "0");
   return `${compactId}-${compactTs}`;
+}
+
+function median(values: number[]): number {
+  if (values.length === 0) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const middle = Math.floor(sorted.length / 2);
+  if (sorted.length % 2 === 0) {
+    return (sorted[middle - 1] + sorted[middle]) / 2;
+  }
+  return sorted[middle];
 }
 
 export default function App() {
@@ -342,6 +352,66 @@ export default function App() {
     }
     return "Apply stage. Approve pending file operations to execute changes safely.";
   }, [guidedStage]);
+  const uiKpi = useMemo(() => {
+    const userTurns = messages.filter((message) => message.role === "user");
+    const assistantTurns = messages.filter((message) => message.role === "assistant");
+    const slashTurns = userTurns.filter((message) => message.content.trim().startsWith("/")).length;
+    const autoRoutedTurns = assistantTurns.filter((message) =>
+      message.content.startsWith("Auto-routed by Intent Router."),
+    ).length;
+
+    const planLatency: number[] = [];
+    const receivedByTurn = new Map<string, number>();
+    const firstPlanByTurn = new Map<string, number>();
+    for (const event of timeline) {
+      if (!event.turnId) continue;
+      if (event.stage === "received" && !receivedByTurn.has(event.turnId)) {
+        receivedByTurn.set(event.turnId, event.timestamp);
+      }
+      if (event.stage === "plan" && !firstPlanByTurn.has(event.turnId)) {
+        firstPlanByTurn.set(event.turnId, event.timestamp);
+      }
+    }
+    for (const [turnId, receivedTs] of receivedByTurn.entries()) {
+      const planTs = firstPlanByTurn.get(turnId);
+      if (planTs && planTs >= receivedTs) {
+        planLatency.push(planTs - receivedTs);
+      }
+    }
+
+    const fileOps = assistantTurns.flatMap((message) => message.fileOperations ?? []);
+    const resolvedApprovals = fileOps.filter((operation) => operation.approved !== undefined);
+    const approvedOps = resolvedApprovals.filter((operation) => operation.approved === true).length;
+    const approvalRate =
+      resolvedApprovals.length > 0
+        ? (approvedOps / resolvedApprovals.length) * 100
+        : 0;
+
+    return {
+      turnsTotal: userTurns.length,
+      naturalLanguageTurns: Math.max(0, userTurns.length - slashTurns),
+      slashTurns,
+      autoRoutedTurns,
+      autoRouteRate: userTurns.length > 0 ? (autoRoutedTurns / userTurns.length) * 100 : 0,
+      medianPromptToPlanMs: median(planLatency),
+      pendingApprovals: pendingFileApprovals,
+      approvalRate,
+    };
+  }, [messages, timeline, pendingFileApprovals]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      vscodeApi.postMessage({
+        type: "uiKpiSnapshot",
+        snapshot: {
+          ...uiKpi,
+          timestamp: Date.now(),
+        },
+      });
+    }, 900);
+
+    return () => window.clearTimeout(timer);
+  }, [uiKpi, vscodeApi]);
   const hasExplainableMessages = useMemo(
     () =>
       messages.some(
@@ -721,6 +791,29 @@ export default function App() {
                         <p className="sentinel-guided-flow__hint">{guidedHint}</p>
                       </div>
 
+                      <div className="sentinel-kpi-strip">
+                        <span>
+                          turns
+                          <strong>{uiKpi.turnsTotal}</strong>
+                        </span>
+                        <span>
+                          auto-route
+                          <strong>{uiKpi.autoRouteRate.toFixed(0)}%</strong>
+                        </span>
+                        <span>
+                          prompt→plan
+                          <strong>{Math.round(uiKpi.medianPromptToPlanMs)}ms</strong>
+                        </span>
+                        <span>
+                          approvals
+                          <strong>{uiKpi.pendingApprovals}</strong>
+                        </span>
+                        <span>
+                          apply rate
+                          <strong>{uiKpi.approvalRate.toFixed(0)}%</strong>
+                        </span>
+                      </div>
+
                       <div className="sentinel-inline-actions sentinel-chat-actions--primary">
                         <Button
                           size="xs"
@@ -920,7 +1013,9 @@ export default function App() {
                     )}
                     {showSimplePreview && latestAppSpec && (
                       <aside className="sentinel-preview-panel">
-                        <AppSpecPreview appSpec={latestAppSpec} />
+                        <Suspense fallback={<div className="sentinel-empty p-3">Loading preview...</div>}>
+                          <AppSpecPreview appSpec={latestAppSpec} />
+                        </Suspense>
                       </aside>
                     )}
                     {showTimelinePanel && <aside
@@ -1051,7 +1146,9 @@ export default function App() {
                     <CardDescription>Dependency topology and execution ordering.</CardDescription>
                   </CardHeader>
                   <CardContent className="h-[440px]">
-                    <GoalGraph goals={goals as unknown as Goal[]} onNodeSelect={setSelectedGoal} />
+                    <Suspense fallback={<p className="sentinel-empty">Loading goal graph...</p>}>
+                      <GoalGraph goals={goals as unknown as Goal[]} onNodeSelect={setSelectedGoal} />
+                    </Suspense>
                   </CardContent>
                 </Card>
                 <Card className="sentinel-card sentinel-panel-resizable">
@@ -1070,7 +1167,9 @@ export default function App() {
                     ) : (
                       <p className="sentinel-empty">No goal selected.</p>
                     )}
-                    <GoalTree />
+                    <Suspense fallback={<p className="sentinel-empty">Loading goal tree...</p>}>
+                      <GoalTree />
+                    </Suspense>
                   </CardContent>
                 </Card>
               </div>
@@ -1162,6 +1261,40 @@ export default function App() {
                       <small>Hard stop when quality metrics drop below policy.</small>
                     </div>
                   </div>
+
+                  <section className="sentinel-policy-card sentinel-panel-resizable">
+                    <header>
+                      <h3>Product KPI Telemetry</h3>
+                      <Badge variant="outline">S7</Badge>
+                    </header>
+                    <p>Local product signals used to measure UX quality and intent-routing effectiveness.</p>
+                    <div className="sentinel-kpi-strip sentinel-kpi-strip--runtime">
+                      <span>
+                        turns
+                        <strong>{uiKpi.turnsTotal}</strong>
+                      </span>
+                      <span>
+                        natural
+                        <strong>{uiKpi.naturalLanguageTurns}</strong>
+                      </span>
+                      <span>
+                        slash
+                        <strong>{uiKpi.slashTurns}</strong>
+                      </span>
+                      <span>
+                        auto-route
+                        <strong>{uiKpi.autoRouteRate.toFixed(0)}%</strong>
+                      </span>
+                      <span>
+                        prompt→plan
+                        <strong>{Math.round(uiKpi.medianPromptToPlanMs)}ms</strong>
+                      </span>
+                      <span>
+                        apply rate
+                        <strong>{uiKpi.approvalRate.toFixed(0)}%</strong>
+                      </span>
+                    </div>
+                  </section>
 
                   <div className="sentinel-panel-grid">
                     <section className="sentinel-policy-card sentinel-panel-resizable">

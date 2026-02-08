@@ -1,14 +1,41 @@
 import React from "react";
 import { useStore } from "../../state/store";
 import { useVSCodeAPI } from "../../hooks/useVSCodeAPI";
-import { Sparkles, Terminal, Shield, Target, Brain, HelpCircle, PlayCircle, Wand2, DraftingCompass } from "lucide-react";
+import {
+  Sparkles,
+  Terminal,
+  Shield,
+  Target,
+  Brain,
+  HelpCircle,
+  PlayCircle,
+  Wand2,
+  DraftingCompass,
+  LayoutTemplate,
+  CalendarClock,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const PROMPTS = [
-  { label: "Initialize", text: "/init", icon: Sparkles },
+  {
+    label: "Client Portal",
+    text: "Build a clean client portal where customers can sign in, track requests, and chat with support. Keep it production-ready and simple.",
+    icon: LayoutTemplate,
+  },
+  {
+    label: "Booking App",
+    text: "Create a booking app for a small business with calendar scheduling, reminder emails, and role-based access.",
+    icon: CalendarClock,
+  },
+  {
+    label: "Spreadsheet to App",
+    text: "Turn this spreadsheet workflow into a web app with forms, approval steps, and an admin dashboard.",
+    icon: Sparkles,
+  },
   { label: "Alignment Status", text: "Show current alignment status", icon: Shield },
   { label: "List Goals", text: "What are the active goals?", icon: Target },
   { label: "Verify Action", text: "Validate my next changes", icon: Terminal },
+  { label: "Initialize", text: "/init", icon: Sparkles },
   { label: "Execute First Pending", text: "/execute-first-pending", icon: PlayCircle },
   {
     label: "Orchestrate",

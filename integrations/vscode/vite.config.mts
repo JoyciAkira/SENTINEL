@@ -17,6 +17,27 @@ export default defineConfig({
         outDir: resolve(__dirname, 'out/webview'),
         rollupOptions: {
             input: resolve(__dirname, 'webview-ui/index.html'),
+            output: {
+                manualChunks(id) {
+                    if (id.includes('node_modules/reactflow')) {
+                        return 'vendor-reactflow';
+                    }
+                    if (
+                        id.includes('react-markdown') ||
+                        id.includes('rehype-highlight') ||
+                        id.includes('highlight.js')
+                    ) {
+                        return 'vendor-markdown';
+                    }
+                    if (id.includes('node_modules/lucide-react')) {
+                        return 'vendor-icons';
+                    }
+                    if (id.includes('node_modules')) {
+                        return 'vendor';
+                    }
+                    return undefined;
+                },
+            },
         },
         emptyOutDir: true,
     },

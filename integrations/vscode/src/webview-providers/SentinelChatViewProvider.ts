@@ -119,6 +119,18 @@ type ParsedOrchestrationCommandResult =
   | { ok: true; value: ParsedOrchestrationCommand }
   | { ok: false; error: string };
 
+interface UiKpiSnapshot {
+  turns_total: number;
+  natural_language_turns: number;
+  slash_turns: number;
+  auto_routed_turns: number;
+  auto_route_rate: number;
+  median_prompt_to_plan_ms: number;
+  pending_approvals: number;
+  approval_rate: number;
+  timestamp: number;
+}
+
 type IntentRouteDecision =
   | { kind: "none" }
   | { kind: "execute_first_pending"; reason: string }
@@ -139,6 +151,7 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
   private augmentSettings: AugmentRuntimeSettings = DEFAULT_AUGMENT_SETTINGS;
   private pendingWritePlans: Map<string, PendingWritePlanEntry[]> = new Map();
   private lastAppSpecDraft: AppSpecPayload | null = null;
+  private lastUiKpiSignature: string | null = null;
 
   constructor(
     private extensionUri: vscode.Uri,
@@ -254,6 +267,39 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
     return `${serialized.slice(0, maxLen)}...`;
   }
 
+  private toFiniteNumber(value: unknown, fallback: number = 0): number {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) return fallback;
+    return numeric;
+  }
+
+  private async handleUiKpiSnapshot(snapshot: unknown): Promise<void> {
+    if (!this.isRecord(snapshot)) return;
+
+    const normalized: UiKpiSnapshot = {
+      turns_total: Math.max(0, Math.round(this.toFiniteNumber(snapshot.turnsTotal))),
+      natural_language_turns: Math.max(
+        0,
+        Math.round(this.toFiniteNumber(snapshot.naturalLanguageTurns)),
+      ),
+      slash_turns: Math.max(0, Math.round(this.toFiniteNumber(snapshot.slashTurns))),
+      auto_routed_turns: Math.max(0, Math.round(this.toFiniteNumber(snapshot.autoRoutedTurns))),
+      auto_route_rate: Math.max(0, Math.min(100, this.toFiniteNumber(snapshot.autoRouteRate))),
+      median_prompt_to_plan_ms: Math.max(
+        0,
+        Math.round(this.toFiniteNumber(snapshot.medianPromptToPlanMs)),
+      ),
+      pending_approvals: Math.max(0, Math.round(this.toFiniteNumber(snapshot.pendingApprovals))),
+      approval_rate: Math.max(0, Math.min(100, this.toFiniteNumber(snapshot.approvalRate))),
+      timestamp: Math.max(0, Math.round(this.toFiniteNumber(snapshot.timestamp, Date.now()))),
+    };
+
+    const signature = JSON.stringify(normalized);
+    if (signature === this.lastUiKpiSignature) return;
+    this.lastUiKpiSignature = signature;
+    await this.context.globalState.update("sentinel.uiKpiSnapshot", normalized);
+  }
+
   private async callToolTracked(
     name: string,
     args: Record<string, unknown>,
@@ -366,6 +412,9 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
 
       case "refreshRuntimePolicies":
         await this.refreshRuntimePolicySnapshot();
+        break;
+      case "uiKpiSnapshot":
+        await this.handleUiKpiSnapshot(msg.snapshot);
         break;
       case "setAugmentSettings":
         await this.handleSetAugmentSettings(msg.settings);
