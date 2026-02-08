@@ -15,6 +15,28 @@ interface OutcomeSummary {
   next: string[];
 }
 
+interface OrchestrationSubtask {
+  index: number;
+  mode: string;
+  title: string;
+  status: string;
+  risk: string;
+  summary: string;
+}
+
+interface OrchestrationSummary {
+  orchestrationId: string;
+  task: string;
+  plannedSubtasks: number | null;
+  parallel: string | null;
+  modes: string[];
+  completed: number | null;
+  failed: number | null;
+  approvals: number | null;
+  next: string;
+  subtasks: OrchestrationSubtask[];
+}
+
 function normalizeHeading(line: string): string {
   return line
     .toLowerCase()
@@ -168,6 +190,89 @@ function deriveOutcome(message: ChatMessage): OutcomeSummary {
   return { changed, approval, next };
 }
 
+function parseIntSafe(value: string | undefined): number | null {
+  if (!value) return null;
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function parseOrchestrationSummary(content: string): OrchestrationSummary | null {
+  if (!content.includes("Orchestration ID:")) return null;
+
+  const lines = content.split(/\r?\n/);
+  const lineStarting = (prefix: string): string | null => {
+    const line = lines.find((entry) => entry.startsWith(prefix));
+    return line ? line.slice(prefix.length).trim() : null;
+  };
+
+  const orchestrationId = lineStarting("Orchestration ID:");
+  const task = lineStarting("Task:");
+  const planLine = lineStarting("Plan:");
+  const outcomeLine = lineStarting("Outcome:");
+  const next = lineStarting("Next:") ?? "";
+
+  if (!orchestrationId || !task || !planLine || !outcomeLine) return null;
+
+  const planMatch = planLine.match(
+    /(\d+)\s+subtasks\s*\|\s*parallel=([^|]+)\|\s*modes=(.+)$/i,
+  );
+  const outcomeMatch = outcomeLine.match(
+    /completed=(\d+),\s*failed=(\d+),\s*approvals=(\d+)/i,
+  );
+
+  const modes = (planMatch?.[3] ?? "")
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0);
+
+  const subtasks: OrchestrationSubtask[] = [];
+  const start = lines.findIndex((line) => line.trim() === "Subtasks:");
+  if (start >= 0) {
+    for (let idx = start + 1; idx < lines.length; idx += 1) {
+      const line = lines[idx];
+      const subtaskMatch = line.match(
+        /^\s*(\d+)\.\s+\[([^\]]+)\]\s+(.+?)\s+-\s+([^,]+),\s*risk=([^\s]+)\s*$/i,
+      );
+      if (!subtaskMatch) continue;
+
+      const summaryLine = lines[idx + 1]?.trim();
+      const summary =
+        summaryLine &&
+        !summaryLine.startsWith("Subtasks:") &&
+        !/^\d+\.\s+\[/.test(summaryLine) &&
+        !summaryLine.startsWith("Orchestration ID:") &&
+        !summaryLine.startsWith("Task:") &&
+        !summaryLine.startsWith("Plan:") &&
+        !summaryLine.startsWith("Outcome:") &&
+        !summaryLine.startsWith("Next:")
+          ? summaryLine
+          : "No summary provided.";
+
+      subtasks.push({
+        index: parseIntSafe(subtaskMatch[1]) ?? subtasks.length + 1,
+        mode: subtaskMatch[2].trim(),
+        title: subtaskMatch[3].trim(),
+        status: subtaskMatch[4].trim(),
+        risk: subtaskMatch[5].trim(),
+        summary,
+      });
+    }
+  }
+
+  return {
+    orchestrationId,
+    task,
+    plannedSubtasks: parseIntSafe(planMatch?.[1]),
+    parallel: planMatch?.[2]?.trim() ?? null,
+    modes,
+    completed: parseIntSafe(outcomeMatch?.[1]),
+    failed: parseIntSafe(outcomeMatch?.[2]),
+    approvals: parseIntSafe(outcomeMatch?.[3]),
+    next,
+    subtasks,
+  };
+}
+
 export default function MessageBubble({
   message,
   index,
@@ -198,6 +303,10 @@ export default function MessageBubble({
     message.fileOperations?.filter((operation) => operation.approved === undefined).length ?? 0;
   const hasSections = !isUser && (message.sections?.length ?? 0) > 0;
   const outcome = useMemo(() => deriveOutcome(message), [message]);
+  const orchestrationSummary = useMemo(
+    () => (!isUser ? parseOrchestrationSummary(message.content) : null),
+    [isUser, message.content],
+  );
   const shouldShowExplainability = !isUser && hasExplainability && (showInternals || askWhy);
   const shouldShowInnovation = !isUser && hasInnovation && showInternals;
 
@@ -323,7 +432,67 @@ export default function MessageBubble({
               </div>
             )}
 
-            {!isUser && simpleMode && (
+            {!isUser && simpleMode && orchestrationSummary && (
+              <div className="sentinel-orchestration-card">
+                <div className="sentinel-orchestration-card__header">
+                  <span className="sentinel-orchestration-card__label">Orchestration Outcome</span>
+                  <span className="sentinel-orchestration-card__id">
+                    {clipText(orchestrationSummary.orchestrationId, 18)}
+                  </span>
+                </div>
+                <div className="sentinel-orchestration-card__kpis">
+                  <span>
+                    task
+                    <strong>{clipText(orchestrationSummary.task, 42)}</strong>
+                  </span>
+                  <span>
+                    subtasks
+                    <strong>{orchestrationSummary.plannedSubtasks ?? "n/a"}</strong>
+                  </span>
+                  <span>
+                    parallel
+                    <strong>{orchestrationSummary.parallel ?? "n/a"}</strong>
+                  </span>
+                  <span>
+                    completed
+                    <strong>{orchestrationSummary.completed ?? "n/a"}</strong>
+                  </span>
+                  <span>
+                    failed
+                    <strong>{orchestrationSummary.failed ?? "n/a"}</strong>
+                  </span>
+                  <span>
+                    approvals
+                    <strong>{orchestrationSummary.approvals ?? "n/a"}</strong>
+                  </span>
+                </div>
+                {orchestrationSummary.subtasks.length > 0 && (
+                  <div className="sentinel-orchestration-card__subtasks">
+                    {orchestrationSummary.subtasks.slice(0, 6).map((subtask) => (
+                      <div key={`${subtask.index}-${subtask.title}`} className="sentinel-orchestration-card__subtask">
+                        <div className="sentinel-orchestration-card__subtask-head">
+                          <span>
+                            {subtask.index}. [{subtask.mode}] {subtask.title}
+                          </span>
+                          <span>{subtask.status} • risk {subtask.risk}</span>
+                        </div>
+                        <p>{subtask.summary}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div className="sentinel-orchestration-card__next">
+                  <h5>What happens next</h5>
+                  <p>{orchestrationSummary.next || "Continue with the safest approved next action."}</p>
+                </div>
+                <details className="sentinel-orchestration-card__details">
+                  <summary>Show backend details (optional)</summary>
+                  <pre>{message.content}</pre>
+                </details>
+              </div>
+            )}
+
+            {!isUser && simpleMode && !orchestrationSummary && (
               <div className="sentinel-outcome-card">
                 <div>
                   <h5>What I changed</h5>
@@ -367,7 +536,13 @@ export default function MessageBubble({
                   onClick={() => setContentExpanded((value) => !value)}
                   className="h-6 text-[9px] normal-case"
                 >
-                  {contentExpanded ? "Hide full response" : "Show full response"}
+                  {contentExpanded
+                    ? orchestrationSummary
+                      ? "Hide raw response"
+                      : "Hide full response"
+                    : orchestrationSummary
+                      ? "Show raw response"
+                      : "Show full response"}
                 </Button>
               </div>
             )}

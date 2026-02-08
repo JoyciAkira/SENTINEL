@@ -95,6 +95,8 @@
   width: 100%;
   max-width: none;
   margin: 0;
+  padding: 12px;
+  gap: 10px;
 }
 
 .sentinel-panel-resizable {
@@ -267,12 +269,13 @@
 }
 
 .sentinel-shell--chat-first .sentinel-main {
-  border-radius: 12px;
+  border-radius: 14px;
+  box-shadow: 0 14px 30px color-mix(in oklab, black 18%, transparent);
 }
 
 .sentinel-shell--chat-first .sentinel-topbar {
-  min-height: 50px;
-  padding: 8px 10px;
+  min-height: 52px;
+  padding: 10px 12px;
 }
 
 .sentinel-topbar {
@@ -319,6 +322,11 @@
   border: 1px solid var(--sentinel-border);
   border-radius: 999px;
   background: color-mix(in oklab, var(--sentinel-surface-2) 86%, transparent);
+}
+
+.sentinel-pill--alert {
+  border-color: color-mix(in oklab, var(--sentinel-warning) 46%, var(--sentinel-border));
+  color: var(--sentinel-warning);
 }
 
 .sentinel-risk-badge {
@@ -484,6 +492,24 @@
   min-height: 0;
 }
 
+.sentinel-chat-header--simple {
+  padding-bottom: 8px;
+  gap: 8px;
+}
+
+.sentinel-chat-header--simple [data-slot="card-description"] {
+  max-width: 640px;
+}
+
+.sentinel-chat-actions--primary {
+  align-items: center;
+}
+
+.sentinel-chat-actions--secondary {
+  border-top: 1px dashed var(--sentinel-border);
+  padding-top: 8px;
+}
+
 .sentinel-chat-composer {
   position: sticky;
   bottom: 0;
@@ -513,9 +539,9 @@
 .sentinel-chat__messages {
   min-height: 0;
   height: min(62vh, 680px);
-  border-radius: 10px;
+  border-radius: 14px;
   border: 1px solid var(--sentinel-border);
-  background: color-mix(in oklab, var(--sentinel-surface) 88%, transparent);
+  background: color-mix(in oklab, var(--sentinel-surface) 94%, white);
   overflow: hidden;
 }
 
@@ -557,6 +583,142 @@
 .sentinel-outcome-card li {
   font-size: 12px;
   line-height: 1.4;
+}
+
+.sentinel-orchestration-card {
+  display: grid;
+  gap: 8px;
+  border: 1px solid var(--sentinel-border);
+  border-radius: 12px;
+  padding: 10px;
+  background: color-mix(in oklab, var(--sentinel-surface) 95%, white);
+}
+
+.sentinel-orchestration-card__header {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: center;
+}
+
+.sentinel-orchestration-card__label {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--sentinel-muted);
+  font-weight: 700;
+}
+
+.sentinel-orchestration-card__id {
+  border: 1px solid var(--sentinel-border);
+  border-radius: 999px;
+  padding: 2px 7px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--sentinel-muted);
+}
+
+.sentinel-orchestration-card__kpis {
+  display: grid;
+  gap: 6px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.sentinel-orchestration-card__kpis span {
+  border: 1px solid var(--sentinel-border);
+  border-radius: 8px;
+  background: color-mix(in oklab, var(--sentinel-surface-2) 90%, white);
+  display: grid;
+  gap: 4px;
+  padding: 6px;
+  font-size: 10px;
+  color: var(--sentinel-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.sentinel-orchestration-card__kpis strong {
+  font-size: 11px;
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--sentinel-ink);
+}
+
+.sentinel-orchestration-card__subtasks {
+  display: grid;
+  gap: 6px;
+}
+
+.sentinel-orchestration-card__subtask {
+  border: 1px solid var(--sentinel-border);
+  border-radius: 10px;
+  background: color-mix(in oklab, var(--sentinel-surface-2) 92%, white);
+  padding: 7px 8px;
+  display: grid;
+  gap: 5px;
+}
+
+.sentinel-orchestration-card__subtask-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 11px;
+}
+
+.sentinel-orchestration-card__subtask-head span:first-child {
+  font-weight: 700;
+}
+
+.sentinel-orchestration-card__subtask-head span:last-child {
+  color: var(--sentinel-muted);
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+.sentinel-orchestration-card__subtask p {
+  margin: 0;
+  font-size: 11px;
+  color: var(--sentinel-muted);
+}
+
+.sentinel-orchestration-card__next h5 {
+  margin: 0 0 4px 0;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--sentinel-muted);
+}
+
+.sentinel-orchestration-card__next p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.sentinel-orchestration-card__details {
+  border-top: 1px dashed var(--sentinel-border);
+  padding-top: 6px;
+}
+
+.sentinel-orchestration-card__details summary {
+  cursor: pointer;
+  font-size: 11px;
+  color: var(--sentinel-muted);
+  font-weight: 600;
+}
+
+.sentinel-orchestration-card__details pre {
+  margin: 8px 0 0;
+  border-radius: 8px;
+  border: 1px solid var(--sentinel-border);
+  background: color-mix(in oklab, var(--sentinel-surface-2) 84%, black);
+  padding: 8px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  white-space: pre-wrap;
+  line-height: 1.4;
+  color: color-mix(in oklab, var(--sentinel-ink) 82%, white);
 }
 
 .sentinel-preview-panel {
@@ -1001,7 +1163,7 @@
 
 /* Cline-like sidebar refinements */
 .sentinel-main--sidebar {
-  background: color-mix(in oklab, var(--sentinel-surface) 94%, black);
+  background: color-mix(in oklab, var(--sentinel-surface) 98%, white);
 }
 
 .sentinel-topbar--sidebar .sentinel-topbar__eyebrow {
@@ -1009,9 +1171,9 @@
 }
 
 .sentinel-topbar--sidebar h1 {
-  font-size: 13px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font-size: 14px;
+  letter-spacing: 0.03em;
+  text-transform: none;
 }
 
 .sentinel-topbar--sidebar .sentinel-topbar__metrics {
@@ -1023,22 +1185,17 @@
 }
 
 .sentinel-shell--chat-first .sentinel-chat {
-  border: none;
-  box-shadow: none;
-  background: transparent;
+  border: 1px solid var(--sentinel-border);
+  box-shadow: 0 10px 24px color-mix(in oklab, black 20%, transparent);
+  background: color-mix(in oklab, var(--sentinel-surface) 96%, white);
 }
 
 .sentinel-shell--chat-first .sentinel-chat [data-slot="card-header"] {
-  padding: 2px 0;
-}
-
-.sentinel-shell--chat-first .sentinel-chat [data-slot="card-title"],
-.sentinel-shell--chat-first .sentinel-chat [data-slot="card-description"] {
-  display: none;
+  padding: 10px 10px 8px 10px;
 }
 
 .sentinel-shell--chat-first .sentinel-chat__messages {
-  background: color-mix(in oklab, var(--sentinel-surface) 96%, black);
+  background: color-mix(in oklab, var(--sentinel-surface) 98%, white);
 }
 
 .sentinel-empty-hero {

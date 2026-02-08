@@ -503,8 +503,12 @@ export default function App() {
                   <Activity className="size-3.5" />
                   <span>{connected ? "Connected" : "Offline"}</span>
                 </div>
+                <div className="sentinel-pill">
+                  <ShieldCheck className="size-3.5" />
+                  <span>Outcome-first</span>
+                </div>
                 {pendingFileApprovals > 0 && (
-                  <div className="sentinel-pill">
+                  <div className="sentinel-pill sentinel-pill--alert">
                     <ShieldAlert className="size-3.5" />
                     <span>{pendingFileApprovals} approvals</span>
                   </div>
@@ -656,93 +660,165 @@ export default function App() {
 
             {activePage === "chat" && (
               <Card className="sentinel-card sentinel-panel-resizable sentinel-chat">
-                <CardHeader>
-                  <CardTitle className="text-base">Chat Runtime</CardTitle>
+                <CardHeader className={cn(simpleMode && "sentinel-chat-header--simple")}>
+                  <CardTitle className="text-base">
+                    {simpleMode ? "Sentinel Chat" : "Chat Runtime"}
+                  </CardTitle>
                   <CardDescription>
-                    Chat-first by default. Timeline, explainability, and governance are progressive details.
+                    {simpleMode
+                      ? "Clean output first. Technical internals only when explicitly requested."
+                      : "Chat-first by default. Timeline, explainability, and governance are progressive details."}
                   </CardDescription>
-                  <div className="sentinel-inline-actions">
-                    {simpleMode && (
-                      <Button
-                        size="xs"
-                        variant={askWhy ? "secondary" : "outline"}
-                        disabled={!hasExplainableMessages}
-                        onClick={() => setAskWhy((value) => !value)}
-                      >
-                        {askWhy ? "Hide Why" : "Ask Why"}
-                      </Button>
-                    )}
-                    {simpleMode && (
-                      <Button
-                        size="xs"
-                        variant={showPreviewPanel ? "secondary" : "outline"}
-                        disabled={!latestAppSpec}
-                        onClick={() => setShowPreviewPanel((value) => !value)}
-                      >
-                        {showPreviewPanel ? "Hide Preview" : latestAppSpec ? "Live Preview" : "Preview unavailable"}
-                      </Button>
-                    )}
-                    {simpleMode && latestAppSpec && (
+                  {simpleMode ? (
+                    <>
+                      <div className="sentinel-inline-actions sentinel-chat-actions--primary">
+                        <Button
+                          size="xs"
+                          variant="outline"
+                          disabled={!connected || Boolean(activeStreamingMessage)}
+                          onClick={() => sendSlashCommand("/execute-first-pending")}
+                        >
+                          Execute Next Goal
+                        </Button>
+                        <Button
+                          size="xs"
+                          variant="outline"
+                          disabled={!connected || Boolean(activeStreamingMessage)}
+                          onClick={() =>
+                            sendSlashCommand(
+                              "/orchestrate Harden auth + payments flow --parallel=2 --count=4 --modes=plan,build,review",
+                            )
+                          }
+                        >
+                          Orchestrate Task
+                        </Button>
+                        <Button
+                          size="xs"
+                          variant={showPreviewPanel ? "secondary" : "outline"}
+                          disabled={!latestAppSpec}
+                          onClick={() => setShowPreviewPanel((value) => !value)}
+                        >
+                          {showPreviewPanel
+                            ? "Hide Preview"
+                            : latestAppSpec
+                              ? "Live Preview"
+                              : "Preview unavailable"}
+                        </Button>
+                        <Button
+                          size="xs"
+                          variant={askWhy ? "secondary" : "outline"}
+                          disabled={!hasExplainableMessages}
+                          onClick={() => setAskWhy((value) => !value)}
+                        >
+                          {askWhy ? "Hide Why" : "Ask Why"}
+                        </Button>
+                        <Button
+                          size="xs"
+                          variant="outline"
+                          onClick={() => setShowChatDetails((value) => !value)}
+                        >
+                          {showChatDetails ? "Less Controls" : "More Controls"}
+                        </Button>
+                      </div>
+                      {showChatDetails && (
+                        <div className="sentinel-inline-actions sentinel-chat-actions--secondary">
+                          {latestAppSpec && (
+                            <Button
+                              size="xs"
+                              variant="outline"
+                              disabled={!connected || Boolean(activeStreamingMessage)}
+                              onClick={() => sendSlashCommand("/appspec-refine")}
+                            >
+                              Refine Spec
+                            </Button>
+                          )}
+                          {latestAppSpec && (
+                            <Button
+                              size="xs"
+                              variant="outline"
+                              disabled={!connected || Boolean(activeStreamingMessage)}
+                              onClick={() => sendSlashCommand("/appspec-plan")}
+                            >
+                              Generate Plan
+                            </Button>
+                          )}
+                          <Button
+                            size="xs"
+                            variant="outline"
+                            disabled={!lastUserMessage || Boolean(activeStreamingMessage)}
+                            onClick={() =>
+                              lastUserMessage &&
+                              vscodeApi.postMessage({
+                                type: "regenerateLastResponse",
+                                text: lastUserMessage.content,
+                              })
+                            }
+                          >
+                            Regenerate
+                          </Button>
+                          <Button
+                            size="xs"
+                            variant="outline"
+                            disabled={!activeStreamingMessage}
+                            onClick={() =>
+                              activeStreamingMessage &&
+                              vscodeApi.postMessage({
+                                type: "cancelStreaming",
+                                messageId: activeStreamingMessage.id,
+                              })
+                            }
+                          >
+                            Stop Stream
+                          </Button>
+                          <Button
+                            size="xs"
+                            variant="destructive"
+                            onClick={() => vscodeApi.postMessage({ type: "clearChatMemory" })}
+                          >
+                            Clear Memory
+                          </Button>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <div className="sentinel-inline-actions">
                       <Button
                         size="xs"
                         variant="outline"
-                        disabled={!connected || Boolean(activeStreamingMessage)}
-                        onClick={() => sendSlashCommand("/appspec-refine")}
+                        disabled={!lastUserMessage || Boolean(activeStreamingMessage)}
+                        onClick={() =>
+                          lastUserMessage &&
+                          vscodeApi.postMessage({
+                            type: "regenerateLastResponse",
+                            text: lastUserMessage.content,
+                          })
+                        }
                       >
-                        Refine Spec
+                        Regenerate
                       </Button>
-                    )}
-                    {simpleMode && latestAppSpec && (
                       <Button
                         size="xs"
                         variant="outline"
-                        disabled={!connected || Boolean(activeStreamingMessage)}
-                        onClick={() => sendSlashCommand("/appspec-plan")}
+                        disabled={!activeStreamingMessage}
+                        onClick={() =>
+                          activeStreamingMessage &&
+                          vscodeApi.postMessage({
+                            type: "cancelStreaming",
+                            messageId: activeStreamingMessage.id,
+                          })
+                        }
                       >
-                        Generate Plan
+                        Stop Stream
                       </Button>
-                    )}
-                    {simpleMode && (
                       <Button
                         size="xs"
-                        variant="outline"
-                        onClick={() => setShowChatDetails((v) => !v)}
+                        variant="destructive"
+                        onClick={() => vscodeApi.postMessage({ type: "clearChatMemory" })}
                       >
-                        {showChatDetails ? "Hide Advanced Panel" : "Advanced Panel"}
+                        Clear Memory
                       </Button>
-                    )}
-                    <Button
-                      size="xs"
-                      variant="outline"
-                      disabled={!lastUserMessage || Boolean(activeStreamingMessage)}
-                      onClick={() =>
-                        lastUserMessage &&
-                        vscodeApi.postMessage({
-                          type: "regenerateLastResponse",
-                          text: lastUserMessage.content,
-                        })
-                      }
-                    >
-                      Regenerate
-                    </Button>
-                    <Button
-                      size="xs"
-                      variant="outline"
-                      disabled={!activeStreamingMessage}
-                      onClick={() =>
-                        activeStreamingMessage &&
-                        vscodeApi.postMessage({
-                          type: "cancelStreaming",
-                          messageId: activeStreamingMessage.id,
-                        })
-                      }
-                    >
-                      Stop Stream
-                    </Button>
-                    <Button size="xs" variant="destructive" onClick={() => vscodeApi.postMessage({ type: "clearChatMemory" })}>
-                      Clear Memory
-                    </Button>
-                  </div>
+                    </div>
+                  )}
                 </CardHeader>
                 <CardContent className="sentinel-chat__body">
                   {simpleMode && messages.length === 0 && <QuickPrompts />}
@@ -754,7 +830,7 @@ export default function App() {
                             gridTemplateColumns: `minmax(0, 1fr) 8px ${timelineWidth}px`,
                           }
                         : showSimplePreview
-                          ? { gridTemplateColumns: "minmax(0, 1fr) minmax(280px, 360px)" }
+                          ? { gridTemplateColumns: "minmax(0, 1fr) minmax(320px, 390px)" }
                         : undefined
                     }
                   >
@@ -763,7 +839,7 @@ export default function App() {
                         className="sentinel-chat__messages"
                         style={
                           simpleMode
-                            ? { height: "72vh", minHeight: "560px" }
+                            ? { height: "74vh", minHeight: "620px" }
                             : { height: `${chatMessagesHeight}px` }
                         }
                       >
@@ -803,7 +879,7 @@ export default function App() {
                         !simpleMode
                           ? { height: `${chatMessagesHeight}px`, maxHeight: "none" }
                           : hasSidePanel
-                            ? { height: "72vh", minHeight: "560px", maxHeight: "none" }
+                            ? { height: "74vh", minHeight: "620px", maxHeight: "none" }
                             : undefined
                       }
                     >
