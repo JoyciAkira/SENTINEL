@@ -25,6 +25,7 @@ export function useMCPMessages(vscodeApi: VSCodeAPI): void {
     const setGoals = useStore((s) => s.setGoals);
     const setRuntimeCapabilities = useStore((s) => s.setRuntimeCapabilities);
     const setAugmentSettings = useStore((s) => s.setAugmentSettings);
+    const setQualityStatus = useStore((s) => s.setQualityStatus);
 
     useEffect(() => {
         const handler = (event: MessageEvent) => {
@@ -153,6 +154,12 @@ export function useMCPMessages(vscodeApi: VSCodeAPI): void {
                         timestamp: Date.now(),
                     });
                     break;
+
+                case 'qualityUpdate':
+                    if (msg.quality) {
+                        setQualityStatus(msg.quality);
+                    }
+                    break;
             }
         };
 
@@ -172,5 +179,6 @@ export function useMCPMessages(vscodeApi: VSCodeAPI): void {
         setGoals,
         setRuntimeCapabilities,
         setAugmentSettings,
+        setQualityStatus,
     ]);
 }

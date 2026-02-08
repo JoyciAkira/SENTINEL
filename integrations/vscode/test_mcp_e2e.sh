@@ -128,6 +128,21 @@ if echo "$TOOLS_RESPONSE" | grep -q '"get_world_model"'; then
 else
     log_fail "get_world_model missing"
 fi
+if echo "$TOOLS_RESPONSE" | grep -q '"get_quality_status"'; then
+    log_pass "get_quality_status tool found"
+else
+    log_fail "get_quality_status missing"
+fi
+if echo "$TOOLS_RESPONSE" | grep -q '"list_quality_reports"'; then
+    log_pass "list_quality_reports tool found"
+else
+    log_fail "list_quality_reports missing"
+fi
+if echo "$TOOLS_RESPONSE" | grep -q '"run_quality_harness"'; then
+    log_pass "run_quality_harness tool found"
+else
+    log_fail "run_quality_harness missing"
+fi
 
 # ── TEST 3: Get Alignment ────────────────────
 log_test "MCP Tool Call: get_alignment"

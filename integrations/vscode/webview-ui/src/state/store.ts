@@ -18,6 +18,7 @@ export const useStore = create<AppState>((set) => ({
         mode: "disabled",
         enforceByo: true,
     },
+    qualityStatus: null,
     goalsCollapsed: true,
     inputText: '',
 
@@ -79,6 +80,8 @@ export const useStore = create<AppState>((set) => ({
     setRuntimeCapabilities: (runtimeCapabilities) => set({ runtimeCapabilities }),
 
     setAugmentSettings: (augmentSettings) => set({ augmentSettings }),
+
+    setQualityStatus: (qualityStatus) => set({ qualityStatus }),
 
     toggleGoalsCollapsed: () =>
         set((state) => ({ goalsCollapsed: !state.goalsCollapsed })),

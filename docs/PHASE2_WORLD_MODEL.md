@@ -33,6 +33,9 @@ Proposal payload now includes:
 - `governance_seed`
 - `governance_approve`
 - `governance_reject`
+- `get_quality_status`
+- `list_quality_reports`
+- `run_quality_harness`
 
 `get_world_model` returns:
 
@@ -64,3 +67,9 @@ Outputs:
 - `.sentinel/quality/harness-<timestamp>.log`
 
 The harness runs package tests and runtime checks and emits machine-readable KPI summaries.
+
+At runtime (MCP), Sentinel can now:
+
+- trigger the harness (`run_quality_harness`)
+- read latest status (`get_quality_status`)
+- inspect history (`list_quality_reports`)

@@ -150,7 +150,8 @@ if r and "result" in r:
         "validate_action", "get_alignment", "safe_write",
         "propose_strategy", "record_handover",
         "get_cognitive_map", "get_enforcement_rules",
-        "get_reliability", "governance_status", "get_world_model"
+        "get_reliability", "governance_status", "get_world_model",
+        "get_quality_status", "run_quality_harness", "list_quality_reports"
     ]
     for name in expected_tools:
         if name in tool_names:

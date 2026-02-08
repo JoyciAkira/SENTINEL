@@ -10,6 +10,7 @@ use sentinel_core::{security::SecurityScanner, AlignmentField, GoalManifold, Pro
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::path::PathBuf;
+use std::process::Command;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 
 use crate::reliability;
@@ -275,6 +276,26 @@ async fn handle_request(req: McpRequest, id: Value) -> McpResponse {
                                 "lock_required": { "type": "boolean" }
                             }
                         }
+                    },
+                    {
+                        "name": "get_quality_status",
+                        "description": "Restituisce l'ultimo report quality harness disponibile",
+                        "inputSchema": { "type": "object", "properties": {} }
+                    },
+                    {
+                        "name": "list_quality_reports",
+                        "description": "Lista gli ultimi report quality harness (storico)",
+                        "inputSchema": {
+                            "type": "object",
+                            "properties": {
+                                "limit": { "type": "integer", "minimum": 1, "maximum": 100 }
+                            }
+                        }
+                    },
+                    {
+                        "name": "run_quality_harness",
+                        "description": "Esegue il world-class harness e restituisce il report più recente",
+                        "inputSchema": { "type": "object", "properties": {} }
                     },
                     {
                         "name": "safe_write",
@@ -1316,6 +1337,65 @@ async fn handle_tool_call(params: Option<Value>) -> Option<Value> {
             )
         }
 
+        "get_quality_status" => {
+            let root = find_manifold_path()
+                .and_then(|path| path.parent().map(std::path::Path::to_path_buf))
+                .or_else(|| std::env::current_dir().ok())
+                .unwrap_or_else(|| std::path::PathBuf::from("."));
+            let result_json = match latest_quality_report(&root) {
+                Some(report) => serde_json::json!({
+                    "ok": true,
+                    "latest": report
+                }),
+                None => serde_json::json!({
+                    "ok": true,
+                    "latest": null,
+                    "message": "No quality reports available yet."
+                }),
+            };
+            Some(
+                serde_json::json!({ "content": [{ "type": "text", "text": result_json.to_string() }] }),
+            )
+        }
+
+        "list_quality_reports" => {
+            let limit = arguments
+                .and_then(|a| a.get("limit"))
+                .and_then(|v| v.as_u64())
+                .map(|v| v.min(100) as usize)
+                .unwrap_or(10);
+            let root = find_manifold_path()
+                .and_then(|path| path.parent().map(std::path::Path::to_path_buf))
+                .or_else(|| std::env::current_dir().ok())
+                .unwrap_or_else(|| std::path::PathBuf::from("."));
+            let reports = list_quality_reports(&root, limit);
+            let result_json = serde_json::json!({
+                "ok": true,
+                "count": reports.len(),
+                "reports": reports
+            });
+            Some(
+                serde_json::json!({ "content": [{ "type": "text", "text": result_json.to_string() }] }),
+            )
+        }
+
+        "run_quality_harness" => {
+            let root = find_manifold_path()
+                .and_then(|path| path.parent().map(std::path::Path::to_path_buf))
+                .or_else(|| std::env::current_dir().ok())
+                .unwrap_or_else(|| std::path::PathBuf::from("."));
+            let result_json = match run_quality_harness(&root) {
+                Ok(payload) => payload,
+                Err(err) => serde_json::json!({
+                    "ok": false,
+                    "error": err
+                }),
+            };
+            Some(
+                serde_json::json!({ "content": [{ "type": "text", "text": result_json.to_string() }] }),
+            )
+        }
+
         "safe_write" => {
             let content = arguments
                 .and_then(|a| a.get("content"))
@@ -1921,6 +2001,78 @@ fn governance_seed_diff(
     })
 }
 
+fn quality_reports_dir(root: &std::path::Path) -> PathBuf {
+    root.join(".sentinel").join("quality")
+}
+
+fn list_quality_reports(root: &std::path::Path, limit: usize) -> Vec<serde_json::Value> {
+    let dir = quality_reports_dir(root);
+    let mut paths: Vec<PathBuf> = match std::fs::read_dir(&dir) {
+        Ok(entries) => entries
+            .filter_map(std::result::Result::ok)
+            .map(|entry| entry.path())
+            .filter(|path| {
+                path.file_name()
+                    .and_then(|name| name.to_str())
+                    .map(|name| name.starts_with("harness-") && name.ends_with(".json"))
+                    .unwrap_or(false)
+            })
+            .collect(),
+        Err(_) => return Vec::new(),
+    };
+    paths.sort_by(|a, b| b.cmp(a));
+    paths
+        .into_iter()
+        .take(limit)
+        .filter_map(|path| {
+            let content = std::fs::read_to_string(&path).ok()?;
+            let mut payload: serde_json::Value = serde_json::from_str(&content).ok()?;
+            payload["path"] = serde_json::json!(path.display().to_string());
+            Some(payload)
+        })
+        .collect()
+}
+
+fn latest_quality_report(root: &std::path::Path) -> Option<serde_json::Value> {
+    list_quality_reports(root, 1).into_iter().next()
+}
+
+fn run_quality_harness(root: &std::path::Path) -> Result<serde_json::Value, String> {
+    let script = root.join("scripts").join("world_class_harness.sh");
+    if !script.exists() {
+        return Err(format!(
+            "Harness script not found at '{}'",
+            script.display()
+        ));
+    }
+
+    let output = Command::new("bash")
+        .arg(&script)
+        .current_dir(root)
+        .output()
+        .map_err(|e| format!("Failed to run harness: {}", e))?;
+
+    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+    let latest = latest_quality_report(root);
+    let ok = output.status.success();
+    Ok(serde_json::json!({
+        "ok": ok,
+        "status_code": output.status.code(),
+        "stdout_tail": tail_lines(&stdout, 20),
+        "stderr_tail": tail_lines(&stderr, 20),
+        "latest": latest,
+    }))
+}
+
+fn tail_lines(text: &str, max_lines: usize) -> String {
+    let lines: Vec<&str> = text.lines().collect();
+    if lines.len() <= max_lines {
+        return text.to_string();
+    }
+    lines[lines.len().saturating_sub(max_lines)..].join("\n")
+}
+
 fn world_model_snapshot(
     manifold: &GoalManifold,
     observed: Option<&sentinel_agent_native::GovernanceObservation>,
@@ -1975,6 +2127,7 @@ fn btree_set<T: Clone + Ord>(values: &[T]) -> std::collections::BTreeSet<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::time::{SystemTime, UNIX_EPOCH};
 
     #[test]
     fn stream_chunks_preserves_content() {
@@ -2011,5 +2164,49 @@ mod tests {
         let hits = top_memory_context(&store, "auth token middleware", 1);
         assert_eq!(hits.len(), 1);
         assert_eq!(hits[0].id, "a");
+    }
+
+    #[test]
+    fn list_quality_reports_returns_latest_first() {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("clock should be monotonic")
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!("sentinel_quality_test_{}", unique));
+        let dir = root.join(".sentinel").join("quality");
+        std::fs::create_dir_all(&dir).expect("should create quality dir");
+
+        let older = dir.join("harness-20250101T000000Z.json");
+        let newer = dir.join("harness-20250102T000000Z.json");
+        std::fs::write(
+            &older,
+            r#"{"run_id":"20250101T000000Z","overall_ok":true,"kpi":{"total_tests":10}}"#,
+        )
+        .expect("should write old report");
+        std::fs::write(
+            &newer,
+            r#"{"run_id":"20250102T000000Z","overall_ok":false,"kpi":{"total_tests":12}}"#,
+        )
+        .expect("should write new report");
+
+        let reports = list_quality_reports(&root, 10);
+        assert_eq!(reports.len(), 2);
+        assert_eq!(
+            reports[0].get("run_id").and_then(|v| v.as_str()),
+            Some("20250102T000000Z")
+        );
+        assert_eq!(
+            reports[1].get("run_id").and_then(|v| v.as_str()),
+            Some("20250101T000000Z")
+        );
+
+        std::fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn tail_lines_limits_output() {
+        let text = "a\nb\nc\nd";
+        assert_eq!(tail_lines(text, 2), "c\nd");
+        assert_eq!(tail_lines(text, 10), text);
     }
 }

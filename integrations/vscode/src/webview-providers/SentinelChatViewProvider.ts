@@ -259,6 +259,9 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
       case "governanceSeed":
         await this.handleGovernanceSeed(Boolean(msg.apply), msg.lockRequired !== false);
         break;
+      case "runQualityHarness":
+        await this.handleRunQualityHarness();
+        break;
 
       case "webviewReady":
         if (this.client.connected) {
@@ -620,6 +623,7 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
     const hasReliability = supportedTools.has("get_reliability");
     const hasGovernance = supportedTools.has("governance_status");
     const hasWorldModel = supportedTools.has("get_world_model");
+    const hasQualityStatus = supportedTools.has("get_quality_status");
     if (!this.warnedMissingRuntimeTools && (!hasReliability || !hasGovernance)) {
       this.warnedMissingRuntimeTools = true;
       const missing = [
@@ -678,6 +682,20 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
       }
     } catch (err: any) {
       this.outputChannel.appendLine(`Failed to refresh governance: ${err.message}`);
+    }
+
+    try {
+      if (hasQualityStatus) {
+        const quality = (await this.client.callTool("get_quality_status", {})) as any;
+        if (quality && !quality.error) {
+          this.postMessage({
+            type: "qualityUpdate",
+            quality,
+          });
+        }
+      }
+    } catch (err: any) {
+      this.outputChannel.appendLine(`Failed to refresh quality status: ${err.message}`);
     }
   }
 
@@ -869,6 +887,51 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
         ok: false,
         message: err.message,
       });
+    }
+  }
+
+  private async handleRunQualityHarness(): Promise<void> {
+    if (!this.client.connected) return;
+    if (!(await this.client.supportsTool("run_quality_harness"))) {
+      this.postMessage({
+        type: "policyActionResult",
+        kind: "run_quality_harness",
+        ok: false,
+        message: "Tool run_quality_harness non disponibile nel backend corrente.",
+      });
+      return;
+    }
+    try {
+      this.emitTimeline("tool", "Quality harness", "run_quality_harness", undefined);
+      const result = (await this.callToolTracked("run_quality_harness", {}, undefined)) as any;
+      const ok = result?.ok === true;
+      this.postMessage({
+        type: "policyActionResult",
+        kind: "run_quality_harness",
+        ok,
+        message: ok
+          ? "World-class quality harness completed."
+          : `Quality harness failed: ${result?.error ?? "unknown error"}`,
+      });
+      this.postMessage({
+        type: "qualityUpdate",
+        quality: result?.latest
+          ? { ok: true, latest: result.latest }
+          : {
+              ok: ok,
+              latest: null,
+              message: "Harness completed but no latest report was parsed.",
+            },
+      });
+      await this.refreshRuntimePolicySnapshot();
+    } catch (err: any) {
+      this.postMessage({
+        type: "policyActionResult",
+        kind: "run_quality_harness",
+        ok: false,
+        message: err.message,
+      });
+      this.emitTimeline("error", "Quality harness failed", err.message, undefined);
     }
   }
 }

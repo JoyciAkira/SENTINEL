@@ -127,6 +127,23 @@ export interface AugmentSettingsState {
     enforceByo: boolean;
 }
 
+export interface QualityStatusState {
+    ok: boolean;
+    latest: {
+        run_id?: string;
+        duration_sec?: number;
+        overall_ok?: boolean;
+        kpi?: {
+            total_tests?: number;
+            passed?: number;
+            failed?: number;
+            pass_rate?: number;
+        };
+        path?: string;
+    } | null;
+    message?: string;
+}
+
 export interface AppState {
     connected: boolean;
     messages: ChatMessage[];
@@ -140,6 +157,7 @@ export interface AppState {
     goals: GoalNodeState[];
     runtimeCapabilities: RuntimeCapabilitiesState | null;
     augmentSettings: AugmentSettingsState;
+    qualityStatus: QualityStatusState | null;
     goalsCollapsed: boolean;
     inputText: string;
 
@@ -165,6 +183,7 @@ export interface AppState {
     setGoals: (goals: GoalNodeState[]) => void;
     setRuntimeCapabilities: (capabilities: RuntimeCapabilitiesState) => void;
     setAugmentSettings: (settings: AugmentSettingsState) => void;
+    setQualityStatus: (quality: QualityStatusState) => void;
     toggleGoalsCollapsed: () => void;
     setInputText: (text: string) => void;
     clearMessages: () => void;

@@ -82,6 +82,7 @@ export default function App() {
   const clearTimeline = useStore((s) => s.clearTimeline);
   const runtimeCapabilities = useStore((s) => s.runtimeCapabilities);
   const augmentSettings = useStore((s) => s.augmentSettings);
+  const qualityStatus = useStore((s) => s.qualityStatus);
 
   const [activePage, setActivePage] = useState<PageId>("chat");
   const [selectedGoal, setSelectedGoal] = useState<Goal | null>(null);
@@ -939,6 +940,47 @@ export default function App() {
                         </ul>
                       ) : (
                         <p className="sentinel-empty">No reliability violations.</p>
+                      )}
+                    </section>
+
+                    <section className="sentinel-policy-card">
+                      <header>
+                        <h3>Quality Harness</h3>
+                        <Button
+                          size="xs"
+                          variant="outline"
+                          onClick={() => vscodeApi.postMessage({ type: "runQualityHarness" })}
+                        >
+                          Run
+                        </Button>
+                      </header>
+                      <p>
+                        Last run: <strong>{qualityStatus?.latest?.run_id ?? "never"}</strong>
+                      </p>
+                      <p>
+                        Overall:{" "}
+                        <strong>
+                          {qualityStatus?.latest?.overall_ok === true
+                            ? "PASS"
+                            : qualityStatus?.latest?.overall_ok === false
+                              ? "FAIL"
+                              : "n/a"}
+                        </strong>{" "}
+                        | Duration: <strong>{qualityStatus?.latest?.duration_sec ?? 0}s</strong>
+                      </p>
+                      <p>
+                        Tests: <strong>{qualityStatus?.latest?.kpi?.total_tests ?? 0}</strong> | Failed:{" "}
+                        <strong>{qualityStatus?.latest?.kpi?.failed ?? 0}</strong> | Pass rate:{" "}
+                        <strong>
+                          {typeof qualityStatus?.latest?.kpi?.pass_rate === "number"
+                            ? `${(qualityStatus.latest.kpi.pass_rate * 100).toFixed(1)}%`
+                            : "n/a"}
+                        </strong>
+                      </p>
+                      {qualityStatus?.latest?.path ? (
+                        <p className="sentinel-mono">{qualityStatus.latest.path}</p>
+                      ) : (
+                        <p className="sentinel-empty">{qualityStatus?.message ?? "No quality report available."}</p>
                       )}
                     </section>
                   </div>
