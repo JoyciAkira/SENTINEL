@@ -24,6 +24,7 @@ export function useMCPMessages(vscodeApi: VSCodeAPI): void {
     const clearTimeline = useStore((s) => s.clearTimeline);
     const setGoals = useStore((s) => s.setGoals);
     const setRuntimeCapabilities = useStore((s) => s.setRuntimeCapabilities);
+    const setAugmentSettings = useStore((s) => s.setAugmentSettings);
 
     useEffect(() => {
         const handler = (event: MessageEvent) => {
@@ -126,6 +127,12 @@ export function useMCPMessages(vscodeApi: VSCodeAPI): void {
                     }
                     break;
 
+                case 'augmentSettingsUpdate':
+                    if (msg.settings) {
+                        setAugmentSettings(msg.settings);
+                    }
+                    break;
+
                 case 'reliabilityUpdate':
                     if (msg.reliability && msg.reliability_thresholds && msg.reliability_slo) {
                         setReliability(msg.reliability, msg.reliability_thresholds, msg.reliability_slo);
@@ -164,5 +171,6 @@ export function useMCPMessages(vscodeApi: VSCodeAPI): void {
         clearTimeline,
         setGoals,
         setRuntimeCapabilities,
+        setAugmentSettings,
     ]);
 }

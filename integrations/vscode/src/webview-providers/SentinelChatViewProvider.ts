@@ -4,6 +4,20 @@ import { getWebviewContent } from "./getWebviewContent";
 import type { AlignmentReport } from "../shared/types";
 import { CMD_CODEX_LOGIN } from "../shared/constants";
 
+type AugmentRuntimeMode = "disabled" | "internal_only" | "byo_customer";
+
+export interface AugmentRuntimeSettings {
+  enabled: boolean;
+  mode: AugmentRuntimeMode;
+  enforceByo: boolean;
+}
+
+const DEFAULT_AUGMENT_SETTINGS: AugmentRuntimeSettings = {
+  enabled: false,
+  mode: "disabled",
+  enforceByo: true,
+};
+
 /**
  * WebviewViewProvider for the Sentinel Chat sidebar panel.
  * Implements the Cline-style full sidebar chat experience.
@@ -14,11 +28,16 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
   private view?: vscode.WebviewView;
   private activeStreamId: string | null = null;
   private warnedMissingRuntimeTools = false;
+  private augmentSettings: AugmentRuntimeSettings = DEFAULT_AUGMENT_SETTINGS;
 
   constructor(
     private extensionUri: vscode.Uri,
     private client: MCPClient,
     private outputChannel: vscode.OutputChannel,
+    private context: vscode.ExtensionContext,
+    private onAugmentSettingsChanged: (
+      settings: AugmentRuntimeSettings,
+    ) => Promise<void>,
   ) {}
 
   resolveWebviewView(
@@ -27,6 +46,10 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
     _token: vscode.CancellationToken,
   ): void {
     this.view = webviewView;
+    this.augmentSettings = this.context.globalState.get<AugmentRuntimeSettings>(
+      "sentinel.augmentSettings",
+      DEFAULT_AUGMENT_SETTINGS,
+    );
 
     webviewView.webview.options = {
       enableScripts: true,
@@ -48,6 +71,10 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
     // Notify webview of connection status
     if (this.client.connected) {
       this.postMessage({ type: "connected" });
+      this.postMessage({
+        type: "augmentSettingsUpdate",
+        settings: this.augmentSettings,
+      });
       void this.refreshGoalSnapshot();
       void this.refreshRuntimePolicySnapshot();
       void this.refreshRuntimeCapabilitiesSnapshot();
@@ -56,6 +83,10 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
 
     this.client.on("connected", () => {
       this.postMessage({ type: "connected" });
+      this.postMessage({
+        type: "augmentSettingsUpdate",
+        settings: this.augmentSettings,
+      });
       void this.refreshGoalSnapshot();
       void this.refreshRuntimePolicySnapshot();
       void this.refreshRuntimeCapabilitiesSnapshot();
@@ -212,6 +243,9 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
 
       case "refreshRuntimePolicies":
         await this.refreshRuntimePolicySnapshot();
+        break;
+      case "setAugmentSettings":
+        await this.handleSetAugmentSettings(msg.settings);
         break;
 
       case "governanceApprove":
@@ -397,7 +431,7 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
 
       let content = "No response from Sentinel.";
       let thoughtChain: string[] | undefined = undefined;
-      let explainability: unknown = undefined;
+      let explainability: Record<string, unknown> | undefined = undefined;
       let streamChunks: string[] = [];
 
       if (result && typeof result === "object") {
@@ -410,9 +444,26 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
         if (Array.isArray(structured.thought_chain)) {
           thoughtChain = structured.thought_chain.map((v) => String(v));
         }
-        if (structured.explainability) {
-          explainability = structured.explainability;
+        if (structured.explainability && typeof structured.explainability === "object") {
+          explainability = { ...(structured.explainability as Record<string, unknown>) };
         }
+        const contextProvider =
+          typeof structured.context_provider === "string"
+            ? structured.context_provider
+            : this.augmentSettings.enabled
+              ? "free_stack_primary (augment_secondary)"
+              : "free_stack_primary";
+        explainability = {
+          ...(explainability ?? {}),
+          context_provider: contextProvider,
+          context_policy_mode: this.augmentSettings.enabled
+            ? this.augmentSettings.mode
+            : "disabled",
+          context_fallback_reason:
+            typeof structured.context_fallback_reason === "string"
+              ? structured.context_fallback_reason
+              : null,
+        };
         if (Array.isArray(structured.stream_chunks)) {
           streamChunks = structured.stream_chunks.map((v) => String(v));
         }
@@ -614,6 +665,42 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
       }
     } catch (err: any) {
       this.outputChannel.appendLine(`Failed to refresh governance: ${err.message}`);
+    }
+  }
+
+  private async handleSetAugmentSettings(
+    raw: Partial<AugmentRuntimeSettings>,
+  ): Promise<void> {
+    const next: AugmentRuntimeSettings = {
+      enabled: Boolean(raw?.enabled),
+      mode:
+        raw?.mode === "internal_only" || raw?.mode === "byo_customer"
+          ? raw.mode
+          : "disabled",
+      enforceByo: raw?.enforceByo !== false,
+    };
+
+    this.augmentSettings = next;
+    await this.context.globalState.update("sentinel.augmentSettings", next);
+    this.postMessage({ type: "augmentSettingsUpdate", settings: next });
+
+    try {
+      await this.onAugmentSettingsChanged(next);
+      this.postMessage({
+        type: "policyActionResult",
+        kind: "augment_settings",
+        ok: true,
+        message: `Augment MCP settings applied (${next.enabled ? next.mode : "disabled"}).`,
+      });
+      await this.refreshRuntimePolicySnapshot();
+      await this.refreshRuntimeCapabilitiesSnapshot();
+    } catch (err: any) {
+      this.postMessage({
+        type: "policyActionResult",
+        kind: "augment_settings",
+        ok: false,
+        message: err?.message ?? "Failed to apply Augment MCP settings.",
+      });
     }
   }
 

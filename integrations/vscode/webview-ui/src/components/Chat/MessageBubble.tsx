@@ -102,6 +102,24 @@ export default function MessageBubble({
                   {message.explainability.reliability_healthy ? "Healthy" : "Violated"}
                 </div>
               )}
+              {message.explainability.context_provider && (
+                <div>
+                  <span className="text-muted-foreground">Context provider:</span>{" "}
+                  {message.explainability.context_provider}
+                </div>
+              )}
+              {message.explainability.context_policy_mode && (
+                <div>
+                  <span className="text-muted-foreground">Policy mode:</span>{" "}
+                  {message.explainability.context_policy_mode}
+                </div>
+              )}
+              {message.explainability.context_fallback_reason && (
+                <div>
+                  <span className="text-muted-foreground">Fallback:</span>{" "}
+                  {message.explainability.context_fallback_reason}
+                </div>
+              )}
               {message.explainability.evidence?.length ? (
                 <div className="text-muted-foreground">
                   Evidence: {message.explainability.evidence.join(" | ")}

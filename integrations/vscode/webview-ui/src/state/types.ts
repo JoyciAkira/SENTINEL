@@ -9,6 +9,9 @@ export interface ChatMessage {
         alignment_score?: number | null;
         reliability_healthy?: boolean | null;
         governance_pending_proposal?: string | null;
+        context_provider?: string | null;
+        context_policy_mode?: string | null;
+        context_fallback_reason?: string | null;
     };
     timestamp: number;
     toolCalls?: ToolCallInfo[];
@@ -108,6 +111,12 @@ export interface RuntimeCapabilitiesState {
     connected: boolean;
 }
 
+export interface AugmentSettingsState {
+    enabled: boolean;
+    mode: "disabled" | "internal_only" | "byo_customer";
+    enforceByo: boolean;
+}
+
 export interface AppState {
     connected: boolean;
     messages: ChatMessage[];
@@ -120,6 +129,7 @@ export interface AppState {
     timeline: TimelineEventState[];
     goals: GoalNodeState[];
     runtimeCapabilities: RuntimeCapabilitiesState | null;
+    augmentSettings: AugmentSettingsState;
     goalsCollapsed: boolean;
     inputText: string;
 
@@ -144,6 +154,7 @@ export interface AppState {
     clearTimeline: () => void;
     setGoals: (goals: GoalNodeState[]) => void;
     setRuntimeCapabilities: (capabilities: RuntimeCapabilitiesState) => void;
+    setAugmentSettings: (settings: AugmentSettingsState) => void;
     toggleGoalsCollapsed: () => void;
     setInputText: (text: string) => void;
     clearMessages: () => void;

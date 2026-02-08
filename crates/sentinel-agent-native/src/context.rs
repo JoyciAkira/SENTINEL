@@ -57,10 +57,17 @@
 //! └─────────────────────────────────────┘
 //! ```
 
+use crate::context_provider::{
+    AugmentMcpClient, AugmentMcpConfig, AugmentMcpProvider, CodeGraphProvider, ContextProviderKind,
+    ContextProviderPolicy, ContextProviderRouter, ContextRoutingEvent, ContextRoutingStats,
+    NativeMemoryProvider, OssVectorProvider,
+};
 use anyhow::{Context, Result};
 use chrono::Utc;
 use sentinel_core::{
-    memory::{MemoryManifold, MemoryQueryResult, MemorySource},
+    memory::{
+        MemoryItem, MemoryManifold, MemoryOrigin, MemoryQueryResult, MemorySource, MemoryType,
+    },
     Uuid,
 };
 use std::collections::HashMap;
@@ -77,7 +84,7 @@ pub struct Query {
 use tokio::sync::Mutex;
 
 /// Context Manager - Hierarchical memory access with intelligent retrieval
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct ContextManager {
     /// Access to memory manifold (Layer 4)
     pub memory_manifold: Arc<Mutex<MemoryManifold>>,
@@ -87,6 +94,10 @@ pub struct ContextManager {
 
     /// Statistics
     pub stats: ContextStats,
+
+    /// Context provider router (commercial-safe policy enforcement + fallback).
+    pub provider_router: ContextProviderRouter,
+    pub augment_client: AugmentMcpClient,
 }
 
 /// Cached context result
@@ -107,6 +118,10 @@ pub struct ContextStats {
     pub cache_hits: u64,
     pub avg_retrieval_time_ms: f64,
     pub context_size_tokens: u64,
+    pub routing_policy_denials: u64,
+    pub routing_fallbacks: u64,
+    pub last_provider: Option<String>,
+    pub last_fallback_reason: Option<String>,
 }
 
 /// Unified context retrieved from all memory levels
@@ -151,11 +166,15 @@ impl ContextManager {
     /// Create a new context manager
     pub fn new(memory_manifold: Arc<Mutex<MemoryManifold>>) -> Self {
         tracing::info!("Initializing Context Manager");
+        let augment_client = AugmentMcpClient::new(AugmentMcpConfig::from_env());
+        let provider_router = default_context_provider_router(augment_client.is_available());
 
         Self {
             memory_manifold,
             query_cache: HashMap::new(),
             stats: ContextStats::default(),
+            provider_router,
+            augment_client,
         }
     }
 
@@ -175,6 +194,16 @@ impl ContextManager {
         tracing::debug!("Retrieving context for query: {}", query.text);
 
         let start_time = std::time::Instant::now();
+
+        let route_decision = self.provider_router.route();
+        self.stats.last_provider = Some(route_decision.selected.as_str().to_string());
+        self.stats.last_fallback_reason = route_decision.reason.clone();
+        if route_decision.fallback_from.is_some() {
+            self.stats.routing_fallbacks += 1;
+        }
+        if route_decision.denied_provider.is_some() {
+            self.stats.routing_policy_denials += 1;
+        }
 
         // Check cache first
         if let Some(cached) = self.query_cache.get(&query.text) {
@@ -199,22 +228,10 @@ impl ContextManager {
             vec![]
         };
 
-        // Step 3: Query Semantic Memory (knowledge graph)
+        // Step 3: Query semantic providers (native graph + optional Augment MCP)
         let semantic_results = if working_hits < 5 && episodic_results.len() < 15 {
-            let mut manifold = self.memory_manifold.lock().await;
-            let concept_ids = manifold.semantic.query(&query.text, limit);
-            // Convert concept IDs to memories
-            let mut results = Vec::new();
-            for id in concept_ids {
-                if let Some(item) = manifold.episodic.get(&id) {
-                    results.push(MemoryQueryResult {
-                        item: item.clone(),
-                        score: 0.5, // Heuristic for now
-                        source: MemorySource::Semantic,
-                    });
-                }
-            }
-            results
+            self.query_semantic_sources(query, limit, route_decision.selected)
+                .await?
         } else {
             vec![]
         };
@@ -264,6 +281,90 @@ impl ContextManager {
         self.cache_query(query.clone(), &unified_context);
 
         Ok(unified_context)
+    }
+
+    pub fn set_context_provider_policy(&mut self, policy: ContextProviderPolicy) {
+        self.provider_router.set_policy(policy);
+    }
+
+    pub fn set_augment_mcp_config(&mut self, config: AugmentMcpConfig) {
+        let client = AugmentMcpClient::new(config);
+        self.provider_router = default_context_provider_router(client.is_available());
+        self.augment_client = client;
+    }
+
+    pub fn context_provider_policy(&self) -> &ContextProviderPolicy {
+        self.provider_router.policy()
+    }
+
+    pub fn context_routing_stats(&self) -> ContextRoutingStats {
+        self.provider_router.stats()
+    }
+
+    pub fn context_routing_events(&self) -> &[ContextRoutingEvent] {
+        self.provider_router.events()
+    }
+
+    async fn query_semantic_sources(
+        &mut self,
+        query: &Query,
+        limit: usize,
+        selected_provider: ContextProviderKind,
+    ) -> Result<Vec<MemoryQueryResult>> {
+        if selected_provider == ContextProviderKind::AugmentMcp
+            && self.augment_client.is_available()
+        {
+            let workspace = std::env::current_dir().context("Failed to resolve workspace path")?;
+            match self
+                .augment_client
+                .retrieve(&query.text, &workspace, limit.min(8))
+                .await
+            {
+                Ok(chunks) => {
+                    let mut external = Vec::new();
+                    for chunk in chunks {
+                        let memory = MemoryItem::builder()
+                            .content(chunk.text)
+                            .memory_type(MemoryType::Observation)
+                            .confidence(chunk.score.clamp(0.0, 1.0))
+                            .origin(MemoryOrigin::ExternalSync)
+                            .tag("augment_mcp".to_string())
+                            .build()
+                            .map_err(anyhow::Error::msg)?;
+                        external.push(MemoryQueryResult {
+                            item: memory,
+                            score: chunk.score,
+                            source: MemorySource::Semantic,
+                        });
+                    }
+                    if !external.is_empty() {
+                        return Ok(external);
+                    }
+                }
+                Err(err) => {
+                    tracing::warn!(
+                        "augment_mcp retrieval failed, switching to native semantic memory: {}",
+                        err
+                    );
+                    self.stats.routing_fallbacks += 1;
+                    self.stats.last_fallback_reason = Some("augment_runtime_failure".to_string());
+                }
+            }
+        }
+
+        let mut manifold = self.memory_manifold.lock().await;
+        let concept_ids = manifold.semantic.query(&query.text, limit);
+        let mut results = Vec::new();
+        for id in concept_ids {
+            if let Some(item) = manifold.episodic.get(&id) {
+                results.push(MemoryQueryResult {
+                    item: item.clone(),
+                    score: 0.5,
+                    source: MemorySource::Semantic,
+                });
+            }
+        }
+        Ok(results)
     }
 
     /// Query working memory (instant, 10-item LRU cache)
@@ -681,9 +782,26 @@ impl ContextManager {
     }
 }
 
+fn default_context_provider_router(augment_available: bool) -> ContextProviderRouter {
+    let mut router = ContextProviderRouter::new();
+    if augment_available {
+        router.register_provider(Box::new(AugmentMcpProvider::healthy()));
+    } else {
+        router.register_provider(Box::new(AugmentMcpProvider::unavailable()));
+    }
+    router.register_provider(Box::new(OssVectorProvider));
+    router.register_provider(Box::new(CodeGraphProvider));
+    router.register_provider(Box::new(NativeMemoryProvider));
+    router
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::context_provider::{
+        ContextComplianceMode, ContextProviderKind, ContextProviderPolicy, CredentialOrigin,
+        TenantMode,
+    };
     use sentinel_core::memory::{MemoryItem, MemoryType};
 
     #[test]
@@ -749,5 +867,41 @@ mod tests {
 
         // "Test description 1" = ~20 chars = ~4 tokens
         assert_eq!(count, 4);
+    }
+
+    #[tokio::test]
+    async fn test_routing_policy_denial_is_tracked() {
+        let memory_manifold = Arc::new(Mutex::new(sentinel_core::memory::MemoryManifold::new()));
+        let mut context_manager = ContextManager::new(memory_manifold);
+        context_manager.provider_router.set_priority(vec![
+            ContextProviderKind::AugmentMcp,
+            ContextProviderKind::NativeMemory,
+        ]);
+        context_manager.set_context_provider_policy(ContextProviderPolicy {
+            augment_mode: ContextComplianceMode::ByoCustomer,
+            tenant_mode: TenantMode::MultiTenantHosted,
+            credential_origin: CredentialOrigin::UserProvided,
+            allow_augment_in_multitenant: false,
+            require_customer_credentials: true,
+        });
+
+        let query = Query {
+            text: "test context routing".to_string(),
+            goal_id: None,
+            tags: vec![],
+        };
+
+        let _ = context_manager.retrieve_context(&query, 5).await.unwrap();
+
+        assert_eq!(context_manager.stats.routing_policy_denials, 1);
+        assert_eq!(
+            context_manager.stats.last_provider.as_deref(),
+            Some("native_memory")
+        );
+        assert_eq!(
+            context_manager.stats.last_fallback_reason.as_deref(),
+            Some("augment_blocked_multi_tenant")
+        );
+        assert!(!context_manager.context_routing_events().is_empty());
     }
 }

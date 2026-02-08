@@ -38,6 +38,7 @@
 pub mod codegen;
 pub mod consensus;
 pub mod context;
+pub mod context_provider;
 pub mod gateway;
 pub mod llm_integration;
 pub mod openrouter;

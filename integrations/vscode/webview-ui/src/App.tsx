@@ -81,6 +81,7 @@ export default function App() {
   const timeline = useStore((s) => s.timeline);
   const clearTimeline = useStore((s) => s.clearTimeline);
   const runtimeCapabilities = useStore((s) => s.runtimeCapabilities);
+  const augmentSettings = useStore((s) => s.augmentSettings);
 
   const [activePage, setActivePage] = useState<PageId>("chat");
   const [selectedGoal, setSelectedGoal] = useState<Goal | null>(null);
@@ -211,6 +212,13 @@ export default function App() {
 
   const requestRuntimeRefresh = () => {
     vscodeApi.postMessage({ type: "refreshRuntimePolicies" });
+  };
+
+  const applyAugmentSettings = (next: typeof augmentSettings) => {
+    vscodeApi.postMessage({
+      type: "setAugmentSettings",
+      settings: next,
+    });
   };
 
   const currentTimelineEvent =
@@ -748,6 +756,60 @@ export default function App() {
                           onChange={(event) => setCompactDensity(event.target.checked)}
                         />
                         <span>Compact message density for power users</span>
+                      </label>
+                    </section>
+
+                    <section className="sentinel-policy-card">
+                      <header>
+                        <h3>Context Engine (Augment MCP)</h3>
+                        <Badge variant={augmentSettings.enabled ? "outline" : "secondary"}>
+                          {augmentSettings.enabled ? "Enabled" : "Disabled"}
+                        </Badge>
+                      </header>
+                      <p>
+                        Primary stack is free/local (Qdrant + filesystem/git/memory). Augment stays secondary (BYO-safe fallback).
+                      </p>
+                      <label className="sentinel-toggle">
+                        <input
+                          type="checkbox"
+                          checked={augmentSettings.enabled}
+                          onChange={(event) =>
+                            applyAugmentSettings({
+                              ...augmentSettings,
+                              enabled: event.target.checked,
+                            })
+                          }
+                        />
+                        <span>Enable Augment MCP context retrieval</span>
+                      </label>
+                      <div className="sentinel-inline-actions">
+                        <select
+                          className="sentinel-select"
+                          value={augmentSettings.mode}
+                          onChange={(event) =>
+                            applyAugmentSettings({
+                              ...augmentSettings,
+                              mode: event.target.value as typeof augmentSettings.mode,
+                            })
+                          }
+                        >
+                          <option value="disabled">Disabled</option>
+                          <option value="internal_only">Internal only</option>
+                          <option value="byo_customer">BYO customer</option>
+                        </select>
+                      </div>
+                      <label className="sentinel-toggle">
+                        <input
+                          type="checkbox"
+                          checked={augmentSettings.enforceByo}
+                          onChange={(event) =>
+                            applyAugmentSettings({
+                              ...augmentSettings,
+                              enforceByo: event.target.checked,
+                            })
+                          }
+                        />
+                        <span>Require BYO credentials (block platform-managed shared keys)</span>
                       </label>
                     </section>
                   </div>

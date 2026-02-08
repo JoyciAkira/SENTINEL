@@ -10,7 +10,10 @@ import {
 import { MCPClient } from "./mcp/client";
 import { SentinelStatusBar } from "./providers/statusBar";
 import { SentinelCodeLensProvider } from "./providers/codeLensProvider";
-import { SentinelChatViewProvider } from "./webview-providers/SentinelChatViewProvider";
+import {
+  AugmentRuntimeSettings,
+  SentinelChatViewProvider,
+} from "./webview-providers/SentinelChatViewProvider";
 import { sentinelService } from "./services/SentinelService";
 import {
   CONFIG_SENTINEL_PATH,
@@ -109,11 +112,28 @@ export function activate(context: vscode.ExtensionContext) {
       "sentinel.useOpenAIAuth",
       false,
     );
-    if (!useOpenAIAuth) return {};
-    return {
-      SENTINEL_OPENAI_AUTH: "true",
-      SENTINEL_LLM_PROVIDER: "openai_auth",
-    } as NodeJS.ProcessEnv;
+    const augment = context.globalState.get<AugmentRuntimeSettings>(
+      "sentinel.augmentSettings",
+      { enabled: false, mode: "disabled", enforceByo: true },
+    );
+    const env: NodeJS.ProcessEnv = {};
+    if (useOpenAIAuth) {
+      env.SENTINEL_OPENAI_AUTH = "true";
+      env.SENTINEL_LLM_PROVIDER = "openai_auth";
+    }
+    env.SENTINEL_AUGMENT_ENABLED = augment.enabled ? "true" : "false";
+    env.SENTINEL_AUGMENT_MODE = augment.mode;
+    env.SENTINEL_AUGMENT_ENFORCE_BYO = augment.enforceByo ? "true" : "false";
+    env.SENTINEL_CONTEXT_PROVIDER_PRIORITY =
+      "qdrant_mcp,filesystem_mcp,git_mcp,memory_mcp,augment_mcp";
+    return env;
+  };
+
+  const applyMcpEnvAndReconnect = async () => {
+    const env = buildMcpEnv();
+    mcpClient?.setEnvOverrides(env);
+    mcpClient?.disconnect();
+    await mcpClient?.start();
   };
 
   // ── 1. MCP Client ────────────────────────────────────────
@@ -176,6 +196,10 @@ export function activate(context: vscode.ExtensionContext) {
     context.extensionUri,
     mcpClient,
     outputChannel,
+    context,
+    async () => {
+      await applyMcpEnvAndReconnect();
+    },
   );
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(
@@ -239,10 +263,7 @@ export function activate(context: vscode.ExtensionContext) {
 
             await login();
             await context.globalState.update("sentinel.useOpenAIAuth", true);
-            const env = buildMcpEnv();
-            mcpClient?.setEnvOverrides(env);
-            mcpClient?.disconnect();
-            await mcpClient?.start();
+            await applyMcpEnvAndReconnect();
             vscode.window.showInformationMessage(
               "ChatGPT sign-in complete. Sentinel now uses OpenAI OAuth via Codex.",
             );
