@@ -130,9 +130,19 @@ export default function AppSpecPreview({ appSpec }: { appSpec: AppSpecPayload })
       </ScrollArea>
 
       <footer className="sentinel-preview__footer">
-        <span>Source: {appSpec.meta.source}</span>
+        <span>
+          Source: {appSpec.meta.source}
+          {appSpec.meta.validation ? ` • ${appSpec.meta.validation.status}` : ""}
+        </span>
         <span>Confidence: {(appSpec.meta.confidence * 100).toFixed(0)}%</span>
       </footer>
+      {appSpec.meta.validation?.issues?.length ? (
+        <div className="sentinel-preview__issues">
+          {appSpec.meta.validation.issues.slice(0, 3).map((issue) => (
+            <p key={issue}>{issue}</p>
+          ))}
+        </div>
+      ) : null}
     </section>
   );
 }

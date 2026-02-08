@@ -94,10 +94,14 @@ interface AppSpecPayload {
     description: string;
   }>;
   meta: {
-    source: "heuristic_v1";
+    source: "heuristic_v1" | "assistant_payload";
     confidence: number;
     generated_at: string;
     prompt_excerpt?: string;
+    validation?: {
+      status: "strict" | "fallback";
+      issues?: string[];
+    };
   };
 }
 
@@ -115,6 +119,7 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
   private warnedMissingRuntimeTools = false;
   private augmentSettings: AugmentRuntimeSettings = DEFAULT_AUGMENT_SETTINGS;
   private pendingWritePlans: Map<string, PendingWritePlanEntry[]> = new Map();
+  private lastAppSpecDraft: AppSpecPayload | null = null;
 
   constructor(
     private extensionUri: vscode.Uri,
@@ -689,8 +694,292 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
         confidence,
         generated_at: new Date().toISOString(),
         prompt_excerpt: this.clip(intentText.trim(), 140),
+        validation: {
+          status: "fallback",
+        },
       },
     };
+  }
+
+  private isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === "object" && value !== null && !Array.isArray(value);
+  }
+
+  private safeJsonParse(raw: string): unknown | null {
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  }
+
+  private normalizeFieldType(raw: unknown): AppSpecFieldType {
+    if (raw === "string" || raw === "number" || raw === "boolean" || raw === "date" || raw === "enum") {
+      return raw;
+    }
+    return "string";
+  }
+
+  private extractAppSpecCodeBlock(content: string): string | null {
+    const appspecBlock = content.match(/```appspec\s*([\s\S]*?)```/i);
+    if (appspecBlock?.[1]) {
+      return appspecBlock[1].trim();
+    }
+
+    const jsonBlocks = Array.from(content.matchAll(/```json\s*([\s\S]*?)```/gi));
+    for (const block of jsonBlocks) {
+      const text = String(block[1] ?? "").trim();
+      if (!text) continue;
+      if (/"dataModel"\s*:/.test(text) && /"views"\s*:/.test(text) && /"actions"\s*:/.test(text)) {
+        return text;
+      }
+    }
+
+    return null;
+  }
+
+  private stripAppSpecCodeBlocks(content: string): string {
+    const stripped = content
+      .replace(/```appspec[\s\S]*?```/gi, "")
+      .replace(/```json[\s\S]*?```/gi, (block) => {
+        if (/"dataModel"\s*:/.test(block) && /"views"\s*:/.test(block) && /"actions"\s*:/.test(block)) {
+          return "";
+        }
+        return block;
+      })
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
+
+    return stripped.length > 0 ? stripped : content;
+  }
+
+  private sanitizeAssistantAppSpec(
+    candidate: unknown,
+    intentText: string,
+    answerContent: string,
+  ): AppSpecPayload | null {
+    if (!this.isRecord(candidate)) return null;
+
+    const issues: string[] = [];
+    const appRaw = this.isRecord(candidate.app) ? candidate.app : null;
+    if (!appRaw) return null;
+
+    const appName = typeof appRaw.name === "string"
+      ? this.clip(appRaw.name.trim(), 64)
+      : this.inferAppName(intentText);
+    if (appName.length === 0) return null;
+
+    const appSummary = typeof appRaw.summary === "string"
+      ? this.clip(appRaw.summary.trim(), 180)
+      : this.clip(`Assistant payload for ${appName}.`, 180);
+
+    const dataModelRaw = this.isRecord(candidate.dataModel) ? candidate.dataModel : null;
+    const rawEntities = Array.isArray(dataModelRaw?.entities) ? dataModelRaw.entities : [];
+    if (rawEntities.length === 0) return null;
+
+    const entities: AppSpecPayload["dataModel"]["entities"] = rawEntities
+      .map((entry, idx) => {
+        if (!this.isRecord(entry)) return null;
+        const name = typeof entry.name === "string"
+          ? this.toSlug(entry.name, `entity_${idx + 1}`)
+          : `entity_${idx + 1}`;
+        const rawFields = Array.isArray(entry.fields) ? entry.fields : [];
+        const fields = rawFields
+          .map((field, fieldIdx) => {
+            if (!this.isRecord(field)) return null;
+            const fieldName = typeof field.name === "string"
+              ? this.toSlug(field.name, `field_${fieldIdx + 1}`)
+              : `field_${fieldIdx + 1}`;
+            const fieldType = this.normalizeFieldType(field.type);
+            const required = typeof field.required === "boolean" ? field.required : true;
+            return {
+              name: fieldName,
+              type: fieldType,
+              required,
+            };
+          })
+          .filter((field): field is { name: string; type: AppSpecFieldType; required: boolean } => Boolean(field));
+
+        if (fields.length === 0) {
+          issues.push(`Entity ${name} had no valid fields; injected default field.`);
+          fields.push({ name: "id", type: "string", required: true });
+        }
+
+        return { name, fields };
+      })
+      .filter((entity): entity is { name: string; fields: Array<{ name: string; type: AppSpecFieldType; required: boolean }> } => Boolean(entity));
+
+    if (entities.length === 0) return null;
+    const primaryEntity = entities[0].name;
+
+    const viewsRaw = Array.isArray(candidate.views) ? candidate.views : [];
+    const views: AppSpecPayload["views"] = viewsRaw
+      .map((entry, idx) => {
+        if (!this.isRecord(entry)) return null;
+        const id = typeof entry.id === "string" ? this.toSlug(entry.id, `view_${idx + 1}`) : `view_${idx + 1}`;
+        const rawType = typeof entry.type === "string" ? entry.type : "list";
+        const type = rawType === "dashboard" || rawType === "list" || rawType === "detail" || rawType === "form"
+          ? rawType
+          : "list";
+        const title = typeof entry.title === "string"
+          ? this.clip(entry.title.trim(), 80)
+          : this.toTitleCase(`${type} ${primaryEntity}`);
+        const entity = typeof entry.entity === "string" ? this.toSlug(entry.entity, primaryEntity) : undefined;
+        return { id, type, title, entity };
+      })
+      .filter((view): view is { id: string; type: "dashboard" | "list" | "detail" | "form"; title: string; entity?: string } => Boolean(view));
+
+    if (views.length === 0) {
+      issues.push("Views missing; injected default list/form views.");
+      views.push(
+        { id: `${primaryEntity}_list`, type: "list", title: `${this.toTitleCase(primaryEntity)} List`, entity: primaryEntity },
+        { id: `${primaryEntity}_form`, type: "form", title: `${this.toTitleCase(primaryEntity)} Form`, entity: primaryEntity },
+      );
+    }
+
+    const actionsRaw = Array.isArray(candidate.actions) ? candidate.actions : [];
+    const actions: AppSpecPayload["actions"] = actionsRaw
+      .map((entry, idx) => {
+        if (!this.isRecord(entry)) return null;
+        const id = typeof entry.id === "string" ? this.toSlug(entry.id, `action_${idx + 1}`) : `action_${idx + 1}`;
+        const rawType = typeof entry.type === "string" ? entry.type : "custom";
+        const type = rawType === "create" || rawType === "update" || rawType === "delete" || rawType === "read" || rawType === "custom"
+          ? rawType
+          : "custom";
+        const title = typeof entry.title === "string"
+          ? this.clip(entry.title.trim(), 80)
+          : this.toTitleCase(`${type} ${primaryEntity}`);
+        const entity = typeof entry.entity === "string" ? this.toSlug(entry.entity, primaryEntity) : primaryEntity;
+        const requiresApproval = typeof entry.requiresApproval === "boolean" ? entry.requiresApproval : type !== "read";
+        return { id, type, title, entity, requiresApproval };
+      })
+      .filter((action): action is { id: string; type: "create" | "update" | "delete" | "read" | "custom"; title: string; entity?: string; requiresApproval?: boolean } => Boolean(action));
+
+    if (actions.length === 0) {
+      issues.push("Actions missing; injected CRUD defaults.");
+      actions.push(
+        { id: `create_${primaryEntity}`, type: "create", title: `Create ${primaryEntity}`, entity: primaryEntity, requiresApproval: true },
+        { id: `update_${primaryEntity}`, type: "update", title: `Update ${primaryEntity}`, entity: primaryEntity, requiresApproval: true },
+        { id: `delete_${primaryEntity}`, type: "delete", title: `Delete ${primaryEntity}`, entity: primaryEntity, requiresApproval: true },
+        { id: `read_${primaryEntity}`, type: "read", title: `Read ${primaryEntity}`, entity: primaryEntity, requiresApproval: false },
+      );
+    }
+
+    const policiesRaw = Array.isArray(candidate.policies) ? candidate.policies : [];
+    const policies: AppSpecPayload["policies"] = policiesRaw
+      .map((entry, idx) => {
+        if (!this.isRecord(entry)) return null;
+        const id = typeof entry.id === "string" ? this.toSlug(entry.id, `policy_${idx + 1}`) : `policy_${idx + 1}`;
+        const rule = typeof entry.rule === "string" ? this.clip(entry.rule.trim(), 180) : "";
+        if (!rule) return null;
+        const rawLevel = entry.level;
+        const level = rawLevel === "hard" || rawLevel === "soft" ? rawLevel : "soft";
+        return { id, rule, level };
+      })
+      .filter((policy): policy is { id: string; rule: string; level: "hard" | "soft" } => Boolean(policy));
+
+    if (policies.length === 0) {
+      policies.push(
+        { id: "policy_contract", rule: "Public contracts are preserved unless explicit migration is provided.", level: "hard" },
+        { id: "policy_determinism", rule: "Execution remains deterministic and bounded by explicit approvals.", level: "hard" },
+      );
+    }
+
+    const integrationsRaw = Array.isArray(candidate.integrations) ? candidate.integrations : [];
+    const integrations: AppSpecPayload["integrations"] = integrationsRaw
+      .map((entry, idx) => {
+        if (!this.isRecord(entry)) return null;
+        const provider = typeof entry.provider === "string" ? this.clip(entry.provider.trim(), 40) : "";
+        if (!provider) return null;
+        const purpose = typeof entry.purpose === "string" ? this.clip(entry.purpose.trim(), 120) : "Integration";
+        const required = typeof entry.required === "boolean" ? entry.required : false;
+        return {
+          id: typeof entry.id === "string" ? this.toSlug(entry.id, `integration_${idx + 1}`) : this.toSlug(provider, `integration_${idx + 1}`),
+          provider,
+          purpose,
+          required,
+        };
+      })
+      .filter((integration): integration is { id: string; provider: string; purpose: string; required: boolean } => Boolean(integration));
+
+    const testsRaw = Array.isArray(candidate.tests) ? candidate.tests : [];
+    const tests: AppSpecPayload["tests"] = testsRaw
+      .map((entry, idx) => {
+        if (!this.isRecord(entry)) return null;
+        const rawType = typeof entry.type === "string" ? entry.type : "integration";
+        const type = rawType === "unit" || rawType === "integration" || rawType === "e2e" || rawType === "policy"
+          ? rawType
+          : "integration";
+        const description = typeof entry.description === "string" ? this.clip(entry.description.trim(), 160) : "";
+        if (!description) return null;
+        const id = typeof entry.id === "string" ? this.toSlug(entry.id, `test_${idx + 1}`) : `test_${idx + 1}`;
+        return { id, type, description };
+      })
+      .filter((test): test is { id: string; type: "unit" | "integration" | "e2e" | "policy"; description: string } => Boolean(test));
+
+    if (tests.length === 0) {
+      tests.push({ id: "test_guardrail_existing", type: "integration", description: "Existing behavior remains unchanged for current user flows." });
+    }
+
+    const metaRaw = this.isRecord(candidate.meta) ? candidate.meta : null;
+    const confidenceRaw = typeof metaRaw?.confidence === "number" ? metaRaw.confidence : 0.78;
+    const confidence = Math.max(0, Math.min(1, Number(confidenceRaw.toFixed(2))));
+
+    return {
+      version: "1.0",
+      app: {
+        name: appName,
+        summary: appSummary,
+      },
+      dataModel: { entities },
+      views,
+      actions,
+      policies,
+      integrations,
+      tests,
+      meta: {
+        source: "assistant_payload",
+        confidence,
+        generated_at: new Date().toISOString(),
+        prompt_excerpt: this.clip(intentText.trim(), 140),
+        validation: {
+          status: "strict",
+          issues: issues.length > 0 ? issues : undefined,
+        },
+      },
+    };
+  }
+
+  private buildAppSpecRefinePrompt(spec: AppSpecPayload): string {
+    return [
+      "Refine the current AppSpec while preserving contracts and deterministic behavior.",
+      "Return:",
+      "1) Outcome-first sections: What I changed / What needs your approval / What happens next.",
+      "2) A strict JSON block fenced as ```appspec``` with keys:",
+      "   app, dataModel.entities, views, actions, policies, integrations, tests, meta.",
+      "No prose after the appspec block.",
+      "",
+      "Current AppSpec:",
+      "```appspec",
+      JSON.stringify(spec, null, 2),
+      "```",
+    ].join("\n");
+  }
+
+  private buildAppSpecPlanPrompt(spec: AppSpecPayload): string {
+    return [
+      "Generate a minimal, zero-regression implementation plan from this AppSpec.",
+      "Constraints:",
+      "- contract-preserving, deterministic, bounded, reversible",
+      "- minimal blast radius",
+      "- include verification tests and rollback notes",
+      "Return only outcome-first sections and no code.",
+      "",
+      "AppSpec:",
+      "```appspec",
+      JSON.stringify(spec, null, 2),
+      "```",
+    ].join("\n");
   }
 
   private buildChatPlan(content: string): ParsedChatPlan | null {
@@ -1137,13 +1426,41 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
       }
     }
 
+    if (trimmedText === "/appspec-refine") {
+      if (!this.lastAppSpecDraft) {
+        this.postMessage({
+          type: "chatResponse",
+          id: messageId,
+          content: "No AppSpec draft available yet. Send a normal request first to generate one.",
+        });
+        this.emitTimeline("error", "Slash command failed", "No AppSpec draft available", messageId);
+        return;
+      }
+      this.emitTimeline("plan", "Slash command /appspec-refine", "Refining current AppSpec", messageId);
+      effectiveText = this.buildAppSpecRefinePrompt(this.lastAppSpecDraft);
+    }
+
+    if (trimmedText === "/appspec-plan") {
+      if (!this.lastAppSpecDraft) {
+        this.postMessage({
+          type: "chatResponse",
+          id: messageId,
+          content: "No AppSpec draft available yet. Send a normal request first to generate one.",
+        });
+        this.emitTimeline("error", "Slash command failed", "No AppSpec draft available", messageId);
+        return;
+      }
+      this.emitTimeline("plan", "Slash command /appspec-plan", "Generating implementation plan from AppSpec", messageId);
+      effectiveText = this.buildAppSpecPlanPrompt(this.lastAppSpecDraft);
+    }
+
     if (trimmedText === "/help") {
       this.emitTimeline("plan", "Slash command /help", "Help menu requested", messageId);
       this.postMessage({
         type: "chatResponse",
         id: messageId,
         content:
-          "Comandi disponibili:\n- `/init <descrizione>`\n- `/execute-first-pending`\n- `/clear-memory`\n- `/memory-status`\n- `/memory-search <query>`\n- `/memory-export [path]`\n- `/memory-import <path> [merge=true|false]`",
+          "Comandi disponibili:\n- `/init <descrizione>`\n- `/execute-first-pending`\n- `/appspec-refine`\n- `/appspec-plan`\n- `/clear-memory`\n- `/memory-status`\n- `/memory-search <query>`\n- `/memory-export [path]`\n- `/memory-import <path> [merge=true|false]`",
       });
       return;
     }
@@ -1273,6 +1590,7 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
       let explainability: Record<string, unknown> | undefined = undefined;
       let innovation: Record<string, unknown> | undefined = undefined;
       let appSpec: AppSpecPayload | undefined;
+      let structuredAppSpecCandidate: unknown = undefined;
       let streamChunks: string[] = [];
       let sections: ChatSectionPayload[] | undefined;
       let fileOperations:
@@ -1301,6 +1619,11 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
         if (structured.innovation && typeof structured.innovation === "object") {
           innovation = { ...(structured.innovation as Record<string, unknown>) };
         }
+        if (structured.appspec !== undefined) {
+          structuredAppSpecCandidate = structured.appspec;
+        } else if (structured.app_spec !== undefined) {
+          structuredAppSpecCandidate = structured.app_spec;
+        }
         const contextProvider =
           typeof structured.context_provider === "string"
             ? structured.context_provider
@@ -1325,6 +1648,45 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
         content = result;
       }
 
+      if (structuredAppSpecCandidate !== undefined) {
+        const validated = this.sanitizeAssistantAppSpec(
+          structuredAppSpecCandidate,
+          effectiveText,
+          content,
+        );
+        if (validated) {
+          appSpec = validated;
+          this.emitTimeline(
+            "plan",
+            "AppSpec validated",
+            `${validated.dataModel.entities.length} entities • strict payload`,
+            messageId,
+          );
+        } else {
+          this.emitTimeline("error", "AppSpec payload invalid", "Falling back to safe heuristic", messageId);
+        }
+      }
+
+      if (!appSpec) {
+        const maybeAppSpecBlock = this.extractAppSpecCodeBlock(content);
+        if (maybeAppSpecBlock) {
+          const parsed = this.safeJsonParse(maybeAppSpecBlock);
+          const validated = this.sanitizeAssistantAppSpec(parsed, effectiveText, content);
+          if (validated) {
+            appSpec = validated;
+            content = this.stripAppSpecCodeBlocks(content);
+            this.emitTimeline(
+              "plan",
+              "AppSpec block parsed",
+              `${validated.dataModel.entities.length} entities • strict block`,
+              messageId,
+            );
+          } else {
+            this.emitTimeline("error", "AppSpec block invalid", "Falling back to safe heuristic", messageId);
+          }
+        }
+      }
+
       const parsedPlan = this.buildChatPlan(content);
       if (parsedPlan) {
         content = parsedPlan.normalizedContent;
@@ -1344,13 +1706,16 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
       } else {
         this.pendingWritePlans.delete(messageId);
       }
-      appSpec = this.buildHeuristicAppSpec(effectiveText, content, fileOperations);
-      this.emitTimeline(
-        "plan",
-        "AppSpec draft prepared",
-        `${appSpec.dataModel.entities.length} entities • confidence ${Math.round(appSpec.meta.confidence * 100)}%`,
-        messageId,
-      );
+      if (!appSpec) {
+        appSpec = this.buildHeuristicAppSpec(effectiveText, content, fileOperations);
+        this.emitTimeline(
+          "plan",
+          "AppSpec draft prepared",
+          `${appSpec.dataModel.entities.length} entities • confidence ${Math.round(appSpec.meta.confidence * 100)}% • fallback`,
+          messageId,
+        );
+      }
+      this.lastAppSpecDraft = appSpec;
 
       streamChunks = this.chunkText(content, 140);
 

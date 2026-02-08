@@ -85,6 +85,7 @@ export default function App() {
   const runtimeCapabilities = useStore((s) => s.runtimeCapabilities);
   const augmentSettings = useStore((s) => s.augmentSettings);
   const qualityStatus = useStore((s) => s.qualityStatus);
+  const addMessage = useStore((s) => s.addMessage);
 
   const [activePage, setActivePage] = useState<PageId>("chat");
   const [selectedGoal, setSelectedGoal] = useState<Goal | null>(null);
@@ -286,6 +287,20 @@ export default function App() {
     vscodeApi.postMessage({
       type: "setAugmentSettings",
       settings: next,
+    });
+  };
+
+  const sendSlashCommand = (command: string) => {
+    if (!connected || Boolean(activeStreamingMessage)) return;
+    addMessage({
+      id: crypto.randomUUID(),
+      role: "user",
+      content: command,
+      timestamp: Date.now(),
+    });
+    vscodeApi.postMessage({
+      type: "chatMessage",
+      text: command,
     });
   };
 
@@ -665,6 +680,26 @@ export default function App() {
                         onClick={() => setShowPreviewPanel((value) => !value)}
                       >
                         {showPreviewPanel ? "Hide Preview" : latestAppSpec ? "Live Preview" : "Preview unavailable"}
+                      </Button>
+                    )}
+                    {simpleMode && latestAppSpec && (
+                      <Button
+                        size="xs"
+                        variant="outline"
+                        disabled={!connected || Boolean(activeStreamingMessage)}
+                        onClick={() => sendSlashCommand("/appspec-refine")}
+                      >
+                        Refine Spec
+                      </Button>
+                    )}
+                    {simpleMode && latestAppSpec && (
+                      <Button
+                        size="xs"
+                        variant="outline"
+                        disabled={!connected || Boolean(activeStreamingMessage)}
+                        onClick={() => sendSlashCommand("/appspec-plan")}
+                      >
+                        Generate Plan
                       </Button>
                     )}
                     {simpleMode && (

@@ -1,7 +1,7 @@
 import React from "react";
 import { useStore } from "../../state/store";
 import { useVSCodeAPI } from "../../hooks/useVSCodeAPI";
-import { Sparkles, Terminal, Shield, Target, Brain, HelpCircle, PlayCircle } from "lucide-react";
+import { Sparkles, Terminal, Shield, Target, Brain, HelpCircle, PlayCircle, Wand2, DraftingCompass } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const PROMPTS = [
@@ -11,6 +11,8 @@ const PROMPTS = [
   { label: "Verify Action", text: "Validate my next changes", icon: Terminal },
   { label: "Execute First Pending", text: "/execute-first-pending", icon: PlayCircle },
   { label: "Memory Status", text: "/memory-status", icon: Brain },
+  { label: "Refine AppSpec", text: "/appspec-refine", icon: Wand2 },
+  { label: "AppSpec Plan", text: "/appspec-plan", icon: DraftingCompass },
   { label: "Help", text: "/help", icon: HelpCircle },
 ];
 

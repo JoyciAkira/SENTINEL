@@ -113,6 +113,10 @@ export interface AppSpecPayload {
         confidence: number;
         generated_at: string;
         prompt_excerpt?: string;
+        validation?: {
+            status: "strict" | "fallback";
+            issues?: string[];
+        };
     };
 }
 

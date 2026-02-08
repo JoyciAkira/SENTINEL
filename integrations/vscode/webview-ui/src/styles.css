@@ -673,6 +673,20 @@
   color: var(--sentinel-muted);
 }
 
+.sentinel-preview__issues {
+  border-top: 1px solid var(--sentinel-border);
+  padding: 8px 10px;
+  display: grid;
+  gap: 4px;
+  font-size: 10px;
+  color: var(--sentinel-warning);
+  background: color-mix(in oklab, var(--sentinel-warning) 8%, transparent);
+}
+
+.sentinel-preview__issues p {
+  margin: 0;
+}
+
 .sentinel-timeline {
   border: 1px solid var(--sentinel-border);
   border-radius: 12px;
