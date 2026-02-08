@@ -119,6 +119,13 @@ type ParsedOrchestrationCommandResult =
   | { ok: true; value: ParsedOrchestrationCommand }
   | { ok: false; error: string };
 
+type IntentRouteDecision =
+  | { kind: "none" }
+  | { kind: "execute_first_pending"; reason: string }
+  | { kind: "appspec_refine"; reason: string }
+  | { kind: "appspec_plan"; reason: string }
+  | { kind: "orchestrate"; reason: string; command: ParsedOrchestrationCommand };
+
 /**
  * WebviewViewProvider for the Sentinel Chat sidebar panel.
  * Implements the Cline-style full sidebar chat experience.
@@ -1396,6 +1403,144 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
     };
   }
 
+  private regexCount(source: string, pattern: RegExp): number {
+    return source.match(pattern)?.length ?? 0;
+  }
+
+  private inferOrchestrationCommandFromIntent(text: string): ParsedOrchestrationCommand {
+    const lower = text.toLowerCase();
+    const complexityScore =
+      (text.length > 120 ? 1 : 0) +
+      (text.length > 220 ? 1 : 0) +
+      (/\b(end-to-end|end to end|e2e)\b/.test(lower) ? 1 : 0) +
+      (/\b(security|performance|scalability|reliability|migration|compliance)\b/.test(lower)
+        ? 1
+        : 0) +
+      (this.regexCount(lower, /,|;|\band\b|\be\b/g) >= 3 ? 1 : 0);
+
+    const includeDeploy = /\b(deploy|release|rollout|production|prod)\b/.test(lower);
+    const maxParallel = Math.max(1, Math.min(4, complexityScore >= 3 ? 3 : 2));
+    const subtaskCount = Math.max(2, Math.min(6, includeDeploy ? 5 : complexityScore >= 3 ? 5 : 4));
+    const modes = includeDeploy
+      ? ["plan", "build", "review", "deploy"]
+      : ["plan", "build", "review"];
+
+    return {
+      task: text.trim(),
+      maxParallel,
+      subtaskCount,
+      modes,
+    };
+  }
+
+  private async resolveIntentRoute(trimmedText: string): Promise<IntentRouteDecision> {
+    if (!trimmedText || trimmedText.startsWith("/")) {
+      return { kind: "none" };
+    }
+
+    const lower = trimmedText.toLowerCase();
+    const asksExecutePending =
+      /\b(execute first pending|first pending goal|next pending goal|primo goal pending)\b/.test(
+        lower,
+      );
+    if (
+      asksExecutePending &&
+      (await this.client.supportsTool("get_goal_graph")) &&
+      (await this.client.supportsTool("chat"))
+    ) {
+      return {
+        kind: "execute_first_pending",
+        reason: "Detected intent to execute the next pending goal.",
+      };
+    }
+
+    const mentionsAppSpec = /\b(appspec|app spec)\b/.test(lower);
+    const asksRefine = /\b(refine|improve|migliora|tighten|harden|revise)\b/.test(lower);
+    const asksPlan = /\b(plan|planning|roadmap|steps|phases|decompose|scomponi)\b/.test(lower);
+    if (mentionsAppSpec && asksRefine && this.lastAppSpecDraft) {
+      return {
+        kind: "appspec_refine",
+        reason: "Detected AppSpec refinement request with available draft.",
+      };
+    }
+    if (mentionsAppSpec && asksPlan && this.lastAppSpecDraft) {
+      return {
+        kind: "appspec_plan",
+        reason: "Detected AppSpec planning request with available draft.",
+      };
+    }
+
+    const explicitOrchestration =
+      /\b(orchestrate|orchestration|orchestrator|orchestrazione|decompose|scomponi|break down)\b/.test(lower);
+    const actionVerb =
+      /\b(build|implement|create|design|refactor|optimi[sz]e|ship|deliver|harden|migrate|upgrade|setup|add|fix|improve|sviluppa|implementa|crea|ottimizza|migliora)\b/.test(
+        lower,
+      );
+    const planningSignal =
+      /\b(roadmap|subtasks?|step-by-step|step by step|phases?|milestones?|piano|fasi)\b/.test(lower);
+    const complexitySignal =
+      trimmedText.length > 160 ||
+      this.regexCount(lower, /,|;|\band\b|\be\b/g) >= 3 ||
+      /\b(end-to-end|end to end|e2e)\b/.test(lower);
+
+    const shouldOrchestrate =
+      explicitOrchestration || (actionVerb && planningSignal) || (actionVerb && complexitySignal);
+    if (shouldOrchestrate && (await this.client.supportsTool("orchestrate_task"))) {
+      return {
+        kind: "orchestrate",
+        reason: "Detected complex implementation intent; auto-routing to bounded orchestration.",
+        command: this.inferOrchestrationCommandFromIntent(trimmedText),
+      };
+    }
+
+    return { kind: "none" };
+  }
+
+  private async runOrchestrationCommand(
+    messageId: string,
+    command: ParsedOrchestrationCommand,
+    routeSource: "slash" | "intent",
+    routeReason?: string,
+  ): Promise<void> {
+    const args: Record<string, unknown> = {
+      task: command.task,
+      max_parallel: command.maxParallel,
+      subtask_count: command.subtaskCount,
+    };
+    if (command.modes && command.modes.length > 0) {
+      args.modes = command.modes;
+    }
+
+    this.emitTimeline(
+      "plan",
+      routeSource === "slash" ? "Slash command /orchestrate" : "Intent router /orchestrate",
+      `${command.subtaskCount} subtasks • parallel ${command.maxParallel}`,
+      messageId,
+    );
+
+    try {
+      const result = await this.callToolTracked("orchestrate_task", args, messageId);
+      const formatted = this.formatOrchestrationResult(result);
+      this.postMessage({
+        type: "chatResponse",
+        id: messageId,
+        content:
+          routeSource === "intent"
+            ? `Auto-routed by Intent Router.\nReason: ${routeReason ?? "Complex request detected."}\n\n${formatted}`
+            : formatted,
+      });
+      this.emitTimeline("result", "Orchestration completed", this.clip(command.task, 80), messageId);
+    } catch (err: any) {
+      const error = err?.message ?? String(err);
+      this.postMessage({
+        type: "chatResponse",
+        id: messageId,
+        content: `Errore durante /orchestrate: ${error}`,
+      });
+      this.emitTimeline("error", "Orchestration failed", error, messageId);
+    }
+  }
+
   private formatOrchestrationResult(result: unknown): string {
     if (!this.isRecord(result)) {
       return "Orchestration completed, but result format is invalid.";
@@ -1635,39 +1780,7 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
         return;
       }
 
-      const args: Record<string, unknown> = {
-        task: parsed.value.task,
-        max_parallel: parsed.value.maxParallel,
-        subtask_count: parsed.value.subtaskCount,
-      };
-      if (parsed.value.modes && parsed.value.modes.length > 0) {
-        args.modes = parsed.value.modes;
-      }
-
-      this.emitTimeline(
-        "plan",
-        "Slash command /orchestrate",
-        `${parsed.value.subtaskCount} subtasks • parallel ${parsed.value.maxParallel}`,
-        messageId,
-      );
-
-      try {
-        const result = await this.callToolTracked("orchestrate_task", args, messageId);
-        this.postMessage({
-          type: "chatResponse",
-          id: messageId,
-          content: this.formatOrchestrationResult(result),
-        });
-        this.emitTimeline("result", "Orchestration completed", this.clip(parsed.value.task, 80), messageId);
-      } catch (err: any) {
-        const error = err?.message ?? String(err);
-        this.postMessage({
-          type: "chatResponse",
-          id: messageId,
-          content: `Errore durante /orchestrate: ${error}`,
-        });
-        this.emitTimeline("error", "Orchestration failed", error, messageId);
-      }
+      await this.runOrchestrationCommand(messageId, parsed.value, "slash");
       return;
     }
 
@@ -1677,7 +1790,7 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
         type: "chatResponse",
         id: messageId,
         content:
-          "Comandi disponibili:\n- `/init <descrizione>`\n- `/execute-first-pending`\n- `/orchestrate <task> [--parallel=1..4] [--count=2..6] [--modes=plan,build,review,deploy]`\n- `/appspec-refine`\n- `/appspec-plan`\n- `/clear-memory`\n- `/memory-status`\n- `/memory-search <query>`\n- `/memory-export [path]`\n- `/memory-import <path> [merge=true|false]`",
+          "Comandi disponibili:\n- `/init <descrizione>`\n- `/execute-first-pending`\n- `/orchestrate <task> [--parallel=1..4] [--count=2..6] [--modes=plan,build,review,deploy]`\n- `/appspec-refine`\n- `/appspec-plan`\n- `/clear-memory`\n- `/memory-status`\n- `/memory-search <query>`\n- `/memory-export [path]`\n- `/memory-import <path> [merge=true|false]`\n\nTip: puoi anche scrivere l'obiettivo in linguaggio naturale. L'Intent Router sceglie automaticamente il percorso più sicuro (chat/appspec/orchestrate).",
       });
       return;
     }
@@ -1785,6 +1898,49 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
           : `Memory import fallito: ${result?.error ?? "unknown error"}`,
       });
       return;
+    }
+
+    if (!trimmedText.startsWith("/")) {
+      const intentRoute = await this.resolveIntentRoute(trimmedText);
+
+      if (intentRoute.kind === "orchestrate") {
+        this.emitTimeline("plan", "Intent router engaged", intentRoute.reason, messageId);
+        await this.runOrchestrationCommand(
+          messageId,
+          intentRoute.command,
+          "intent",
+          intentRoute.reason,
+        );
+        return;
+      }
+
+      if (intentRoute.kind === "execute_first_pending") {
+        this.emitTimeline("plan", "Intent router /execute-first-pending", intentRoute.reason, messageId);
+        try {
+          const nextPrompt = await this.buildExecuteFirstPendingPrompt(messageId);
+          if (!nextPrompt) return;
+          effectiveText = nextPrompt;
+        } catch (err: any) {
+          const error = err?.message ?? String(err);
+          this.postMessage({
+            type: "chatResponse",
+            id: messageId,
+            content: `Errore durante intent routing: ${error}`,
+          });
+          this.emitTimeline("error", "Intent routing failed", error, messageId);
+          return;
+        }
+      }
+
+      if (intentRoute.kind === "appspec_refine" && this.lastAppSpecDraft) {
+        this.emitTimeline("plan", "Intent router /appspec-refine", intentRoute.reason, messageId);
+        effectiveText = this.buildAppSpecRefinePrompt(this.lastAppSpecDraft);
+      }
+
+      if (intentRoute.kind === "appspec_plan" && this.lastAppSpecDraft) {
+        this.emitTimeline("plan", "Intent router /appspec-plan", intentRoute.reason, messageId);
+        effectiveText = this.buildAppSpecPlanPrompt(this.lastAppSpecDraft);
+      }
     }
 
     try {

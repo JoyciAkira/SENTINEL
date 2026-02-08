@@ -40,6 +40,7 @@ type PageId = "command" | "chat" | "forge" | "network" | "audit" | "settings";
 type TimelineStage = "all" | "received" | "plan" | "tool" | "stream" | "approval" | "result" | "error" | "cancel";
 type ThemePreset = "mono-mint" | "warm-graphite" | "pure-vscode";
 type UiMode = "simple" | "advanced";
+type GuidedStage = "goal" | "plan" | "apply";
 
 const RISK_LEVELS = [
   { label: "Low", min: 85, className: "sentinel-risk-low" },
@@ -268,6 +269,10 @@ export default function App() {
     () => [...messages].reverse().find((message) => message.role === "assistant" && message.appSpec)?.appSpec ?? null,
     [messages],
   );
+  const lastAssistantMessage = useMemo(
+    () => [...messages].reverse().find((message) => message.role === "assistant") ?? null,
+    [messages],
+  );
 
   useEffect(() => {
     if (!latestAppSpec) {
@@ -311,6 +316,32 @@ export default function App() {
   const showSimplePreview = simpleMode && !showChatDetails && showPreviewPanel && Boolean(latestAppSpec);
   const showTimelinePanel = !simpleMode || showChatDetails;
   const hasSidePanel = showSimplePreview || showTimelinePanel;
+  const guidedStage = useMemo<GuidedStage>(() => {
+    if (pendingFileApprovals > 0) return "apply";
+    if (activeStreamingMessage) return "plan";
+    if (messages.length === 0) return "goal";
+    const hasPlanSignal =
+      Boolean(latestAppSpec) ||
+      Boolean(lastAssistantMessage?.content && /Orchestration ID:/i.test(lastAssistantMessage.content)) ||
+      pendingGoals.length > 0;
+    return hasPlanSignal ? "plan" : "goal";
+  }, [
+    pendingFileApprovals,
+    activeStreamingMessage,
+    messages.length,
+    latestAppSpec,
+    lastAssistantMessage,
+    pendingGoals.length,
+  ]);
+  const guidedHint = useMemo(() => {
+    if (guidedStage === "goal") {
+      return "Describe the end result. Sentinel chooses the safest execution path automatically.";
+    }
+    if (guidedStage === "plan") {
+      return "Plan ready. Review the summarized outcome and ask for refinements if needed.";
+    }
+    return "Apply stage. Approve pending file operations to execute changes safely.";
+  }, [guidedStage]);
   const hasExplainableMessages = useMemo(
     () =>
       messages.some(
@@ -671,6 +702,25 @@ export default function App() {
                   </CardDescription>
                   {simpleMode ? (
                     <>
+                      <div className="sentinel-guided-flow">
+                        {(["goal", "plan", "apply"] as GuidedStage[]).map((step) => (
+                          <div
+                            key={step}
+                            className={cn(
+                              "sentinel-guided-flow__step",
+                              step === guidedStage && "sentinel-guided-flow__step--active",
+                              step !== guidedStage &&
+                                ((step === "goal" && guidedStage !== "goal") ||
+                                (step === "plan" && guidedStage === "apply")) &&
+                                "sentinel-guided-flow__step--complete",
+                            )}
+                          >
+                            <span>{step === "goal" ? "Goal" : step === "plan" ? "Plan" : "Apply"}</span>
+                          </div>
+                        ))}
+                        <p className="sentinel-guided-flow__hint">{guidedHint}</p>
+                      </div>
+
                       <div className="sentinel-inline-actions sentinel-chat-actions--primary">
                         <Button
                           size="xs"

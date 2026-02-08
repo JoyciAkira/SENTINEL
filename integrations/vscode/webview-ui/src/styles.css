@@ -510,6 +510,53 @@
   padding-top: 8px;
 }
 
+.sentinel-guided-flow {
+  display: grid;
+  gap: 8px;
+}
+
+.sentinel-guided-flow__step {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 78px;
+  border: 1px solid var(--sentinel-border);
+  border-radius: 999px;
+  padding: 4px 10px;
+  background: color-mix(in oklab, var(--sentinel-surface-2) 88%, transparent);
+  color: var(--sentinel-muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.sentinel-guided-flow__step--active {
+  border-color: color-mix(in oklab, var(--sentinel-accent) 52%, var(--sentinel-border));
+  background: color-mix(in oklab, var(--sentinel-accent-soft) 76%, var(--sentinel-surface));
+  color: var(--sentinel-ink);
+}
+
+.sentinel-guided-flow__step--complete {
+  border-color: color-mix(in oklab, var(--sentinel-success) 42%, var(--sentinel-border));
+  color: var(--sentinel-success);
+}
+
+.sentinel-guided-flow__hint {
+  margin: 0;
+  font-size: 11px;
+  color: var(--sentinel-muted);
+}
+
+.sentinel-guided-flow {
+  grid-template-columns: repeat(3, minmax(0, max-content));
+  align-items: center;
+}
+
+.sentinel-guided-flow__hint {
+  grid-column: 1 / -1;
+}
+
 .sentinel-chat-composer {
   position: sticky;
   bottom: 0;
@@ -1359,6 +1406,16 @@
 
   .sentinel-chat__messages {
     height: 42vh;
+  }
+
+  .sentinel-guided-flow {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .sentinel-guided-flow__step {
+    min-width: 0;
+    padding-inline: 6px;
+    font-size: 9px;
   }
 
   .sentinel-panel-resizable {
