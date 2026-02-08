@@ -223,6 +223,15 @@ export default function App() {
 
   const currentTimelineEvent =
     filteredTimeline.length > 0 ? filteredTimeline[timelineCursor] : undefined;
+  const worldModel = governance?.world_model;
+  const missingRequiredDeps =
+    Array.isArray((worldModel?.required_missing_now as any)?.dependencies)
+      ? ((worldModel?.required_missing_now as any).dependencies as unknown[]).length
+      : 0;
+  const missingRequiredFrameworks =
+    Array.isArray((worldModel?.required_missing_now as any)?.frameworks)
+      ? ((worldModel?.required_missing_now as any).frameworks as unknown[]).length
+      : 0;
 
   return (
     <div
@@ -829,6 +838,17 @@ export default function App() {
                         Pending proposal:{" "}
                         <strong>{governance?.pending_proposal?.id ? governance.pending_proposal.id.slice(0, 8) : "none"}</strong>
                       </p>
+                      <p>
+                        World model version:{" "}
+                        <strong>{worldModel?.how_enforced?.manifold_version ?? "n/a"}</strong>{" "}
+                        | required missing now:{" "}
+                        <strong>{missingRequiredDeps + missingRequiredFrameworks}</strong>
+                      </p>
+                      {worldModel?.how_enforced?.manifold_integrity_hash && (
+                        <p className="sentinel-mono">
+                          hash {String(worldModel.how_enforced.manifold_integrity_hash).slice(0, 12)}…
+                        </p>
+                      )}
 
                       <div className="sentinel-inline-actions">
                         <Button

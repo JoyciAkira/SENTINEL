@@ -619,6 +619,7 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
 
     const hasReliability = supportedTools.has("get_reliability");
     const hasGovernance = supportedTools.has("governance_status");
+    const hasWorldModel = supportedTools.has("get_world_model");
     if (!this.warnedMissingRuntimeTools && (!hasReliability || !hasGovernance)) {
       this.warnedMissingRuntimeTools = true;
       const missing = [
@@ -635,6 +636,15 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
         ok: false,
         message,
       });
+    }
+
+    let worldModel: any = null;
+    if (hasWorldModel) {
+      try {
+        worldModel = (await this.client.callTool("get_world_model", {})) as any;
+      } catch (err: any) {
+        this.outputChannel.appendLine(`Failed to refresh world model: ${err.message}`);
+      }
     }
 
     try {
@@ -659,7 +669,10 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
         if (governance && !governance.error) {
           this.postMessage({
             type: "governanceUpdate",
-            governance,
+            governance: {
+              ...governance,
+              world_model: worldModel && !worldModel.error ? worldModel : null,
+            },
           });
         }
       }

@@ -36,10 +36,24 @@ let pollTimer: ReturnType<typeof setInterval> | undefined;
  */
 function resolveSentinelPath(
   configuredPath: string,
+  workspaceRoot: string,
   outputChannel: vscode.OutputChannel,
 ): string {
   if (path.isAbsolute(configuredPath)) {
     return configuredPath;
+  }
+
+  const workspaceCandidates = [
+    path.join(workspaceRoot, "target", "release", "sentinel-cli"),
+    path.join(workspaceRoot, "target", "release", "sentinel"),
+    path.join(workspaceRoot, "target", "debug", "sentinel-cli"),
+    path.join(workspaceRoot, "target", "debug", "sentinel"),
+  ];
+  for (const candidate of workspaceCandidates) {
+    if (fs.existsSync(candidate)) {
+      outputChannel.appendLine(`Resolved sentinel path from workspace build: ${candidate}`);
+      return candidate;
+    }
   }
 
   const home = process.env.HOME || process.env.USERPROFILE;
@@ -66,14 +80,6 @@ export function activate(context: vscode.ExtensionContext) {
   const outputChannel = vscode.window.createOutputChannel("Sentinel");
   context.subscriptions.push(outputChannel);
 
-  let rawPath =
-    vscode.workspace
-      .getConfiguration("sentinel")
-      .get<string>(CONFIG_SENTINEL_PATH) || CONFIG_DEFAULT_PATH;
-  rawPath = rawPath.replace(/^["'](.+)["']$/, "$1");
-
-  const sentinelPath = resolveSentinelPath(rawPath, outputChannel);
-
   const resolveWorkspaceRoot = (): string => {
     if (vscode.workspace.workspaceFolders?.length) {
       return vscode.workspace.workspaceFolders[0].uri.fsPath;
@@ -96,6 +102,14 @@ export function activate(context: vscode.ExtensionContext) {
   };
 
   const workspaceRoot = resolveWorkspaceRoot();
+
+  let rawPath =
+    vscode.workspace
+      .getConfiguration("sentinel")
+      .get<string>(CONFIG_SENTINEL_PATH) || CONFIG_DEFAULT_PATH;
+  rawPath = rawPath.replace(/^["'](.+)["']$/, "$1");
+
+  const sentinelPath = resolveSentinelPath(rawPath, workspaceRoot, outputChannel);
 
   outputChannel.appendLine(`Activating Sentinel extension...`);
   outputChannel.appendLine(`Workspace: ${workspaceRoot}`);

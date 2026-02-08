@@ -10,6 +10,18 @@ PASS=0
 FAIL=0
 TOTAL=0
 
+run_with_timeout() {
+    local seconds="$1"
+    shift
+    if command -v timeout >/dev/null 2>&1; then
+        timeout "$seconds" "$@"
+    elif command -v gtimeout >/dev/null 2>&1; then
+        gtimeout "$seconds" "$@"
+    else
+        "$@"
+    fi
+}
+
 log_test() {
     TOTAL=$((TOTAL + 1))
     echo ""
@@ -29,7 +41,7 @@ log_fail() {
 # Helper: send JSON-RPC and get response
 send_rpc() {
     local request="$1"
-    echo "$request" | timeout 10 "$SENTINEL_BIN" mcp 2>/dev/null | head -1
+    echo "$request" | run_with_timeout 10 "$SENTINEL_BIN" mcp 2>/dev/null | head -1
 }
 
 # Ensure sentinel.json exists
@@ -64,7 +76,7 @@ fi
 
 # ── TEST 2: Tools List ────────────────────────
 log_test "MCP Tools List"
-INIT_AND_LIST=$(printf '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}},"id":1}\n{"jsonrpc":"2.0","method":"tools/list","params":{},"id":2}\n' | timeout 10 "$SENTINEL_BIN" mcp 2>/dev/null)
+INIT_AND_LIST=$(printf '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}},"id":1}\n{"jsonrpc":"2.0","method":"tools/list","params":{},"id":2}\n' | run_with_timeout 10 "$SENTINEL_BIN" mcp 2>/dev/null)
 TOOLS_RESPONSE=$(echo "$INIT_AND_LIST" | grep '"id":2' | head -1)
 if echo "$TOOLS_RESPONSE" | grep -q '"validate_action"'; then
     log_pass "validate_action tool found"
@@ -101,10 +113,25 @@ if echo "$TOOLS_RESPONSE" | grep -q '"get_enforcement_rules"'; then
 else
     log_fail "get_enforcement_rules missing"
 fi
+if echo "$TOOLS_RESPONSE" | grep -q '"get_reliability"'; then
+    log_pass "get_reliability tool found"
+else
+    log_fail "get_reliability missing"
+fi
+if echo "$TOOLS_RESPONSE" | grep -q '"governance_status"'; then
+    log_pass "governance_status tool found"
+else
+    log_fail "governance_status missing"
+fi
+if echo "$TOOLS_RESPONSE" | grep -q '"get_world_model"'; then
+    log_pass "get_world_model tool found"
+else
+    log_fail "get_world_model missing"
+fi
 
 # ── TEST 3: Get Alignment ────────────────────
 log_test "MCP Tool Call: get_alignment"
-ALIGN_RESPONSE=$(printf '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}},"id":1}\n{"jsonrpc":"2.0","method":"tools/call","params":{"name":"get_alignment","arguments":{}},"id":3}\n' | timeout 10 "$SENTINEL_BIN" mcp 2>/dev/null | grep '"id":3' | head -1)
+ALIGN_RESPONSE=$(printf '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}},"id":1}\n{"jsonrpc":"2.0","method":"tools/call","params":{"name":"get_alignment","arguments":{}},"id":3}\n' | run_with_timeout 10 "$SENTINEL_BIN" mcp 2>/dev/null | grep '"id":3' | head -1)
 if echo "$ALIGN_RESPONSE" | grep -q '"content"'; then
     log_pass "get_alignment returned content"
     # Extract and display alignment score
@@ -114,9 +141,18 @@ else
     log_fail "get_alignment failed. Response: $ALIGN_RESPONSE"
 fi
 
+# ── TEST 3b: Get World Model ─────────────────
+log_test "MCP Tool Call: get_world_model"
+WORLD_RESPONSE=$(printf '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}},"id":1}\n{"jsonrpc":"2.0","method":"tools/call","params":{"name":"get_world_model","arguments":{}},"id":31}\n' | run_with_timeout 10 "$SENTINEL_BIN" mcp 2>/dev/null | grep '"id":31' | head -1)
+if echo "$WORLD_RESPONSE" | grep -q '"where_we_must_go"'; then
+    log_pass "get_world_model returned world model payload"
+else
+    log_fail "get_world_model failed. Response: $WORLD_RESPONSE"
+fi
+
 # ── TEST 4: Validate Action ──────────────────
 log_test "MCP Tool Call: validate_action"
-VA_RESPONSE=$(printf '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}},"id":1}\n{"jsonrpc":"2.0","method":"tools/call","params":{"name":"validate_action","arguments":{"action_type":"edit_file","description":"Implement JWT authentication for login"}},"id":4}\n' | timeout 10 "$SENTINEL_BIN" mcp 2>/dev/null | grep '"id":4' | head -1)
+VA_RESPONSE=$(printf '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}},"id":1}\n{"jsonrpc":"2.0","method":"tools/call","params":{"name":"validate_action","arguments":{"action_type":"edit_file","description":"Implement JWT authentication for login"}},"id":4}\n' | run_with_timeout 10 "$SENTINEL_BIN" mcp 2>/dev/null | grep '"id":4' | head -1)
 if echo "$VA_RESPONSE" | grep -q '"content"'; then
     log_pass "validate_action returned content"
     VA_TEXT=$(echo "$VA_RESPONSE" | python3 -c "import sys,json; r=json.load(sys.stdin); print(r['result']['content'][0]['text'])" 2>/dev/null || echo "parse error")
@@ -127,7 +163,7 @@ fi
 
 # ── TEST 5: Safe Write (security scan) ───────
 log_test "MCP Tool Call: safe_write (clean code)"
-SW_RESPONSE=$(printf '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}},"id":1}\n{"jsonrpc":"2.0","method":"tools/call","params":{"name":"safe_write","arguments":{"file_path":"src/main.rs","content":"fn main() { println!(\"hello\"); }"}},"id":5}\n' | timeout 10 "$SENTINEL_BIN" mcp 2>/dev/null | grep '"id":5' | head -1)
+SW_RESPONSE=$(printf '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}},"id":1}\n{"jsonrpc":"2.0","method":"tools/call","params":{"name":"safe_write","arguments":{"file_path":"src/main.rs","content":"fn main() { println!(\"hello\"); }"}},"id":5}\n' | run_with_timeout 10 "$SENTINEL_BIN" mcp 2>/dev/null | grep '"id":5' | head -1)
 if echo "$SW_RESPONSE" | grep -q '"content"'; then
     log_pass "safe_write returned content for clean code"
     SW_TEXT=$(echo "$SW_RESPONSE" | python3 -c "import sys,json; r=json.load(sys.stdin); print(r['result']['content'][0]['text'])" 2>/dev/null || echo "parse error")
@@ -138,7 +174,7 @@ fi
 
 # ── TEST 6: Safe Write (malicious code) ──────
 log_test "MCP Tool Call: safe_write (security threat detection)"
-SW_BAD=$(printf '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}},"id":1}\n{"jsonrpc":"2.0","method":"tools/call","params":{"name":"safe_write","arguments":{"file_path":"config.rs","content":"let aws_key = \"AKIA1234567890ABCDEF\"; let private_key = \"-----BEGIN RSA PRIVATE KEY-----\";"}},"id":6}\n' | timeout 10 "$SENTINEL_BIN" mcp 2>/dev/null | grep '"id":6' | head -1)
+SW_BAD=$(printf '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}},"id":1}\n{"jsonrpc":"2.0","method":"tools/call","params":{"name":"safe_write","arguments":{"file_path":"config.rs","content":"let aws_key = \"AKIA1234567890ABCDEF\"; let private_key = \"-----BEGIN RSA PRIVATE KEY-----\";"}},"id":6}\n' | run_with_timeout 10 "$SENTINEL_BIN" mcp 2>/dev/null | grep '"id":6' | head -1)
 if echo "$SW_BAD" | grep -q '"content"'; then
     log_pass "safe_write detected threats"
     SW_BAD_TEXT=$(echo "$SW_BAD" | python3 -c "import sys,json; r=json.load(sys.stdin); print(r['result']['content'][0]['text'])" 2>/dev/null || echo "parse error")
@@ -149,7 +185,7 @@ fi
 
 # ── TEST 7: Get Cognitive Map ─────────────────
 log_test "MCP Tool Call: get_cognitive_map"
-CM_RESPONSE=$(printf '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}},"id":1}\n{"jsonrpc":"2.0","method":"tools/call","params":{"name":"get_cognitive_map","arguments":{}},"id":7}\n' | timeout 10 "$SENTINEL_BIN" mcp 2>/dev/null | grep '"id":7' | head -1)
+CM_RESPONSE=$(printf '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}},"id":1}\n{"jsonrpc":"2.0","method":"tools/call","params":{"name":"get_cognitive_map","arguments":{}},"id":7}\n' | run_with_timeout 10 "$SENTINEL_BIN" mcp 2>/dev/null | grep '"id":7' | head -1)
 if echo "$CM_RESPONSE" | grep -q '"content"'; then
     log_pass "get_cognitive_map returned content"
     CM_TEXT=$(echo "$CM_RESPONSE" | python3 -c "import sys,json; r=json.load(sys.stdin); print(r['result']['content'][0]['text'][:200])" 2>/dev/null || echo "parse error")
@@ -160,7 +196,7 @@ fi
 
 # ── TEST 8: Propose Strategy ─────────────────
 log_test "MCP Tool Call: propose_strategy"
-PS_RESPONSE=$(printf '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}},"id":1}\n{"jsonrpc":"2.0","method":"tools/call","params":{"name":"propose_strategy","arguments":{"goal_description":"Implement user authentication with OAuth2"}},"id":8}\n' | timeout 10 "$SENTINEL_BIN" mcp 2>/dev/null | grep '"id":8' | head -1)
+PS_RESPONSE=$(printf '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}},"id":1}\n{"jsonrpc":"2.0","method":"tools/call","params":{"name":"propose_strategy","arguments":{"goal_description":"Implement user authentication with OAuth2"}},"id":8}\n' | run_with_timeout 10 "$SENTINEL_BIN" mcp 2>/dev/null | grep '"id":8' | head -1)
 if echo "$PS_RESPONSE" | grep -q '"content"'; then
     log_pass "propose_strategy returned content"
     PS_TEXT=$(echo "$PS_RESPONSE" | python3 -c "import sys,json; r=json.load(sys.stdin); print(r['result']['content'][0]['text'][:200])" 2>/dev/null || echo "parse error")
@@ -171,7 +207,7 @@ fi
 
 # ── TEST 9: Get Enforcement Rules ─────────────
 log_test "MCP Tool Call: get_enforcement_rules"
-ER_RESPONSE=$(printf '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}},"id":1}\n{"jsonrpc":"2.0","method":"tools/call","params":{"name":"get_enforcement_rules","arguments":{}},"id":9}\n' | timeout 10 "$SENTINEL_BIN" mcp 2>/dev/null | grep '"id":9' | head -1)
+ER_RESPONSE=$(printf '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}},"id":1}\n{"jsonrpc":"2.0","method":"tools/call","params":{"name":"get_enforcement_rules","arguments":{}},"id":9}\n' | run_with_timeout 10 "$SENTINEL_BIN" mcp 2>/dev/null | grep '"id":9' | head -1)
 if echo "$ER_RESPONSE" | grep -q '"content"'; then
     log_pass "get_enforcement_rules returned content"
 else
@@ -180,7 +216,7 @@ fi
 
 # ── TEST 10: Record Handover ──────────────────
 log_test "MCP Tool Call: record_handover"
-RH_RESPONSE=$(printf '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}},"id":1}\n{"jsonrpc":"2.0","method":"tools/call","params":{"name":"record_handover","arguments":{"goal_id":"test-goal","content":"E2E test handover note","warnings":["test warning"]}},"id":10}\n' | timeout 10 "$SENTINEL_BIN" mcp 2>/dev/null | grep '"id":10' | head -1)
+RH_RESPONSE=$(printf '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}},"id":1}\n{"jsonrpc":"2.0","method":"tools/call","params":{"name":"record_handover","arguments":{"goal_id":"test-goal","content":"E2E test handover note","warnings":["test warning"]}},"id":10}\n' | run_with_timeout 10 "$SENTINEL_BIN" mcp 2>/dev/null | grep '"id":10' | head -1)
 if echo "$RH_RESPONSE" | grep -q '"content"'; then
     log_pass "record_handover returned content"
 else

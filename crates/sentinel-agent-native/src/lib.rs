@@ -982,6 +982,8 @@ impl GovernanceDrift {
             || !self.unexpected_frameworks.is_empty()
             || !self.unexpected_endpoints.is_empty()
             || !self.unexpected_ports.is_empty()
+            || !self.missing_required_dependencies.is_empty()
+            || !self.missing_required_frameworks.is_empty()
     }
 }
 
@@ -999,6 +1001,9 @@ fn bootstrap_governance_contract_from_workspace(manifold: &mut GoalManifold) -> 
     }
     if manifold.governance.allowed_frameworks.is_empty() {
         manifold.governance.allowed_frameworks = observed.frameworks.iter().cloned().collect();
+    }
+    if manifold.governance.required_frameworks.is_empty() {
+        manifold.governance.required_frameworks = manifold.governance.allowed_frameworks.clone();
     }
     if manifold.governance.allowed_endpoints.is_empty() {
         let mut endpoints = BTreeMap::new();
@@ -1069,15 +1074,63 @@ fn build_governance_proposal(
         drift.missing_required_dependencies.len(),
         drift.missing_required_frameworks.len()
     );
+    let mut evidence = Vec::new();
+    if !drift.unexpected_dependencies.is_empty() {
+        evidence.push(format!(
+            "Observed new dependencies not present in contract: {}",
+            drift.unexpected_dependencies.join(", ")
+        ));
+    }
+    if !drift.unexpected_frameworks.is_empty() {
+        evidence.push(format!(
+            "Observed new frameworks not present in contract: {}",
+            drift.unexpected_frameworks.join(", ")
+        ));
+    }
+    if !drift.unexpected_endpoints.is_empty() {
+        evidence.push(format!(
+            "Observed new endpoints not present in contract: {}",
+            drift.unexpected_endpoints.join(", ")
+        ));
+    }
+    if !drift.unexpected_ports.is_empty() {
+        evidence.push(format!(
+            "Observed new ports not present in contract: {}",
+            drift
+                .unexpected_ports
+                .iter()
+                .map(|port| port.to_string())
+                .collect::<Vec<_>>()
+                .join(", ")
+        ));
+    }
+    if !drift.missing_required_dependencies.is_empty() {
+        evidence.push(format!(
+            "Required dependencies missing in workspace scan: {}",
+            drift.missing_required_dependencies.join(", ")
+        ));
+    }
+    if !drift.missing_required_frameworks.is_empty() {
+        evidence.push(format!(
+            "Required frameworks missing in workspace scan: {}",
+            drift.missing_required_frameworks.join(", ")
+        ));
+    }
 
     sentinel_core::goal_manifold::GovernanceChangeProposal {
         id: Uuid::new_v4(),
         created_at: chrono::Utc::now(),
         rationale,
         proposed_dependencies: drift.unexpected_dependencies.clone(),
+        proposed_dependency_removals: drift.missing_required_dependencies.clone(),
         proposed_frameworks: drift.unexpected_frameworks.clone(),
+        proposed_framework_removals: drift.missing_required_frameworks.clone(),
         proposed_endpoints,
+        proposed_endpoint_removals: Vec::new(),
         proposed_ports: drift.unexpected_ports.clone(),
+        proposed_port_removals: Vec::new(),
+        deterministic_confidence: 1.0,
+        evidence,
         status: sentinel_core::goal_manifold::GovernanceProposalStatus::PendingUserApproval,
         user_note: None,
     }
@@ -1376,4 +1429,65 @@ struct ExecutionResult {
     alignment_score: f64,
     deviations: Vec<DeviationDetails>,
     success: bool,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use sentinel_core::goal_manifold::{GoalManifold, Intent};
+
+    #[test]
+    fn governance_drift_blocks_when_required_dependencies_missing() {
+        let mut manifold = GoalManifold::new(Intent::new("test", Vec::<String>::new()));
+        manifold.governance.allowed_dependencies = vec!["cargo:tokio".to_string()];
+        manifold.governance.required_dependencies = vec!["cargo:tokio".to_string()];
+        manifold.governance.allowed_frameworks = vec!["framework:axum".to_string()];
+        manifold.governance.required_frameworks = vec!["framework:axum".to_string()];
+
+        let observed = ObservedWorkspaceContract {
+            dependencies: BTreeSet::new(),
+            frameworks: BTreeSet::new(),
+            endpoints: BTreeSet::new(),
+            ports: BTreeSet::new(),
+        };
+
+        let drift = compute_contract_drift(&manifold.governance, &observed);
+        assert!(drift.has_blocking_violation());
+        assert_eq!(
+            drift.missing_required_dependencies,
+            vec!["cargo:tokio".to_string()]
+        );
+        assert_eq!(
+            drift.missing_required_frameworks,
+            vec!["framework:axum".to_string()]
+        );
+    }
+
+    #[test]
+    fn governance_proposal_contains_additions_and_removals() {
+        let drift = GovernanceDrift {
+            unexpected_dependencies: vec!["cargo:reqwest".to_string()],
+            unexpected_frameworks: vec!["framework:nextjs".to_string()],
+            unexpected_endpoints: vec!["http://localhost:4173".to_string()],
+            unexpected_ports: vec![4173],
+            missing_required_dependencies: vec!["cargo:tokio".to_string()],
+            missing_required_frameworks: vec!["framework:axum".to_string()],
+        };
+
+        let proposal = build_governance_proposal(&drift);
+        assert_eq!(
+            proposal.proposed_dependencies,
+            vec!["cargo:reqwest".to_string()]
+        );
+        assert_eq!(
+            proposal.proposed_dependency_removals,
+            vec!["cargo:tokio".to_string()]
+        );
+        assert_eq!(
+            proposal.proposed_framework_removals,
+            vec!["framework:axum".to_string()]
+        );
+        assert_eq!(proposal.deterministic_confidence, 1.0);
+        assert!(!proposal.evidence.is_empty());
+    }
 }

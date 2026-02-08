@@ -241,6 +241,11 @@ async fn handle_request(req: McpRequest, id: Value) -> McpResponse {
                         "inputSchema": { "type": "object", "properties": {} }
                     },
                     {
+                        "name": "get_world_model",
+                        "description": "Restituisce il Project World Model corrente (where we are / where we must go / drift / pending governance change)",
+                        "inputSchema": { "type": "object", "properties": {} }
+                    },
+                    {
                         "name": "governance_approve",
                         "description": "Approva la proposal governance pending e aggiorna il manifold",
                         "inputSchema": {
@@ -463,13 +468,16 @@ fn get_manifold() -> Result<GoalManifold, String> {
 
 /// Helper per salvare il manifold
 fn save_manifold(manifold: &GoalManifold) -> Result<(), String> {
-    let path = find_manifold_path().ok_or_else(|| {
-        "Impossibile salvare: sentinel.json non trovato (necessario per sovrascrittura)."
-            .to_string()
-    })?;
+    let path = find_manifold_path().unwrap_or_else(|| {
+        std::env::current_dir()
+            .unwrap_or_else(|_| PathBuf::from("."))
+            .join("sentinel.json")
+    });
     let content = serde_json::to_string_pretty(manifold)
         .map_err(|e| format!("Errore serializzazione: {}", e))?;
-    std::fs::write(&path, content).map_err(|e| format!("Errore scrittura file: {}", e))
+    std::fs::write(&path, content).map_err(|e| format!("Errore scrittura file: {}", e))?;
+    persist_world_model_snapshot_for(manifold, path.parent().unwrap_or(std::path::Path::new(".")))?;
+    Ok(())
 }
 
 fn find_chat_memory_path() -> Option<PathBuf> {
@@ -481,6 +489,23 @@ fn find_chat_memory_path() -> Option<PathBuf> {
 fn default_chat_memory_export_path() -> Option<PathBuf> {
     let root = find_manifold_path()?.parent()?.to_path_buf();
     Some(root.join(".sentinel").join("chat_memory_export.json"))
+}
+
+fn persist_world_model_snapshot_for(
+    manifold: &GoalManifold,
+    root: &std::path::Path,
+) -> Result<(), String> {
+    let path = root.join(".sentinel").join("world_model.json");
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)
+            .map_err(|e| format!("Errore creazione directory world model: {}", e))?;
+    }
+
+    let observed = sentinel_agent_native::observe_workspace_governance(root).ok();
+    let payload = world_model_snapshot(manifold, observed.as_ref());
+    let content = serde_json::to_string_pretty(&payload)
+        .map_err(|e| format!("Errore serializzazione world model: {}", e))?;
+    std::fs::write(path, content).map_err(|e| format!("Errore scrittura world model: {}", e))
 }
 
 fn load_chat_memory() -> ChatMemoryStore {
@@ -938,14 +963,13 @@ async fn handle_tool_call(params: Option<Value>) -> Option<Value> {
             }
 
             let response_text = {
-                let content = serde_json::to_string_pretty(&manifold).unwrap_or_default();
-                match std::fs::write("sentinel.json", content) {
+                match save_manifold(&manifold) {
                     Ok(_) => format!(
                         "PROJECT INITIALIZED SUCCESS: Creati {} obiettivi per '{}'.",
                         manifold.goal_dag.goals().count(),
                         description
                     ),
-                    Err(e) => format!("Errore scrittura file: {}", e),
+                    Err(e) => format!("Errore scrittura manifold: {}", e),
                 }
             };
             Some(serde_json::json!({ "content": [{ "type": "text", "text": response_text }] }))
@@ -1157,6 +1181,22 @@ async fn handle_tool_call(params: Option<Value>) -> Option<Value> {
                     "pending_proposal": manifold.governance.pending_proposal,
                     "history_size": manifold.governance.history.len()
                 }),
+                Err(e) => serde_json::json!({ "error": e }),
+            };
+            Some(
+                serde_json::json!({ "content": [{ "type": "text", "text": result_json.to_string() }] }),
+            )
+        }
+
+        "get_world_model" => {
+            let result_json = match get_manifold() {
+                Ok(manifold) => {
+                    let root = find_manifold_path()
+                        .and_then(|path| path.parent().map(std::path::Path::to_path_buf))
+                        .unwrap_or_else(|| std::path::PathBuf::from("."));
+                    let observed = sentinel_agent_native::observe_workspace_governance(&root).ok();
+                    world_model_snapshot(&manifold, observed.as_ref())
+                }
                 Err(e) => serde_json::json!({ "error": e }),
             };
             Some(
@@ -1841,23 +1881,21 @@ fn governance_seed_diff(
     manifold: &GoalManifold,
     observed: &sentinel_agent_native::GovernanceObservation,
 ) -> serde_json::Value {
-    fn set_of<T: Clone + Ord>(values: &[T]) -> std::collections::BTreeSet<T> {
-        values.iter().cloned().collect()
-    }
-
-    let current_deps = set_of(&manifold.governance.allowed_dependencies);
-    let next_deps = set_of(&observed.dependencies);
-    let current_frameworks = set_of(&manifold.governance.allowed_frameworks);
-    let next_frameworks = set_of(&observed.frameworks);
+    let current_deps = btree_set(&manifold.governance.allowed_dependencies);
+    let next_deps = btree_set(&observed.dependencies);
+    let current_frameworks = btree_set(&manifold.governance.allowed_frameworks);
+    let next_frameworks = btree_set(&observed.frameworks);
     let current_endpoints: std::collections::BTreeSet<String> = manifold
         .governance
         .allowed_endpoints
         .values()
         .cloned()
         .collect();
-    let next_endpoints = set_of(&observed.endpoints);
-    let current_ports = set_of(&manifold.governance.allowed_ports);
-    let next_ports = set_of(&observed.ports);
+    let next_endpoints = btree_set(&observed.endpoints);
+    let current_ports = btree_set(&manifold.governance.allowed_ports);
+    let next_ports = btree_set(&observed.ports);
+    let required_dependencies = btree_set(&manifold.governance.required_dependencies);
+    let required_frameworks = btree_set(&manifold.governance.required_frameworks);
 
     serde_json::json!({
         "dependencies": {
@@ -1875,8 +1913,63 @@ fn governance_seed_diff(
         "ports": {
             "add": next_ports.difference(&current_ports).cloned().collect::<Vec<_>>(),
             "remove": current_ports.difference(&next_ports).cloned().collect::<Vec<_>>()
+        },
+        "required": {
+            "missing_dependencies": required_dependencies.difference(&next_deps).cloned().collect::<Vec<_>>(),
+            "missing_frameworks": required_frameworks.difference(&next_frameworks).cloned().collect::<Vec<_>>()
         }
     })
+}
+
+fn world_model_snapshot(
+    manifold: &GoalManifold,
+    observed: Option<&sentinel_agent_native::GovernanceObservation>,
+) -> serde_json::Value {
+    let contract = serde_json::json!({
+        "required_dependencies": manifold.governance.required_dependencies.clone(),
+        "allowed_dependencies": manifold.governance.allowed_dependencies.clone(),
+        "required_frameworks": manifold.governance.required_frameworks.clone(),
+        "allowed_frameworks": manifold.governance.allowed_frameworks.clone(),
+        "allowed_endpoints": manifold.governance.allowed_endpoints.clone(),
+        "allowed_ports": manifold.governance.allowed_ports.clone()
+    });
+    let observed_json = observed.map(|value| {
+        serde_json::json!({
+            "dependencies": value.dependencies,
+            "frameworks": value.frameworks,
+            "endpoints": value.endpoints,
+            "ports": value.ports,
+        })
+    });
+    let drift = observed.map(|value| governance_seed_diff(manifold, value));
+    let expected_missing_required = observed.map(|value| {
+        let deps = btree_set(&value.dependencies);
+        let frameworks = btree_set(&value.frameworks);
+        let required_deps = btree_set(&manifold.governance.required_dependencies);
+        let required_frameworks = btree_set(&manifold.governance.required_frameworks);
+        serde_json::json!({
+            "dependencies": required_deps.difference(&deps).cloned().collect::<Vec<_>>(),
+            "frameworks": required_frameworks.difference(&frameworks).cloned().collect::<Vec<_>>(),
+        })
+    });
+
+    serde_json::json!({
+        "where_we_are": observed_json,
+        "where_we_must_go": contract,
+        "how_enforced": {
+            "pending_proposal": manifold.governance.pending_proposal.clone(),
+            "history_size": manifold.governance.history.len(),
+            "manifold_version": manifold.current_version(),
+            "manifold_integrity_hash": manifold.integrity_hash.to_hex()
+        },
+        "why": "Keep runtime deterministic by enforcing explicit governance contract for dependencies/frameworks/endpoints/ports.",
+        "deterministic_drift": drift,
+        "required_missing_now": expected_missing_required
+    })
+}
+
+fn btree_set<T: Clone + Ord>(values: &[T]) -> std::collections::BTreeSet<T> {
+    values.iter().cloned().collect()
 }
 
 #[cfg(test)]

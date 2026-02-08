@@ -874,6 +874,12 @@
   background-color: var(--vscode-scrollbarSlider-hoverBackground);
 }
 
+.sentinel-mono {
+  font-family: var(--vscode-editor-font-family, "SFMono-Regular", Menlo, Consolas, monospace);
+  font-size: 11px;
+  opacity: 0.8;
+}
+
 @media (max-width: 1180px) {
   .sentinel-shell--mission {
     grid-template-columns: 76px minmax(0, 1fr);

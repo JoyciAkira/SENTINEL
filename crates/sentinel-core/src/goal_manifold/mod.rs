@@ -137,9 +137,21 @@ pub struct GovernanceChangeProposal {
     pub created_at: Timestamp,
     pub rationale: String,
     pub proposed_dependencies: Vec<String>,
+    #[serde(default)]
+    pub proposed_dependency_removals: Vec<String>,
     pub proposed_frameworks: Vec<String>,
+    #[serde(default)]
+    pub proposed_framework_removals: Vec<String>,
     pub proposed_endpoints: std::collections::HashMap<String, String>,
+    #[serde(default)]
+    pub proposed_endpoint_removals: Vec<String>,
     pub proposed_ports: Vec<u16>,
+    #[serde(default)]
+    pub proposed_port_removals: Vec<u16>,
+    #[serde(default)]
+    pub deterministic_confidence: f64,
+    #[serde(default)]
+    pub evidence: Vec<String>,
     pub status: GovernanceProposalStatus,
     pub user_note: Option<String>,
 }
@@ -503,6 +515,30 @@ impl GoalManifold {
         })?;
         let proposal_id = pending.id;
 
+        self.governance.allowed_dependencies.retain(|dep| {
+            !pending
+                .proposed_dependency_removals
+                .iter()
+                .any(|candidate| candidate == dep)
+        });
+        self.governance.allowed_frameworks.retain(|framework| {
+            !pending
+                .proposed_framework_removals
+                .iter()
+                .any(|candidate| candidate == framework)
+        });
+        self.governance.allowed_ports.retain(|port| {
+            !pending
+                .proposed_port_removals
+                .iter()
+                .any(|candidate| candidate == port)
+        });
+        if !pending.proposed_endpoint_removals.is_empty() {
+            self.governance
+                .allowed_endpoints
+                .retain(|_, endpoint| !pending.proposed_endpoint_removals.contains(endpoint));
+        }
+
         for dep in pending.proposed_dependencies {
             self.governance.allowed_dependencies.push(dep);
         }
@@ -519,6 +555,20 @@ impl GoalManifold {
         self.governance.allowed_frameworks =
             dedup_sorted(self.governance.allowed_frameworks.clone());
         self.governance.allowed_ports = dedup_sorted(self.governance.allowed_ports.clone());
+        self.governance.required_dependencies = self
+            .governance
+            .required_dependencies
+            .iter()
+            .filter(|dep| self.governance.allowed_dependencies.contains(dep))
+            .cloned()
+            .collect();
+        self.governance.required_frameworks = self
+            .governance
+            .required_frameworks
+            .iter()
+            .filter(|framework| self.governance.allowed_frameworks.contains(framework))
+            .cloned()
+            .collect();
 
         if let Some(history_entry) = self
             .governance
@@ -867,9 +917,15 @@ mod tests {
             created_at: chrono::Utc::now(),
             rationale: "legacy proposal".to_string(),
             proposed_dependencies: vec!["cargo:old".to_string()],
+            proposed_dependency_removals: vec![],
             proposed_frameworks: vec!["framework:old".to_string()],
+            proposed_framework_removals: vec![],
             proposed_endpoints: std::collections::HashMap::new(),
+            proposed_endpoint_removals: vec![],
             proposed_ports: vec![1111],
+            proposed_port_removals: vec![],
+            deterministic_confidence: 1.0,
+            evidence: vec!["seed reset".to_string()],
             status: GovernanceProposalStatus::PendingUserApproval,
             user_note: None,
         });
@@ -927,5 +983,85 @@ mod tests {
             manifold.governance.required_frameworks,
             vec!["framework:axum".to_string()]
         );
+    }
+
+    #[test]
+    fn test_approve_governance_proposal_applies_additions_and_removals() {
+        let intent = Intent::new("Test project", Vec::<String>::new());
+        let mut manifold = GoalManifold::new(intent);
+        manifold.governance.allowed_dependencies =
+            vec!["cargo:tokio".to_string(), "cargo:serde".to_string()];
+        manifold.governance.required_dependencies = vec!["cargo:serde".to_string()];
+        manifold.governance.allowed_frameworks =
+            vec!["framework:axum".to_string(), "framework:react".to_string()];
+        manifold.governance.required_frameworks = vec!["framework:axum".to_string()];
+        manifold
+            .governance
+            .allowed_endpoints
+            .insert("api".to_string(), "http://localhost:8080".to_string());
+        manifold.governance.allowed_ports = vec![8080, 5173];
+
+        manifold.record_governance_proposal(GovernanceChangeProposal {
+            id: Uuid::new_v4(),
+            created_at: chrono::Utc::now(),
+            rationale: "deterministic contract update".to_string(),
+            proposed_dependencies: vec!["cargo:reqwest".to_string()],
+            proposed_dependency_removals: vec!["cargo:serde".to_string()],
+            proposed_frameworks: vec!["framework:nextjs".to_string()],
+            proposed_framework_removals: vec!["framework:axum".to_string()],
+            proposed_endpoints: std::collections::HashMap::from([(
+                "preview".to_string(),
+                "http://localhost:4173".to_string(),
+            )]),
+            proposed_endpoint_removals: vec!["http://localhost:8080".to_string()],
+            proposed_ports: vec![4173],
+            proposed_port_removals: vec![8080],
+            deterministic_confidence: 1.0,
+            evidence: vec!["scan".to_string()],
+            status: GovernanceProposalStatus::PendingUserApproval,
+            user_note: None,
+        });
+
+        let _ = manifold
+            .approve_pending_governance_proposal(Some("approved".to_string()))
+            .expect("proposal should be approved");
+
+        assert!(manifold
+            .governance
+            .allowed_dependencies
+            .contains(&"cargo:reqwest".to_string()));
+        assert!(!manifold
+            .governance
+            .allowed_dependencies
+            .contains(&"cargo:serde".to_string()));
+        assert!(manifold
+            .governance
+            .allowed_frameworks
+            .contains(&"framework:nextjs".to_string()));
+        assert!(!manifold
+            .governance
+            .allowed_frameworks
+            .contains(&"framework:axum".to_string()));
+        assert_eq!(
+            manifold.governance.required_dependencies,
+            Vec::<String>::new()
+        );
+        assert_eq!(
+            manifold.governance.required_frameworks,
+            Vec::<String>::new()
+        );
+        assert!(manifold
+            .governance
+            .allowed_endpoints
+            .values()
+            .any(|value| value == "http://localhost:4173"));
+        assert!(!manifold
+            .governance
+            .allowed_endpoints
+            .values()
+            .any(|value| value == "http://localhost:8080"));
+        assert!(manifold.governance.allowed_ports.contains(&4173));
+        assert!(!manifold.governance.allowed_ports.contains(&8080));
+        assert!(manifold.governance.pending_proposal.is_none());
     }
 }

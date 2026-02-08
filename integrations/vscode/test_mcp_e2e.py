@@ -149,7 +149,8 @@ if r and "result" in r:
     expected_tools = [
         "validate_action", "get_alignment", "safe_write",
         "propose_strategy", "record_handover",
-        "get_cognitive_map", "get_enforcement_rules"
+        "get_cognitive_map", "get_enforcement_rules",
+        "get_reliability", "governance_status", "get_world_model"
     ]
     for name in expected_tools:
         if name in tool_names:
@@ -177,6 +178,23 @@ if text:
         log_pass("Text response received")
 else:
     log_fail(f"get_alignment failed: {r}")
+
+# ── TEST 3b: get_world_model ─────────────────────
+log_test("Tool Call: get_world_model")
+r = init_and_call("tools/call", {"name": "get_world_model", "arguments": {}})
+text = extract_text(r)
+if text:
+    log_pass("get_world_model returned content")
+    try:
+        data = json.loads(text)
+        if "where_we_must_go" in data and "how_enforced" in data:
+            log_pass("world model payload shape looks valid")
+        else:
+            log_fail("world model payload missing required keys")
+    except json.JSONDecodeError:
+        log_fail("get_world_model did not return JSON")
+else:
+    log_fail(f"get_world_model failed: {r}")
 
 # ── TEST 4: validate_action ─────────────────────
 log_test("Tool Call: validate_action")
@@ -305,6 +323,11 @@ try:
         if "manifold" in data:
             log_pass("status --json returned manifold")
             manifold = data["manifold"]
+            if isinstance(manifold, str):
+                try:
+                    manifold = json.loads(manifold)
+                except json.JSONDecodeError:
+                    manifold = {}
             root = manifold.get("root_intent", {}).get("description", "N/A")
             goals = manifold.get("goal_dag", {}).get("nodes", {})
             print(f"  Root intent: {root[:80]}")

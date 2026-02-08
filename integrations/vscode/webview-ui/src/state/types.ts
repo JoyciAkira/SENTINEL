@@ -79,6 +79,16 @@ export interface GovernanceState {
     allowed_ports: number[];
     pending_proposal: GovernanceProposalState | null;
     history_size: number;
+    world_model?: {
+        where_we_are?: unknown;
+        where_we_must_go?: unknown;
+        deterministic_drift?: unknown;
+        required_missing_now?: unknown;
+        how_enforced?: {
+            manifold_version?: number;
+            manifold_integrity_hash?: string;
+        };
+    } | null;
 }
 
 export interface PolicyActionState {
