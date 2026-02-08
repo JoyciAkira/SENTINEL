@@ -38,6 +38,7 @@ import GoalGraph from "./components/AtomicForge/GoalGraph";
 type PageId = "command" | "chat" | "forge" | "network" | "audit" | "settings";
 type TimelineStage = "all" | "received" | "plan" | "tool" | "stream" | "approval" | "result" | "error" | "cancel";
 type ThemePreset = "mono-mint" | "warm-graphite" | "pure-vscode";
+type UiMode = "simple" | "advanced";
 
 const RISK_LEVELS = [
   { label: "Low", min: 85, className: "sentinel-risk-low" },
@@ -92,8 +93,9 @@ export default function App() {
   const [timelineCursor, setTimelineCursor] = useState(0);
   const [timelineStageFilter, setTimelineStageFilter] = useState<TimelineStage>("all");
   const [timelineTurnFilter, setTimelineTurnFilter] = useState("");
-  const [sidebarMode, setSidebarMode] = useState(true);
+  const [uiMode, setUiMode] = useState<UiMode>("simple");
   const [showChatDetails, setShowChatDetails] = useState(false);
+  const [askWhy, setAskWhy] = useState(false);
   const [themePreset, setThemePreset] = useState<ThemePreset>("mono-mint");
   const [compactDensity, setCompactDensity] = useState(false);
   const [chatMessagesHeight, setChatMessagesHeight] = useState(620);
@@ -107,8 +109,12 @@ export default function App() {
   }, [vscodeApi]);
 
   useEffect(() => {
+    const savedMode = window.localStorage.getItem("sentinel.ui.mode");
     const savedTheme = window.localStorage.getItem("sentinel.ui.theme");
     const savedDensity = window.localStorage.getItem("sentinel.ui.compact");
+    if (savedMode === "simple" || savedMode === "advanced") {
+      setUiMode(savedMode);
+    }
     if (
       savedTheme === "mono-mint" ||
       savedTheme === "warm-graphite" ||
@@ -120,6 +126,10 @@ export default function App() {
       setCompactDensity(true);
     }
   }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem("sentinel.ui.mode", uiMode);
+  }, [uiMode]);
 
   useEffect(() => {
     window.localStorage.setItem("sentinel.ui.theme", themePreset);
@@ -151,6 +161,15 @@ export default function App() {
     window.localStorage.setItem("sentinel.ui.timelineWidth", String(timelineWidth));
     timelineWidthRef.current = timelineWidth;
   }, [timelineWidth]);
+
+  useEffect(() => {
+    if (uiMode === "simple" && activePage !== "chat") {
+      setActivePage("chat");
+    }
+    if (uiMode === "simple") {
+      setShowChatDetails(false);
+    }
+  }, [uiMode, activePage]);
 
   const filteredTimeline = useMemo(() => {
     const turnPrefix = timelineTurnFilter.trim().toLowerCase();
@@ -256,6 +275,16 @@ export default function App() {
   const currentTimelineEvent =
     filteredTimeline.length > 0 ? filteredTimeline[timelineCursor] : undefined;
   const worldModel = governance?.world_model;
+  const simpleMode = uiMode === "simple";
+  const showInternals = !simpleMode || showChatDetails;
+  const hasExplainableMessages = useMemo(
+    () =>
+      messages.some(
+        (message) =>
+          message.role === "assistant" && (Boolean(message.explainability) || Boolean(message.thoughtChain)),
+      ),
+    [messages],
+  );
   const missingRequiredDeps =
     Array.isArray((worldModel?.required_missing_now as any)?.dependencies)
       ? ((worldModel?.required_missing_now as any).dependencies as unknown[]).length
@@ -357,12 +386,12 @@ export default function App() {
     <div
       className={cn(
         "sentinel-shell",
-        sidebarMode ? "sentinel-shell--chat-first" : "sentinel-shell--mission",
+        simpleMode ? "sentinel-shell--chat-first" : "sentinel-shell--mission",
         `sentinel-theme--${themePreset}`,
         compactDensity && "sentinel-density--compact",
       )}
     >
-      {!sidebarMode && <aside className="sentinel-rail sentinel-panel-resizable">
+      {!simpleMode && <aside className="sentinel-rail sentinel-panel-resizable">
         <div className="sentinel-brand">
           <div className="sentinel-brand__glyph">S</div>
           <div>
@@ -408,62 +437,74 @@ export default function App() {
         </div>
       </aside>}
 
-      <main className={cn("sentinel-main", sidebarMode && "sentinel-main--sidebar")}>
-        <header className={cn("sentinel-topbar", sidebarMode && "sentinel-topbar--sidebar")}>
+      <main className={cn("sentinel-main", simpleMode && "sentinel-main--sidebar")}>
+        <header className={cn("sentinel-topbar", simpleMode && "sentinel-topbar--sidebar")}>
           <div>
-            <p className="sentinel-topbar__eyebrow">{sidebarMode ? "Sidebar Mode" : "Mission Control"}</p>
-            <h1>{pageTitle}</h1>
+            <p className="sentinel-topbar__eyebrow">{simpleMode ? "Simple Mode" : "Mission Control"}</p>
+            <h1>{simpleMode ? "Sentinel Chat" : pageTitle}</h1>
           </div>
           <div className="sentinel-topbar__metrics">
             <Button
               size="xs"
               variant="outline"
               onClick={() => {
-                setSidebarMode((prev) => !prev);
-                if (!sidebarMode && activePage !== "chat") setActivePage("chat");
+                setUiMode((prev) => (prev === "simple" ? "advanced" : "simple"));
               }}
             >
-              {sidebarMode ? (
+              {simpleMode ? (
                 <>
                   <LayoutPanelTop className="size-3.5" />
-                  Mission
+                  Advanced
                 </>
               ) : (
                 <>
                   <PanelRightOpen className="size-3.5" />
-                  Sidebar
+                  Simple
                 </>
               )}
             </Button>
-            <div className="sentinel-pill">
-              <Gauge className="size-3.5" />
-              <span>Alignment {alignmentScore.toFixed(1)}%</span>
-            </div>
-            <div className="sentinel-pill">
-              <Activity className="size-3.5" />
-              <span>Confidence {alignmentConfidence}%</span>
-            </div>
-            {!sidebarMode && (
-              <select
-                className="sentinel-select sentinel-select--tiny"
-                value={themePreset}
-                onChange={(event) => setThemePreset(event.target.value as ThemePreset)}
-              >
-                <option value="mono-mint">Monochrome Mint</option>
-                <option value="warm-graphite">Warm Graphite</option>
-                <option value="pure-vscode">Pure VSCode</option>
-              </select>
+            {simpleMode ? (
+              <>
+                <div className="sentinel-pill">
+                  <Activity className="size-3.5" />
+                  <span>{connected ? "Connected" : "Offline"}</span>
+                </div>
+                {pendingFileApprovals > 0 && (
+                  <div className="sentinel-pill">
+                    <ShieldAlert className="size-3.5" />
+                    <span>{pendingFileApprovals} approvals</span>
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                <div className="sentinel-pill">
+                  <Gauge className="size-3.5" />
+                  <span>Alignment {alignmentScore.toFixed(1)}%</span>
+                </div>
+                <div className="sentinel-pill">
+                  <Activity className="size-3.5" />
+                  <span>Confidence {alignmentConfidence}%</span>
+                </div>
+                <select
+                  className="sentinel-select sentinel-select--tiny"
+                  value={themePreset}
+                  onChange={(event) => setThemePreset(event.target.value as ThemePreset)}
+                >
+                  <option value="mono-mint">Monochrome Mint</option>
+                  <option value="warm-graphite">Warm Graphite</option>
+                  <option value="pure-vscode">Pure VSCode</option>
+                </select>
+                <Button
+                  size="xs"
+                  variant={compactDensity ? "secondary" : "outline"}
+                  onClick={() => setCompactDensity((prev) => !prev)}
+                >
+                  Density: {compactDensity ? "Compact" : "Comfort"}
+                </Button>
+                <Badge className={cn("sentinel-risk-badge", risk.className)}>{alignmentStatus}</Badge>
+              </>
             )}
-            {!sidebarMode && (
-              <Button
-                size="xs"
-                variant={compactDensity ? "secondary" : "outline"}
-                onClick={() => setCompactDensity((prev) => !prev)}
-              >
-                Density: {compactDensity ? "Compact" : "Comfort"}
-              </Button>
-            )}
-            <Badge className={cn("sentinel-risk-badge", risk.className)}>{alignmentStatus}</Badge>
           </div>
         </header>
 
@@ -587,13 +628,25 @@ export default function App() {
                     Chat-first by default. Timeline, explainability, and governance are progressive details.
                   </CardDescription>
                   <div className="sentinel-inline-actions">
-                    <Button
-                      size="xs"
-                      variant="outline"
-                      onClick={() => setShowChatDetails((v) => !v)}
-                    >
-                      {showChatDetails ? "Hide Details" : "Show Details"}
-                    </Button>
+                    {simpleMode && (
+                      <Button
+                        size="xs"
+                        variant={askWhy ? "secondary" : "outline"}
+                        disabled={!hasExplainableMessages}
+                        onClick={() => setAskWhy((value) => !value)}
+                      >
+                        {askWhy ? "Hide Why" : "Ask Why"}
+                      </Button>
+                    )}
+                    {simpleMode && (
+                      <Button
+                        size="xs"
+                        variant="outline"
+                        onClick={() => setShowChatDetails((v) => !v)}
+                      >
+                        {showChatDetails ? "Hide Advanced Panel" : "Advanced Panel"}
+                      </Button>
+                    )}
                     <Button
                       size="xs"
                       variant="outline"
@@ -628,11 +681,11 @@ export default function App() {
                   </div>
                 </CardHeader>
                 <CardContent className="sentinel-chat__body">
-                  {!sidebarMode && <QuickPrompts />}
+                  {simpleMode && messages.length === 0 && <QuickPrompts />}
                   <div
                     className="sentinel-chat-layout"
                     style={
-                      !sidebarMode
+                      !simpleMode
                         ? {
                             gridTemplateColumns: `minmax(0, 1fr) 8px ${timelineWidth}px`,
                           }
@@ -643,14 +696,20 @@ export default function App() {
                       <div
                         className="sentinel-chat__messages"
                         style={
-                          sidebarMode
-                            ? { height: "68vh", minHeight: "520px" }
+                          simpleMode
+                            ? { height: "72vh", minHeight: "560px" }
                             : { height: `${chatMessagesHeight}px` }
                         }
                       >
-                        <MessageList compact={compactDensity} clineMode={sidebarMode} />
+                        <MessageList
+                          compact={compactDensity}
+                          clineMode={simpleMode}
+                          simpleMode={simpleMode}
+                          showInternals={showInternals}
+                          askWhy={askWhy}
+                        />
                       </div>
-                      {!sidebarMode && (
+                      {!simpleMode && (
                         <div
                           className="sentinel-resize-handle sentinel-resize-handle--horizontal"
                           onMouseDown={beginChatHeightResize}
@@ -659,7 +718,7 @@ export default function App() {
                         />
                       )}
                     </div>
-                    {!sidebarMode && (
+                    {!simpleMode && (
                       <div
                         className="sentinel-resize-handle sentinel-resize-handle--vertical"
                         onMouseDown={beginTimelineResize}
@@ -667,10 +726,10 @@ export default function App() {
                         role="separator"
                       />
                     )}
-                    {(showChatDetails || !sidebarMode) && <aside
+                    {showInternals && <aside
                       className="sentinel-timeline"
                       style={
-                        !sidebarMode
+                        !simpleMode
                           ? { height: `${chatMessagesHeight}px`, maxHeight: "none" }
                           : undefined
                       }
@@ -779,7 +838,7 @@ export default function App() {
                     </aside>}
                   </div>
                   <div className="sentinel-chat-composer">
-                    <ChatInput compact={compactDensity} clineMode={sidebarMode} />
+                    <ChatInput compact={compactDensity} clineMode={simpleMode} />
                   </div>
                 </CardContent>
               </Card>

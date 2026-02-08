@@ -7,9 +7,15 @@ import { Bot, ChevronRight } from "lucide-react";
 export default function MessageList({
   compact = false,
   clineMode = false,
+  simpleMode = false,
+  showInternals = false,
+  askWhy = false,
 }: {
   compact?: boolean;
   clineMode?: boolean;
+  simpleMode?: boolean;
+  showInternals?: boolean;
+  askWhy?: boolean;
 }) {
   const messages = useStore((s) => s.messages);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -50,9 +56,17 @@ export default function MessageList({
 
   return (
     <ScrollArea className="h-full w-full">
-      <div className={compact ? "flex flex-col gap-3 p-3" : "flex flex-col gap-6 p-6"}>
+        <div className={compact ? "flex flex-col gap-3 p-3" : "flex flex-col gap-6 p-6"}>
         {messages.map((msg, index) => (
-          <MessageBubble key={msg.id} message={msg} index={index} compact={compact} />
+          <MessageBubble
+            key={msg.id}
+            message={msg}
+            index={index}
+            compact={compact}
+            simpleMode={simpleMode}
+            showInternals={showInternals}
+            askWhy={askWhy}
+          />
         ))}
         <div ref={bottomRef} className="h-4" />
       </div>

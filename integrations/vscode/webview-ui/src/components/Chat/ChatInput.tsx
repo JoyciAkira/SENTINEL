@@ -97,7 +97,7 @@ export default function ChatInput({
         <div className={cn("absolute left-3 bottom-3 flex items-center gap-2", clineMode && "sentinel-input__left-meta")}>
            <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-accent/30 border border-border text-[10px] text-muted-foreground font-medium">
               <Command className="size-2.5" />
-              <span>{clineMode ? "Auto-approve: Read/Edit safe commands" : "Context Active"}</span>
+              <span>{clineMode ? "Outcome-first mode" : "Context Active"}</span>
            </div>
         </div>
 

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import type { ChatMessage } from "../../state/types";
 import { renderMarkdown } from "../../utils/markdown";
 import ToolCallCard from "./ToolCallCard";
@@ -7,14 +7,165 @@ import { cn } from "@/lib/utils";
 import { useVSCodeAPI } from "../../hooks/useVSCodeAPI";
 import { Button } from "../ui/button";
 
+type OutcomeKey = "changed" | "approval" | "next";
+
+interface OutcomeSummary {
+  changed: string[];
+  approval: string[];
+  next: string[];
+}
+
+function normalizeHeading(line: string): string {
+  return line
+    .toLowerCase()
+    .replace(/[`*_]/g, "")
+    .replace(/^\s*[#>\-*\d\.\)\(]+\s*/, "")
+    .replace(/\s*[:\-]+\s*$/, "")
+    .trim();
+}
+
+function detectOutcomeHeading(line: string): OutcomeKey | null {
+  const normalized = normalizeHeading(line);
+  if (
+    normalized.startsWith("what i changed") ||
+    normalized.startsWith("changes made") ||
+    normalized.startsWith("cosa ho cambiato")
+  ) {
+    return "changed";
+  }
+  if (
+    normalized.startsWith("what needs your approval") ||
+    normalized.startsWith("approval needed") ||
+    normalized.startsWith("cosa devi approvare")
+  ) {
+    return "approval";
+  }
+  if (
+    normalized.startsWith("what happens next") ||
+    normalized.startsWith("next steps") ||
+    normalized.startsWith("cosa succede dopo")
+  ) {
+    return "next";
+  }
+  return null;
+}
+
+function cleanLine(line: string): string {
+  return line
+    .replace(/^\s*(?:[-*+]|\d+[.)])\s*/, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function clipText(value: string, max: number = 180): string {
+  if (value.length <= max) return value;
+  return `${value.slice(0, max - 3).trimEnd()}...`;
+}
+
+function dedupeAndLimit(values: string[], fallback: string, limit: number = 3): string[] {
+  const unique = Array.from(new Set(values.map((item) => item.trim()).filter(Boolean)));
+  if (unique.length === 0) return [fallback];
+  return unique.slice(0, limit).map((item) => clipText(item));
+}
+
+function extractStructuredOutcome(content: string): OutcomeSummary | null {
+  const lines = content.split(/\r?\n/);
+  const bucket: Record<OutcomeKey, string[]> = {
+    changed: [],
+    approval: [],
+    next: [],
+  };
+  let current: OutcomeKey | null = null;
+
+  for (const rawLine of lines) {
+    const heading = detectOutcomeHeading(rawLine);
+    if (heading) {
+      current = heading;
+      continue;
+    }
+    if (!current) continue;
+    const cleaned = cleanLine(rawLine);
+    if (!cleaned) continue;
+    bucket[current].push(cleaned);
+  }
+
+  if (bucket.changed.length && bucket.approval.length && bucket.next.length) {
+    return {
+      changed: dedupeAndLimit(bucket.changed, "Changes prepared."),
+      approval: dedupeAndLimit(bucket.approval, "No explicit approval required."),
+      next: dedupeAndLimit(bucket.next, "Continue with the next task."),
+    };
+  }
+
+  return null;
+}
+
+function deriveOutcome(message: ChatMessage): OutcomeSummary {
+  const structured = extractStructuredOutcome(message.content);
+  if (structured) return structured;
+
+  const pendingOps =
+    message.fileOperations?.filter((operation) => operation.approved === undefined) ?? [];
+
+  const sectionDrivenChanges =
+    message.sections?.map((section) =>
+      section.pathHint ? `${section.title} (${section.pathHint})` : section.title,
+    ) ?? [];
+
+  const contentLines = message.content
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(
+      (line) =>
+        line.length > 0 &&
+        !line.startsWith("```") &&
+        !line.startsWith("#") &&
+        !detectOutcomeHeading(line),
+    );
+
+  const changed = dedupeAndLimit(
+    sectionDrivenChanges.length ? sectionDrivenChanges : contentLines.slice(0, 3),
+    "Response generated and ready for review.",
+  );
+
+  const approval =
+    pendingOps.length > 0
+      ? dedupeAndLimit(
+          pendingOps.map((operation) => `Approve ${operation.type} on ${operation.path}`),
+          "Review required approvals.",
+        )
+      : ["No explicit approval required right now."];
+
+  const next = dedupeAndLimit(
+    pendingOps.length > 0
+      ? [
+          "Approve the pending file plan to apply changes safely.",
+          "After approval, ask Sentinel to validate or continue execution.",
+        ]
+      : [
+          "Review the result and request refinements if needed.",
+          "If ready, ask Sentinel for tests, verification, or the next implementation step.",
+        ],
+    "Continue with the next task.",
+  );
+
+  return { changed, approval, next };
+}
+
 export default function MessageBubble({
   message,
   index,
   compact = false,
+  simpleMode = false,
+  showInternals = false,
+  askWhy = false,
 }: {
   message: ChatMessage;
   index: number;
   compact?: boolean;
+  simpleMode?: boolean;
+  showInternals?: boolean;
+  askWhy?: boolean;
 }) {
   const isUser = message.role === "user";
   const [thoughtsExpanded, setThoughtsExpanded] = useState(false);
@@ -22,6 +173,7 @@ export default function MessageBubble({
   const [copiedSectionId, setCopiedSectionId] = useState<string | null>(null);
   const [copiedMessage, setCopiedMessage] = useState(false);
   const [applyingPlan, setApplyingPlan] = useState(false);
+  const [contentExpanded, setContentExpanded] = useState(!simpleMode);
   const vscode = useVSCodeAPI();
   const hasThoughts = message.thoughtChain && message.thoughtChain.length > 0;
   const hasExplainability = Boolean(message.explainability);
@@ -29,6 +181,13 @@ export default function MessageBubble({
   const pendingOperationsCount =
     message.fileOperations?.filter((operation) => operation.approved === undefined).length ?? 0;
   const hasSections = !isUser && (message.sections?.length ?? 0) > 0;
+  const outcome = useMemo(() => deriveOutcome(message), [message]);
+  const shouldShowExplainability = !isUser && hasExplainability && (showInternals || askWhy);
+  const shouldShowInnovation = !isUser && hasInnovation && showInternals;
+
+  useEffect(() => {
+    setContentExpanded(!simpleMode);
+  }, [simpleMode]);
 
   const copyText = async (text: string) => {
     if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
@@ -116,7 +275,7 @@ export default function MessageBubble({
                   >
                     {copiedMessage ? "Copied" : "Copy"}
                   </Button>
-                  {hasThoughts && (
+                  {hasThoughts && showInternals && (
                     <button 
                       onClick={() => setThoughtsExpanded(!thoughtsExpanded)}
                       className="text-[9px] hover:underline normal-case font-normal opacity-60"
@@ -124,10 +283,10 @@ export default function MessageBubble({
                       {thoughtsExpanded ? "Hide thoughts" : "Show thoughts"}
                     </button>
                   )}
-                  {hasExplainability && (
+                  {hasExplainability && (showInternals || askWhy) && (
                     <span className="text-[9px] normal-case opacity-60">Explainable turn</span>
                   )}
-                  {hasInnovation && (
+                  {hasInnovation && showInternals && (
                     <button
                       onClick={() => setInnovationExpanded((prev) => !prev)}
                       className="text-[9px] hover:underline normal-case font-normal opacity-60"
@@ -140,7 +299,7 @@ export default function MessageBubble({
             )}
 
             {/* Thought Chain */}
-            {!isUser && hasThoughts && thoughtsExpanded && (
+            {!isUser && hasThoughts && thoughtsExpanded && showInternals && (
               <div className="mb-3 p-2 bg-muted/50 rounded-lg border border-border/50 font-mono text-[11px] text-muted-foreground animate-in fade-in zoom-in-95 duration-200">
                 {message.thoughtChain!.map((thought, i) => (
                   <div key={i} className="mb-1 last:mb-0">• {thought}</div>
@@ -148,17 +307,61 @@ export default function MessageBubble({
               </div>
             )}
 
-            <div 
-              className="prose prose-sm dark:prose-invert max-w-none prose-p:leading-relaxed prose-pre:bg-muted prose-pre:border prose-pre:rounded-lg sentinel-selectable-content"
-              dangerouslySetInnerHTML={{ __html: renderMarkdown(message.content) }} 
-            />
-            
+            {!isUser && simpleMode && (
+              <div className="sentinel-outcome-card">
+                <div>
+                  <h5>What I changed</h5>
+                  <ul>
+                    {outcome.changed.map((item) => (
+                      <li key={`changed-${item}`}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
+                <div>
+                  <h5>What needs your approval</h5>
+                  <ul>
+                    {outcome.approval.map((item) => (
+                      <li key={`approval-${item}`}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
+                <div>
+                  <h5>What happens next</h5>
+                  <ul>
+                    {outcome.next.map((item) => (
+                      <li key={`next-${item}`}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            )}
+
+            {(!simpleMode || contentExpanded || message.streaming) && (
+              <div 
+                className="prose prose-sm dark:prose-invert max-w-none prose-p:leading-relaxed prose-pre:bg-muted prose-pre:border prose-pre:rounded-lg sentinel-selectable-content"
+                dangerouslySetInnerHTML={{ __html: renderMarkdown(message.content) }} 
+              />
+            )}
+
+            {!isUser && simpleMode && !message.streaming && (
+              <div className="mt-2 flex justify-end">
+                <Button
+                  size="xs"
+                  variant="outline"
+                  onClick={() => setContentExpanded((value) => !value)}
+                  className="h-6 text-[9px] normal-case"
+                >
+                  {contentExpanded ? "Hide full response" : "Show full response"}
+                </Button>
+              </div>
+            )}
+
             {message.streaming && (
               <span className="inline-block w-1.5 h-4 ml-1 bg-primary/40 animate-pulse align-middle" />
             )}
           </div>
 
-          {!isUser && message.explainability && (
+          {shouldShowExplainability && message.explainability && (
             <div className="text-[11px] border rounded-lg p-2 bg-card/60 space-y-1">
               <div className="font-semibold text-[10px] uppercase tracking-wider text-muted-foreground">Turn Explainability</div>
               {message.explainability.intent_summary && (
@@ -202,7 +405,7 @@ export default function MessageBubble({
             </div>
           )}
 
-          {!isUser && message.innovation && (
+          {shouldShowInnovation && message.innovation && (
             <div className="text-[11px] border rounded-lg p-2 bg-card/60 space-y-1">
               <div className="font-semibold text-[10px] uppercase tracking-wider text-muted-foreground">
                 Innovation Trace
@@ -249,7 +452,7 @@ export default function MessageBubble({
             </div>
           )}
 
-          {hasSections && (
+          {hasSections && showInternals && (
             <div className="rounded-lg border bg-card/60 p-2 space-y-1.5">
               <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
                 Implementation Sections
@@ -279,7 +482,7 @@ export default function MessageBubble({
           )}
 
           {/* TOOL CALLS & ACTIONS */}
-          {(message.toolCalls || message.fileOperations) && (
+          {((showInternals && message.toolCalls) || message.fileOperations) && (
             <div className="space-y-2 mt-2 w-full">
               {!isUser && pendingOperationsCount > 0 && (
                 <div className="flex justify-end">
@@ -295,7 +498,7 @@ export default function MessageBubble({
                   </Button>
                 </div>
               )}
-              {message.toolCalls?.map((tool, i) => (
+              {showInternals && message.toolCalls?.map((tool, i) => (
                 <div key={`tool-${i}`} className="animate-in fade-in slide-in-from-left-2 duration-300 fill-mode-both" style={{ animationDelay: '150ms' }}>
                    <ToolCallCard tool={tool} />
                 </div>

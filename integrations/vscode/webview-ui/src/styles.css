@@ -270,6 +270,11 @@
   border-radius: 12px;
 }
 
+.sentinel-shell--chat-first .sentinel-topbar {
+  min-height: 50px;
+  padding: 8px 10px;
+}
+
 .sentinel-topbar {
   min-height: 56px;
   display: flex;
@@ -518,6 +523,40 @@
 .sentinel-chat__messages * {
   user-select: text;
   -webkit-user-select: text;
+}
+
+.sentinel-outcome-card {
+  display: grid;
+  gap: 8px;
+  border: 1px solid var(--sentinel-border);
+  border-radius: 12px;
+  padding: 10px;
+  background: color-mix(in oklab, var(--sentinel-surface) 92%, transparent);
+}
+
+.sentinel-outcome-card > div {
+  display: grid;
+  gap: 4px;
+}
+
+.sentinel-outcome-card h5 {
+  margin: 0;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--sentinel-muted);
+}
+
+.sentinel-outcome-card ul {
+  margin: 0;
+  padding-left: 16px;
+  display: grid;
+  gap: 4px;
+}
+
+.sentinel-outcome-card li {
+  font-size: 12px;
+  line-height: 1.4;
 }
 
 .sentinel-timeline {
@@ -851,7 +890,6 @@
   gap: 4px;
 }
 
-.sentinel-shell--chat-first .sentinel-topbar--sidebar .sentinel-pill:nth-of-type(n + 2),
 .sentinel-shell--chat-first .sentinel-topbar--sidebar .sentinel-risk-badge {
   display: none;
 }
