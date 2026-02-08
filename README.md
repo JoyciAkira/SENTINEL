@@ -7,6 +7,12 @@
 
 **Sentinel** makes goal drift impossible in AI coding agents through cryptographically verified, continuously validated goal alignment and hierarchical context injection.
 
+## Current Status
+
+- Canonical implementation snapshot: `docs/IMPLEMENTATION_STATUS_2026-02-08.md`
+- World model phase details: `docs/PHASE2_WORLD_MODEL.md`
+- Commercial-safe Augment integration notes: `docs/AUGMENT_MCP_COMMERCIAL_SAFE_INTEGRATION.md`
+
 ## The Problem
 
 Current AI coding agents suffer from **cognitive drift** and **context loss**:
