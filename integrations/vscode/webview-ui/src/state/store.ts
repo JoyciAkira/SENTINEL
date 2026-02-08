@@ -34,6 +34,7 @@ export const useStore = create<AppState>((set) => ({
         sections?,
         innovation?,
         fileOperations?,
+        appSpec?,
     ) =>
         set((state) => {
             const msgs = [...state.messages];
@@ -47,6 +48,7 @@ export const useStore = create<AppState>((set) => ({
                         sections: sections || msgs[i].sections,
                         innovation: innovation || msgs[i].innovation,
                         fileOperations: fileOperations || msgs[i].fileOperations,
+                        appSpec: appSpec || msgs[i].appSpec,
                         streaming: false 
                     };
                     break;

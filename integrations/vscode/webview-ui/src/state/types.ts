@@ -2,6 +2,7 @@ export interface ChatMessage {
     id: string;
     role: 'user' | 'assistant';
     content: string; // The visible response
+    appSpec?: AppSpecPayload;
     sections?: ChatSection[];
     innovation?: InnovationPayload;
     thoughtChain?: string[]; // Internal reasoning steps (NEW)
@@ -44,6 +45,75 @@ export interface ChatSection {
     content: string;
     language?: string;
     pathHint?: string;
+}
+
+export type AppSpecFieldType = "string" | "number" | "boolean" | "date" | "enum";
+
+export interface AppSpecField {
+    name: string;
+    type: AppSpecFieldType;
+    required: boolean;
+}
+
+export interface AppSpecEntity {
+    name: string;
+    fields: AppSpecField[];
+}
+
+export interface AppSpecView {
+    id: string;
+    type: "dashboard" | "list" | "detail" | "form";
+    title: string;
+    entity?: string;
+}
+
+export interface AppSpecAction {
+    id: string;
+    type: "create" | "update" | "delete" | "read" | "custom";
+    title: string;
+    entity?: string;
+    requiresApproval?: boolean;
+}
+
+export interface AppSpecPolicy {
+    id: string;
+    rule: string;
+    level: "hard" | "soft";
+}
+
+export interface AppSpecIntegration {
+    id: string;
+    provider: string;
+    purpose: string;
+    required: boolean;
+}
+
+export interface AppSpecTest {
+    id: string;
+    type: "unit" | "integration" | "e2e" | "policy";
+    description: string;
+}
+
+export interface AppSpecPayload {
+    version: "1.0";
+    app: {
+        name: string;
+        summary: string;
+    };
+    dataModel: {
+        entities: AppSpecEntity[];
+    };
+    views: AppSpecView[];
+    actions: AppSpecAction[];
+    policies: AppSpecPolicy[];
+    integrations: AppSpecIntegration[];
+    tests: AppSpecTest[];
+    meta: {
+        source: "heuristic_v1" | "assistant_payload";
+        confidence: number;
+        generated_at: string;
+        prompt_excerpt?: string;
+    };
 }
 
 export interface InnovationPlan {
@@ -230,6 +300,7 @@ export interface AppState {
         sections?: ChatSection[],
         innovation?: InnovationPayload,
         fileOperations?: FileOperation[],
+        appSpec?: AppSpecPayload,
     ) => void;
     updateFileOperationApproval: (
         messageId: string,

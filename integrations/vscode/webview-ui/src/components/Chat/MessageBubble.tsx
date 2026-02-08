@@ -111,6 +111,13 @@ function deriveOutcome(message: ChatMessage): OutcomeSummary {
     message.sections?.map((section) =>
       section.pathHint ? `${section.title} (${section.pathHint})` : section.title,
     ) ?? [];
+  const appSpecChanges = message.appSpec
+    ? [
+        `Drafted AppSpec for ${message.appSpec.app.name}.`,
+        `${message.appSpec.dataModel.entities.length} data entities and ${message.appSpec.views.length} views prepared.`,
+        `${message.appSpec.actions.length} executable actions defined with approval policy hints.`,
+      ]
+    : [];
 
   const contentLines = message.content
     .split(/\r?\n/)
@@ -124,7 +131,11 @@ function deriveOutcome(message: ChatMessage): OutcomeSummary {
     );
 
   const changed = dedupeAndLimit(
-    sectionDrivenChanges.length ? sectionDrivenChanges : contentLines.slice(0, 3),
+    appSpecChanges.length
+      ? appSpecChanges
+      : sectionDrivenChanges.length
+        ? sectionDrivenChanges
+        : contentLines.slice(0, 3),
     "Response generated and ready for review.",
   );
 
@@ -142,6 +153,11 @@ function deriveOutcome(message: ChatMessage): OutcomeSummary {
           "Approve the pending file plan to apply changes safely.",
           "After approval, ask Sentinel to validate or continue execution.",
         ]
+      : message.appSpec
+        ? [
+            "Review the Live Preview panel generated from AppSpec.",
+            "Refine entities/views/actions in plain language and regenerate.",
+          ]
       : [
           "Review the result and request refinements if needed.",
           "If ready, ask Sentinel for tests, verification, or the next implementation step.",

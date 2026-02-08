@@ -34,6 +34,7 @@ import ChatInput from "./components/Chat/ChatInput";
 import QuickPrompts from "./components/Chat/QuickPrompts";
 import GoalTree from "./components/Goals/GoalTree";
 import GoalGraph from "./components/AtomicForge/GoalGraph";
+import AppSpecPreview from "./components/AppSpec/AppSpecPreview";
 
 type PageId = "command" | "chat" | "forge" | "network" | "audit" | "settings";
 type TimelineStage = "all" | "received" | "plan" | "tool" | "stream" | "approval" | "result" | "error" | "cancel";
@@ -96,12 +97,14 @@ export default function App() {
   const [uiMode, setUiMode] = useState<UiMode>("simple");
   const [showChatDetails, setShowChatDetails] = useState(false);
   const [askWhy, setAskWhy] = useState(false);
+  const [showPreviewPanel, setShowPreviewPanel] = useState(true);
   const [themePreset, setThemePreset] = useState<ThemePreset>("mono-mint");
   const [compactDensity, setCompactDensity] = useState(false);
   const [chatMessagesHeight, setChatMessagesHeight] = useState(620);
   const [timelineWidth, setTimelineWidth] = useState(320);
   const chatHeightRef = useRef(chatMessagesHeight);
   const timelineWidthRef = useRef(timelineWidth);
+  const simpleMode = uiMode === "simple";
 
   useEffect(() => {
     vscodeApi.postMessage({ type: "webviewReady" });
@@ -260,6 +263,20 @@ export default function App() {
     () => [...messages].reverse().find((message) => message.role === "assistant" && message.streaming),
     [messages],
   );
+  const latestAppSpec = useMemo(
+    () => [...messages].reverse().find((message) => message.role === "assistant" && message.appSpec)?.appSpec ?? null,
+    [messages],
+  );
+
+  useEffect(() => {
+    if (!latestAppSpec) {
+      setShowPreviewPanel(false);
+      return;
+    }
+    if (simpleMode) {
+      setShowPreviewPanel(true);
+    }
+  }, [latestAppSpec, simpleMode]);
 
   const requestRuntimeRefresh = () => {
     vscodeApi.postMessage({ type: "refreshRuntimePolicies" });
@@ -275,8 +292,10 @@ export default function App() {
   const currentTimelineEvent =
     filteredTimeline.length > 0 ? filteredTimeline[timelineCursor] : undefined;
   const worldModel = governance?.world_model;
-  const simpleMode = uiMode === "simple";
   const showInternals = !simpleMode || showChatDetails;
+  const showSimplePreview = simpleMode && !showChatDetails && showPreviewPanel && Boolean(latestAppSpec);
+  const showTimelinePanel = !simpleMode || showChatDetails;
+  const hasSidePanel = showSimplePreview || showTimelinePanel;
   const hasExplainableMessages = useMemo(
     () =>
       messages.some(
@@ -641,6 +660,16 @@ export default function App() {
                     {simpleMode && (
                       <Button
                         size="xs"
+                        variant={showPreviewPanel ? "secondary" : "outline"}
+                        disabled={!latestAppSpec}
+                        onClick={() => setShowPreviewPanel((value) => !value)}
+                      >
+                        {showPreviewPanel ? "Hide Preview" : latestAppSpec ? "Live Preview" : "Preview unavailable"}
+                      </Button>
+                    )}
+                    {simpleMode && (
+                      <Button
+                        size="xs"
                         variant="outline"
                         onClick={() => setShowChatDetails((v) => !v)}
                       >
@@ -689,6 +718,8 @@ export default function App() {
                         ? {
                             gridTemplateColumns: `minmax(0, 1fr) 8px ${timelineWidth}px`,
                           }
+                        : showSimplePreview
+                          ? { gridTemplateColumns: "minmax(0, 1fr) minmax(280px, 360px)" }
                         : undefined
                     }
                   >
@@ -726,12 +757,19 @@ export default function App() {
                         role="separator"
                       />
                     )}
-                    {showInternals && <aside
+                    {showSimplePreview && latestAppSpec && (
+                      <aside className="sentinel-preview-panel">
+                        <AppSpecPreview appSpec={latestAppSpec} />
+                      </aside>
+                    )}
+                    {showTimelinePanel && <aside
                       className="sentinel-timeline"
                       style={
                         !simpleMode
                           ? { height: `${chatMessagesHeight}px`, maxHeight: "none" }
-                          : undefined
+                          : hasSidePanel
+                            ? { height: "72vh", minHeight: "560px", maxHeight: "none" }
+                            : undefined
                       }
                     >
                       <div className="sentinel-timeline__header">

@@ -46,6 +46,61 @@ interface ParsedChatPlan {
   writeEntries: PendingWritePlanEntry[];
 }
 
+type AppSpecFieldType = "string" | "number" | "boolean" | "date" | "enum";
+
+interface AppSpecPayload {
+  version: "1.0";
+  app: {
+    name: string;
+    summary: string;
+  };
+  dataModel: {
+    entities: Array<{
+      name: string;
+      fields: Array<{
+        name: string;
+        type: AppSpecFieldType;
+        required: boolean;
+      }>;
+    }>;
+  };
+  views: Array<{
+    id: string;
+    type: "dashboard" | "list" | "detail" | "form";
+    title: string;
+    entity?: string;
+  }>;
+  actions: Array<{
+    id: string;
+    type: "create" | "update" | "delete" | "read" | "custom";
+    title: string;
+    entity?: string;
+    requiresApproval?: boolean;
+  }>;
+  policies: Array<{
+    id: string;
+    rule: string;
+    level: "hard" | "soft";
+  }>;
+  integrations: Array<{
+    id: string;
+    provider: string;
+    purpose: string;
+    required: boolean;
+  }>;
+  tests: Array<{
+    id: string;
+    type: "unit" | "integration" | "e2e" | "policy";
+    description: string;
+  }>;
+  meta: {
+    source: "heuristic_v1";
+    confidence: number;
+    generated_at: string;
+    prompt_excerpt?: string;
+  };
+}
+
 const COMMON_APP_SUBPATHS = ["database/", "server/", "client/"];
 
 /**
@@ -451,6 +506,191 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
     }
     if (remaining.length > 0) chunks.push(remaining);
     return chunks;
+  }
+
+  private toSlug(value: string, fallback: string): string {
+    const slug = value
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "");
+    return slug || fallback;
+  }
+
+  private toTitleCase(value: string): string {
+    return value
+      .replace(/[_-]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .replace(/\b\w/g, (char) => char.toUpperCase());
+  }
+
+  private clip(value: string, maxLen: number): string {
+    if (value.length <= maxLen) return value;
+    return `${value.slice(0, maxLen - 3).trimEnd()}...`;
+  }
+
+  private detectEntitiesFromText(text: string): string[] {
+    const lower = text.toLowerCase();
+    const candidates: Array<{ pattern: RegExp; entity: string }> = [
+      { pattern: /\b(todo|task|tasks)\b/, entity: "task" },
+      { pattern: /\b(project|projects)\b/, entity: "project" },
+      { pattern: /\b(user|users|account|accounts|profile|profiles)\b/, entity: "user" },
+      { pattern: /\b(order|orders)\b/, entity: "order" },
+      { pattern: /\b(customer|customers|client|clients)\b/, entity: "customer" },
+      { pattern: /\b(invoice|invoices)\b/, entity: "invoice" },
+      { pattern: /\b(product|products|catalog)\b/, entity: "product" },
+      { pattern: /\b(booking|bookings|reservation|reservations)\b/, entity: "booking" },
+      { pattern: /\b(ticket|tickets|issue|issues)\b/, entity: "ticket" },
+      { pattern: /\b(note|notes)\b/, entity: "note" },
+    ];
+
+    const found = candidates
+      .filter((entry) => entry.pattern.test(lower))
+      .map((entry) => entry.entity);
+    if (found.length === 0) return ["item"];
+    return Array.from(new Set(found)).slice(0, 3);
+  }
+
+  private inferAppName(intent: string): string {
+    const quoted = intent.match(/"([^"]{3,80})"/)?.[1]?.trim();
+    if (quoted) {
+      return this.clip(this.toTitleCase(quoted), 48);
+    }
+
+    const cleaned = intent
+      .replace(/^\/\w+\s*/g, "")
+      .replace(/^(build|create|make|implement|generate)\s+/i, "")
+      .replace(/\b(app|application|web app|platform)\b/gi, "")
+      .trim();
+    if (cleaned.length > 0) {
+      return this.clip(this.toTitleCase(cleaned), 48);
+    }
+    return "Sentinel Generated App";
+  }
+
+  private inferIntegrations(text: string): AppSpecPayload["integrations"] {
+    const lower = text.toLowerCase();
+    const integrations: AppSpecPayload["integrations"] = [];
+    const push = (provider: string, purpose: string, required: boolean) => {
+      integrations.push({
+        id: this.toSlug(provider, "integration"),
+        provider,
+        purpose,
+        required,
+      });
+    };
+
+    if (/\b(postgres|postgresql|mysql|sqlite|mongodb|redis)\b/.test(lower)) {
+      push("database", "Persistent data storage", true);
+    }
+    if (/\b(stripe|payments?)\b/.test(lower)) {
+      push("stripe", "Payment processing", false);
+    }
+    if (/\b(auth0|clerk|oauth|jwt|authentication|auth)\b/.test(lower)) {
+      push("auth", "Identity and access management", true);
+    }
+    if (/\b(sendgrid|mailgun|email|smtp|newsletter)\b/.test(lower)) {
+      push("email", "Transactional notifications", false);
+    }
+    if (/\b(slack|discord|teams|webhook)\b/.test(lower)) {
+      push("notifications", "Operational notifications", false);
+    }
+
+    return integrations;
+  }
+
+  private buildHeuristicAppSpec(
+    intentText: string,
+    answerContent: string,
+    fileOperations?:
+      | Array<{
+          path: string;
+          type: "create" | "edit" | "delete";
+          linesAdded: number;
+          linesRemoved: number;
+          diff: string;
+        }>
+      | undefined,
+  ): AppSpecPayload {
+    const combinedText = `${intentText}\n${answerContent}`;
+    const entities = this.detectEntitiesFromText(combinedText);
+    const appName = this.inferAppName(intentText);
+
+    const dataEntities = entities.map((entity) => {
+      const baseFields: AppSpecPayload["dataModel"]["entities"][number]["fields"] = [
+        { name: "id", type: "string", required: true },
+        { name: "title", type: "string", required: true },
+        { name: "status", type: "string", required: true },
+        { name: "created_at", type: "date", required: true },
+      ];
+      if (entity === "user") {
+        baseFields.push(
+          { name: "email", type: "string", required: true },
+          { name: "role", type: "enum", required: true },
+        );
+      }
+      if (entity === "order" || entity === "invoice") {
+        baseFields.push(
+          { name: "amount", type: "number", required: true },
+          { name: "currency", type: "string", required: true },
+        );
+      }
+      return {
+        name: entity,
+        fields: baseFields,
+      };
+    });
+
+    const primaryEntity = entities[0];
+    let confidence = 0.54;
+    if ((fileOperations?.length ?? 0) > 0) confidence += 0.14;
+    if (entities.length > 1) confidence += 0.08;
+    if (/\b(next\.?js|react|vue|svelte|express|fastapi|django|rails)\b/i.test(combinedText)) {
+      confidence += 0.06;
+    }
+    confidence = Math.min(0.9, Number(confidence.toFixed(2)));
+
+    return {
+      version: "1.0",
+      app: {
+        name: appName,
+        summary: this.clip(
+          `Draft generated from the current intent and latest response. Primary entity: ${primaryEntity}.`,
+          140,
+        ),
+      },
+      dataModel: {
+        entities: dataEntities,
+      },
+      views: [
+        { id: "dashboard", type: "dashboard", title: "Operational Dashboard" },
+        { id: `${primaryEntity}_list`, type: "list", title: `${this.toTitleCase(primaryEntity)} List`, entity: primaryEntity },
+        { id: `${primaryEntity}_form`, type: "form", title: `${this.toTitleCase(primaryEntity)} Form`, entity: primaryEntity },
+      ],
+      actions: [
+        { id: `create_${primaryEntity}`, type: "create", title: `Create ${primaryEntity}`, entity: primaryEntity, requiresApproval: true },
+        { id: `update_${primaryEntity}`, type: "update", title: `Update ${primaryEntity}`, entity: primaryEntity, requiresApproval: true },
+        { id: `delete_${primaryEntity}`, type: "delete", title: `Delete ${primaryEntity}`, entity: primaryEntity, requiresApproval: true },
+        { id: `read_${primaryEntity}`, type: "read", title: `Read ${primaryEntity}`, entity: primaryEntity, requiresApproval: false },
+      ],
+      policies: [
+        { id: "policy_contract", rule: "Public contracts are preserved unless explicit migration is provided.", level: "hard" },
+        { id: "policy_determinism", rule: "Execution remains deterministic and bounded by explicit approvals.", level: "hard" },
+        { id: "policy_visibility", rule: "Default responses remain outcome-first; internals are progressive details.", level: "soft" },
+      ],
+      integrations: this.inferIntegrations(combinedText),
+      tests: [
+        { id: "test_guardrail_existing", type: "integration", description: "Existing behavior remains unchanged for current user flows." },
+        { id: "test_regression_write_gate", type: "policy", description: "Sensitive file operations require explicit approval." },
+        { id: "test_appspec_smoke", type: "e2e", description: "Draft AppSpec generates a valid preview without runtime errors." },
+      ],
+      meta: {
+        source: "heuristic_v1",
+        confidence,
+        generated_at: new Date().toISOString(),
+        prompt_excerpt: this.clip(intentText.trim(), 140),
+      },
+    };
   }
 
   private buildChatPlan(content: string): ParsedChatPlan | null {
@@ -1032,6 +1272,7 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
       let thoughtChain: string[] | undefined = undefined;
       let explainability: Record<string, unknown> | undefined = undefined;
       let innovation: Record<string, unknown> | undefined = undefined;
+      let appSpec: AppSpecPayload | undefined;
       let streamChunks: string[] = [];
       let sections: ChatSectionPayload[] | undefined;
       let fileOperations:
@@ -1103,6 +1344,13 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
       } else {
         this.pendingWritePlans.delete(messageId);
       }
+      appSpec = this.buildHeuristicAppSpec(effectiveText, content, fileOperations);
+      this.emitTimeline(
+        "plan",
+        "AppSpec draft prepared",
+        `${appSpec.dataModel.entities.length} entities • confidence ${Math.round(appSpec.meta.confidence * 100)}%`,
+        messageId,
+      );
 
       streamChunks = this.chunkText(content, 140);
 
@@ -1130,6 +1378,7 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
           explainability,
           sections,
           innovation,
+          appSpec,
           fileOperations,
           streaming: false,
         });

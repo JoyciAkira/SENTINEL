@@ -64,6 +64,7 @@ export function useMCPMessages(vscodeApi: VSCodeAPI): void {
                             role: 'assistant',
                             content: msg.content ?? '',
                             timestamp: Date.now(),
+                            appSpec: msg.appSpec,
                             toolCalls: msg.toolCalls,
                             sections: msg.sections,
                             fileOperations: msg.fileOperations,
@@ -81,6 +82,7 @@ export function useMCPMessages(vscodeApi: VSCodeAPI): void {
                                 msg.sections,
                                 msg.innovation,
                                 msg.fileOperations,
+                                msg.appSpec,
                             );
                         } else {
                             addMessage({
@@ -88,6 +90,7 @@ export function useMCPMessages(vscodeApi: VSCodeAPI): void {
                                 role: 'assistant',
                                 content: msg.content ?? '',
                                 timestamp: Date.now(),
+                                appSpec: msg.appSpec,
                                 toolCalls: msg.toolCalls,
                                 thoughtChain: msg.thoughtChain,
                                 explainability: msg.explainability,
