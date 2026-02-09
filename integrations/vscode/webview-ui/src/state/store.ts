@@ -19,6 +19,7 @@ export const useStore = create<AppState>((set) => ({
         enforceByo: true,
     },
     qualityStatus: null,
+    uiKpiHistory: null,
     goalsCollapsed: true,
     inputText: '',
 
@@ -122,6 +123,8 @@ export const useStore = create<AppState>((set) => ({
     setAugmentSettings: (augmentSettings) => set({ augmentSettings }),
 
     setQualityStatus: (qualityStatus) => set({ qualityStatus }),
+
+    setUiKpiHistory: (uiKpiHistory) => set({ uiKpiHistory }),
 
     toggleGoalsCollapsed: () =>
         set((state) => ({ goalsCollapsed: !state.goalsCollapsed })),

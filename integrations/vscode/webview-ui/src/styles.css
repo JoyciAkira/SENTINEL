@@ -540,6 +540,109 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.sentinel-kpi-trend-grid {
+  display: grid;
+  gap: 6px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.sentinel-kpi-trend-grid > div {
+  border: 1px solid var(--sentinel-border);
+  border-radius: 10px;
+  padding: 6px;
+  background: color-mix(in oklab, var(--sentinel-surface-2) 90%, transparent);
+  display: grid;
+  gap: 4px;
+}
+
+.sentinel-kpi-trend-grid small {
+  font-size: 10px;
+  color: var(--sentinel-muted);
+}
+
+.sentinel-kpi-trend-grid strong {
+  font-size: 12px;
+}
+
+.sentinel-trend-bars {
+  height: 68px;
+  border: 1px solid var(--sentinel-border);
+  border-radius: 10px;
+  padding: 6px;
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  background: color-mix(in oklab, var(--sentinel-surface-2) 88%, transparent);
+}
+
+.sentinel-trend-bars__bar {
+  flex: 1;
+  border-radius: 4px 4px 0 0;
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklab, var(--sentinel-accent) 78%, white),
+    color-mix(in oklab, var(--sentinel-accent) 58%, black)
+  );
+  min-height: 8px;
+}
+
+.sentinel-onboarding {
+  border: 1px solid var(--sentinel-border);
+  border-radius: 12px;
+  padding: 10px;
+  background: color-mix(in oklab, var(--sentinel-surface) 95%, transparent);
+  display: grid;
+  gap: 8px;
+}
+
+.sentinel-onboarding__header {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: baseline;
+}
+
+.sentinel-onboarding__header h3 {
+  margin: 0;
+  font-size: 13px;
+}
+
+.sentinel-onboarding__header span {
+  font-size: 10px;
+  color: var(--sentinel-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.sentinel-onboarding__body {
+  display: grid;
+  gap: 6px;
+}
+
+.sentinel-onboarding__body p {
+  margin: 0;
+  font-size: 12px;
+  color: var(--sentinel-muted);
+}
+
+.sentinel-onboarding__textarea {
+  min-height: 78px;
+  resize: vertical;
+  border: 1px solid var(--sentinel-border);
+  border-radius: 8px;
+  background: color-mix(in oklab, var(--sentinel-surface) 94%, transparent);
+  color: var(--sentinel-ink);
+  padding: 8px;
+  font: inherit;
+  font-size: 12px;
+}
+
+.sentinel-onboarding__actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
 .sentinel-guided-flow {
   display: grid;
   gap: 8px;
@@ -1441,6 +1544,10 @@
   .sentinel-kpi-strip,
   .sentinel-kpi-strip--runtime {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .sentinel-kpi-trend-grid {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .sentinel-guided-flow {

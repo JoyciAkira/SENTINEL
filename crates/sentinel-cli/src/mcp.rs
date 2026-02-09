@@ -767,7 +767,7 @@ fn persist_constitutional_spec(
 }
 
 fn build_counterfactual_plans(
-    strict_goal_execution: bool,
+    _strict_goal_execution: bool,
     reliability_healthy: Option<bool>,
     governance_pending: Option<&String>,
 ) -> serde_json::Value {
@@ -775,8 +775,6 @@ fn build_counterfactual_plans(
     let reliability_ok = reliability_healthy.unwrap_or(false);
     let recommended = if has_pending_governance || !reliability_ok {
         "conservative"
-    } else if strict_goal_execution {
-        "balanced"
     } else {
         "balanced"
     };
@@ -1213,7 +1211,7 @@ fn is_goal_execution_request(user_message: &str) -> bool {
     let has_next_step = message.contains("prossimo step") || message.contains("next step");
     let has_alignment_status = message.contains("alignment status") || message.contains("allineamento");
 
-    (has_goal && has_pending) || (has_goal && has_next_step) || (has_goal && has_alignment_status)
+    has_goal && (has_pending || has_next_step || has_alignment_status)
 }
 
 fn deterministic_template_for_common_requests(user_message: &str) -> Option<String> {

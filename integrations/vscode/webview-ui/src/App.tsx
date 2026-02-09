@@ -96,6 +96,7 @@ export default function App() {
   const runtimeCapabilities = useStore((s) => s.runtimeCapabilities);
   const augmentSettings = useStore((s) => s.augmentSettings);
   const qualityStatus = useStore((s) => s.qualityStatus);
+  const uiKpiHistory = useStore((s) => s.uiKpiHistory);
   const addMessage = useStore((s) => s.addMessage);
 
   const [activePage, setActivePage] = useState<PageId>("chat");
@@ -114,6 +115,12 @@ export default function App() {
   const [compactDensity, setCompactDensity] = useState(false);
   const [chatMessagesHeight, setChatMessagesHeight] = useState(620);
   const [timelineWidth, setTimelineWidth] = useState(320);
+  const [onboardingOpen, setOnboardingOpen] = useState(false);
+  const [onboardingStep, setOnboardingStep] = useState(1);
+  const [onboardingMode, setOnboardingMode] = useState<"no-code" | "developer">("no-code");
+  const [onboardingGoal, setOnboardingGoal] = useState("");
+  const [onboardingUsers, setOnboardingUsers] = useState("");
+  const [onboardingPriority, setOnboardingPriority] = useState<"speed" | "quality" | "compliance">("quality");
   const chatHeightRef = useRef(chatMessagesHeight);
   const timelineWidthRef = useRef(timelineWidth);
   const simpleMode = uiMode === "simple";
@@ -185,6 +192,17 @@ export default function App() {
       setShowChatDetails(false);
     }
   }, [uiMode, activePage]);
+
+  useEffect(() => {
+    const dismissed = window.localStorage.getItem("sentinel.onboarding.dismissed") === "true";
+    if (!dismissed && simpleMode && messages.length === 0 && goals.length === 0) {
+      setOnboardingOpen(true);
+      return;
+    }
+    if (!simpleMode) {
+      setOnboardingOpen(false);
+    }
+  }, [simpleMode, messages.length, goals.length]);
 
   const filteredTimeline = useMemo(() => {
     const turnPrefix = timelineTurnFilter.trim().toLowerCase();
@@ -305,18 +323,22 @@ export default function App() {
     });
   };
 
-  const sendSlashCommand = (command: string) => {
+  const sendChatPrompt = (text: string) => {
     if (!connected || Boolean(activeStreamingMessage)) return;
     addMessage({
       id: crypto.randomUUID(),
       role: "user",
-      content: command,
+      content: text,
       timestamp: Date.now(),
     });
     vscodeApi.postMessage({
       type: "chatMessage",
-      text: command,
+      text,
     });
+  };
+
+  const sendSlashCommand = (command: string) => {
+    sendChatPrompt(command);
   };
 
   const currentTimelineEvent =
@@ -412,6 +434,52 @@ export default function App() {
 
     return () => window.clearTimeout(timer);
   }, [uiKpi, vscodeApi]);
+  const kpiTrend = useMemo(() => {
+    const summary7d = uiKpiHistory?.summary_7d;
+    const summary30d = uiKpiHistory?.summary_30d;
+    const safeDelta = (a: number, b: number): number => a - b;
+    return {
+      hasData: Boolean(summary7d && summary30d),
+      autoRouteDelta:
+        summary7d && summary30d ? safeDelta(summary7d.auto_route_rate, summary30d.auto_route_rate) : 0,
+      promptToPlanDelta:
+        summary7d && summary30d
+          ? safeDelta(summary7d.median_prompt_to_plan_ms, summary30d.median_prompt_to_plan_ms)
+          : 0,
+      approvalDelta:
+        summary7d && summary30d ? safeDelta(summary7d.approval_rate, summary30d.approval_rate) : 0,
+      series14d: uiKpiHistory?.series_14d ?? [],
+    };
+  }, [uiKpiHistory]);
+
+  const closeOnboarding = (persistDismiss: boolean) => {
+    setOnboardingOpen(false);
+    if (persistDismiss) {
+      window.localStorage.setItem("sentinel.onboarding.dismissed", "true");
+    }
+  };
+
+  const runOnboarding = () => {
+    const goal = onboardingGoal.trim();
+    const users = onboardingUsers.trim();
+    if (!goal || !users) return;
+
+    const prompt =
+      `Build an app with this target outcome: ${goal}\n` +
+      `Primary users: ${users}\n` +
+      `Operating mode: ${onboardingMode === "no-code" ? "no-code friendly" : "developer-centric"}\n` +
+      `Priority: ${onboardingPriority}\n\n` +
+      "Execution requirements:\n" +
+      "- outcome-first UX for end users\n" +
+      "- modular and composable architecture\n" +
+      "- deterministic implementation plan with safe approval gates\n" +
+      "- minimal regressions and clear rollout checkpoints";
+
+    sendChatPrompt(prompt);
+    closeOnboarding(true);
+    setOnboardingStep(1);
+  };
+
   const hasExplainableMessages = useMemo(
     () =>
       messages.some(
@@ -772,6 +840,116 @@ export default function App() {
                   </CardDescription>
                   {simpleMode ? (
                     <>
+                      {onboardingOpen && (
+                        <div className="sentinel-onboarding">
+                          <div className="sentinel-onboarding__header">
+                            <h3>No-code Starter Wizard</h3>
+                            <span>Step {onboardingStep}/3</span>
+                          </div>
+
+                          {onboardingStep === 1 && (
+                            <div className="sentinel-onboarding__body">
+                              <p>How do you want Sentinel to guide this build?</p>
+                              <div className="sentinel-inline-actions">
+                                <Button
+                                  size="xs"
+                                  variant={onboardingMode === "no-code" ? "secondary" : "outline"}
+                                  onClick={() => setOnboardingMode("no-code")}
+                                >
+                                  No-code guided
+                                </Button>
+                                <Button
+                                  size="xs"
+                                  variant={onboardingMode === "developer" ? "secondary" : "outline"}
+                                  onClick={() => setOnboardingMode("developer")}
+                                >
+                                  Developer mode
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+
+                          {onboardingStep === 2 && (
+                            <div className="sentinel-onboarding__body">
+                              <p>What should the app do? (outcome in plain language)</p>
+                              <textarea
+                                className="sentinel-onboarding__textarea"
+                                value={onboardingGoal}
+                                onChange={(event) => setOnboardingGoal(event.target.value)}
+                                placeholder="Example: A client portal for requests, invoices, and support chat."
+                              />
+                            </div>
+                          )}
+
+                          {onboardingStep === 3 && (
+                            <div className="sentinel-onboarding__body">
+                              <p>Who uses this app and what is the top priority?</p>
+                              <input
+                                className="sentinel-input"
+                                value={onboardingUsers}
+                                onChange={(event) => setOnboardingUsers(event.target.value)}
+                                placeholder="Example: small team + customers"
+                              />
+                              <div className="sentinel-inline-actions">
+                                <Button
+                                  size="xs"
+                                  variant={onboardingPriority === "speed" ? "secondary" : "outline"}
+                                  onClick={() => setOnboardingPriority("speed")}
+                                >
+                                  Speed
+                                </Button>
+                                <Button
+                                  size="xs"
+                                  variant={onboardingPriority === "quality" ? "secondary" : "outline"}
+                                  onClick={() => setOnboardingPriority("quality")}
+                                >
+                                  Quality
+                                </Button>
+                                <Button
+                                  size="xs"
+                                  variant={onboardingPriority === "compliance" ? "secondary" : "outline"}
+                                  onClick={() => setOnboardingPriority("compliance")}
+                                >
+                                  Compliance
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+
+                          <div className="sentinel-onboarding__actions">
+                            <Button
+                              size="xs"
+                              variant="outline"
+                              onClick={() => {
+                                if (onboardingStep === 1) {
+                                  closeOnboarding(true);
+                                  return;
+                                }
+                                setOnboardingStep((step) => Math.max(1, step - 1));
+                              }}
+                            >
+                              {onboardingStep === 1 ? "Skip" : "Back"}
+                            </Button>
+                            {onboardingStep < 3 ? (
+                              <Button
+                                size="xs"
+                                onClick={() => setOnboardingStep((step) => Math.min(3, step + 1))}
+                              >
+                                Next
+                              </Button>
+                            ) : (
+                              <Button
+                                size="xs"
+                                onClick={runOnboarding}
+                                disabled={!onboardingGoal.trim() || !onboardingUsers.trim()}
+                              >
+                                Start Build
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
                       <div className="sentinel-guided-flow">
                         {(["goal", "plan", "apply"] as GuidedStage[]).map((step) => (
                           <div
@@ -1294,6 +1472,43 @@ export default function App() {
                         <strong>{uiKpi.approvalRate.toFixed(0)}%</strong>
                       </span>
                     </div>
+                    {kpiTrend.hasData && (
+                      <div className="sentinel-kpi-trend-grid">
+                        <div>
+                          <small>7d vs 30d auto-route</small>
+                          <strong className={cn(kpiTrend.autoRouteDelta >= 0 ? "sentinel-up" : "sentinel-down")}>
+                            {kpiTrend.autoRouteDelta >= 0 ? "+" : ""}
+                            {kpiTrend.autoRouteDelta.toFixed(1)}%
+                          </strong>
+                        </div>
+                        <div>
+                          <small>7d vs 30d prompt→plan</small>
+                          <strong className={cn(kpiTrend.promptToPlanDelta <= 0 ? "sentinel-up" : "sentinel-down")}>
+                            {kpiTrend.promptToPlanDelta >= 0 ? "+" : ""}
+                            {Math.round(kpiTrend.promptToPlanDelta)}ms
+                          </strong>
+                        </div>
+                        <div>
+                          <small>7d vs 30d apply rate</small>
+                          <strong className={cn(kpiTrend.approvalDelta >= 0 ? "sentinel-up" : "sentinel-down")}>
+                            {kpiTrend.approvalDelta >= 0 ? "+" : ""}
+                            {kpiTrend.approvalDelta.toFixed(1)}%
+                          </strong>
+                        </div>
+                      </div>
+                    )}
+                    {kpiTrend.series14d.length > 0 && (
+                      <div className="sentinel-trend-bars" aria-label="14 day auto-route trend">
+                        {kpiTrend.series14d.map((point) => (
+                          <div
+                            key={point.date}
+                            className="sentinel-trend-bars__bar"
+                            style={{ height: `${Math.max(10, Math.min(100, point.auto_route_rate))}%` }}
+                            title={`${point.date}: ${point.auto_route_rate.toFixed(1)}%`}
+                          />
+                        ))}
+                      </div>
+                    )}
                   </section>
 
                   <div className="sentinel-panel-grid">

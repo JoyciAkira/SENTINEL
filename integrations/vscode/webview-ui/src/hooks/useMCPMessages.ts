@@ -26,6 +26,7 @@ export function useMCPMessages(vscodeApi: VSCodeAPI): void {
     const setRuntimeCapabilities = useStore((s) => s.setRuntimeCapabilities);
     const setAugmentSettings = useStore((s) => s.setAugmentSettings);
     const setQualityStatus = useStore((s) => s.setQualityStatus);
+    const setUiKpiHistory = useStore((s) => s.setUiKpiHistory);
     const updateFileOperationApproval = useStore((s) => s.updateFileOperationApproval);
 
     useEffect(() => {
@@ -177,6 +178,12 @@ export function useMCPMessages(vscodeApi: VSCodeAPI): void {
                     }
                     break;
 
+                case 'uiKpiHistoryUpdate':
+                    if (msg.history) {
+                        setUiKpiHistory(msg.history);
+                    }
+                    break;
+
                 case 'fileApprovalResult':
                     if (typeof msg.messageId === 'string' && typeof msg.path === 'string') {
                         updateFileOperationApproval(
@@ -207,6 +214,7 @@ export function useMCPMessages(vscodeApi: VSCodeAPI): void {
         setRuntimeCapabilities,
         setAugmentSettings,
         setQualityStatus,
+        setUiKpiHistory,
         updateFileOperationApproval,
     ]);
 }

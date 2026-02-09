@@ -277,6 +277,39 @@ export interface QualityStatusState {
     message?: string;
 }
 
+export interface UiKpiHistoryState {
+    sample_count: number;
+    latest: {
+        turns_total: number;
+        natural_language_turns: number;
+        slash_turns: number;
+        auto_routed_turns: number;
+        auto_route_rate: number;
+        median_prompt_to_plan_ms: number;
+        pending_approvals: number;
+        approval_rate: number;
+        timestamp: number;
+    } | null;
+    summary_7d: {
+        samples: number;
+        turns_total: number;
+        auto_route_rate: number;
+        median_prompt_to_plan_ms: number;
+        approval_rate: number;
+    };
+    summary_30d: {
+        samples: number;
+        turns_total: number;
+        auto_route_rate: number;
+        median_prompt_to_plan_ms: number;
+        approval_rate: number;
+    };
+    series_14d: Array<{
+        date: string;
+        auto_route_rate: number;
+    }>;
+}
+
 export interface AppState {
     connected: boolean;
     messages: ChatMessage[];
@@ -291,6 +324,7 @@ export interface AppState {
     runtimeCapabilities: RuntimeCapabilitiesState | null;
     augmentSettings: AugmentSettingsState;
     qualityStatus: QualityStatusState | null;
+    uiKpiHistory: UiKpiHistoryState | null;
     goalsCollapsed: boolean;
     inputText: string;
 
@@ -327,6 +361,7 @@ export interface AppState {
     setRuntimeCapabilities: (capabilities: RuntimeCapabilitiesState) => void;
     setAugmentSettings: (settings: AugmentSettingsState) => void;
     setQualityStatus: (quality: QualityStatusState) => void;
+    setUiKpiHistory: (history: UiKpiHistoryState) => void;
     toggleGoalsCollapsed: () => void;
     setInputText: (text: string) => void;
     clearMessages: () => void;

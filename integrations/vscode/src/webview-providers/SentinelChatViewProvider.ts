@@ -5,6 +5,19 @@ import { MCPClient } from "../mcp/client";
 import { getWebviewContent } from "./getWebviewContent";
 import type { AlignmentReport } from "../shared/types";
 import { CMD_CODEX_LOGIN } from "../shared/constants";
+import {
+  ORCHESTRATION_ALLOWED_MODES,
+  decideIntentRoute,
+  type IntentRouteDecision,
+  type ParsedOrchestrationCommand,
+} from "./intent-routing";
+import {
+  BLUEPRINTS,
+  buildBlueprintPrompt,
+  detectBlueprintFromIntent,
+  getBlueprintById,
+  listBlueprintsForChat,
+} from "./blueprints";
 
 type AugmentRuntimeMode = "disabled" | "internal_only" | "byo_customer";
 
@@ -106,14 +119,6 @@ interface AppSpecPayload {
 }
 
 const COMMON_APP_SUBPATHS = ["database/", "server/", "client/"];
-const ORCHESTRATE_ALLOWED_MODES = new Set(["plan", "build", "review", "deploy"]);
-
-interface ParsedOrchestrationCommand {
-  task: string;
-  maxParallel: number;
-  subtaskCount: number;
-  modes?: string[];
-}
 
 type ParsedOrchestrationCommandResult =
   | { ok: true; value: ParsedOrchestrationCommand }
@@ -131,12 +136,9 @@ interface UiKpiSnapshot {
   timestamp: number;
 }
 
-type IntentRouteDecision =
-  | { kind: "none" }
-  | { kind: "execute_first_pending"; reason: string }
-  | { kind: "appspec_refine"; reason: string }
-  | { kind: "appspec_plan"; reason: string }
-  | { kind: "orchestrate"; reason: string; command: ParsedOrchestrationCommand };
+type ResolvedIntentRouteDecision =
+  | IntentRouteDecision
+  | { kind: "blueprint"; reason: string; prompt: string; blueprintId: string };
 
 /**
  * WebviewViewProvider for the Sentinel Chat sidebar panel.
@@ -211,6 +213,7 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
       void this.refreshRuntimePolicySnapshot();
       void this.refreshRuntimeCapabilitiesSnapshot();
       void this.refreshAlignmentSnapshot();
+      void this.refreshUiKpiHistorySnapshot();
     }
 
     this.client.on("connected", () => {
@@ -223,6 +226,7 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
       void this.refreshRuntimePolicySnapshot();
       void this.refreshRuntimeCapabilitiesSnapshot();
       void this.refreshAlignmentSnapshot();
+      void this.refreshUiKpiHistorySnapshot();
     });
 
     this.client.on("disconnected", () => {
@@ -297,7 +301,125 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
     const signature = JSON.stringify(normalized);
     if (signature === this.lastUiKpiSignature) return;
     this.lastUiKpiSignature = signature;
+
+    const existing = this.context.globalState.get<UiKpiSnapshot[]>("sentinel.uiKpiHistory", []);
+    const history = [
+      ...existing.filter((entry) => this.isRecord(entry)),
+      normalized,
+    ]
+      .map((entry) => ({
+        turns_total: Math.max(0, Math.round(this.toFiniteNumber((entry as UiKpiSnapshot).turns_total))),
+        natural_language_turns: Math.max(
+          0,
+          Math.round(this.toFiniteNumber((entry as UiKpiSnapshot).natural_language_turns)),
+        ),
+        slash_turns: Math.max(0, Math.round(this.toFiniteNumber((entry as UiKpiSnapshot).slash_turns))),
+        auto_routed_turns: Math.max(
+          0,
+          Math.round(this.toFiniteNumber((entry as UiKpiSnapshot).auto_routed_turns)),
+        ),
+        auto_route_rate: Math.max(
+          0,
+          Math.min(100, this.toFiniteNumber((entry as UiKpiSnapshot).auto_route_rate)),
+        ),
+        median_prompt_to_plan_ms: Math.max(
+          0,
+          Math.round(this.toFiniteNumber((entry as UiKpiSnapshot).median_prompt_to_plan_ms)),
+        ),
+        pending_approvals: Math.max(
+          0,
+          Math.round(this.toFiniteNumber((entry as UiKpiSnapshot).pending_approvals)),
+        ),
+        approval_rate: Math.max(
+          0,
+          Math.min(100, this.toFiniteNumber((entry as UiKpiSnapshot).approval_rate)),
+        ),
+        timestamp: Math.max(0, Math.round(this.toFiniteNumber((entry as UiKpiSnapshot).timestamp))),
+      }))
+      .sort((a, b) => a.timestamp - b.timestamp);
+
+    const historyCutoff = Date.now() - 35 * 24 * 60 * 60 * 1000;
+    const pruned = history
+      .filter((entry) => entry.timestamp >= historyCutoff)
+      .slice(-1200);
+
     await this.context.globalState.update("sentinel.uiKpiSnapshot", normalized);
+    await this.context.globalState.update("sentinel.uiKpiHistory", pruned);
+    await this.refreshUiKpiHistorySnapshot();
+  }
+
+  private summarizeUiKpiWindow(history: UiKpiSnapshot[], windowMs: number): {
+    samples: number;
+    turns_total: number;
+    auto_route_rate: number;
+    median_prompt_to_plan_ms: number;
+    approval_rate: number;
+  } {
+    const cutoff = Date.now() - windowMs;
+    const scoped = history.filter((entry) => entry.timestamp >= cutoff);
+    if (scoped.length === 0) {
+      return {
+        samples: 0,
+        turns_total: 0,
+        auto_route_rate: 0,
+        median_prompt_to_plan_ms: 0,
+        approval_rate: 0,
+      };
+    }
+    const avg = (selector: (entry: UiKpiSnapshot) => number): number =>
+      scoped.reduce((acc, entry) => acc + selector(entry), 0) / scoped.length;
+    return {
+      samples: scoped.length,
+      turns_total: scoped.reduce((acc, entry) => acc + entry.turns_total, 0),
+      auto_route_rate: avg((entry) => entry.auto_route_rate),
+      median_prompt_to_plan_ms: avg((entry) => entry.median_prompt_to_plan_ms),
+      approval_rate: avg((entry) => entry.approval_rate),
+    };
+  }
+
+  private buildUiKpiHistoryPayload(history: UiKpiSnapshot[]): {
+    sample_count: number;
+    latest: UiKpiSnapshot | null;
+    summary_7d: ReturnType<SentinelChatViewProvider["summarizeUiKpiWindow"]>;
+    summary_30d: ReturnType<SentinelChatViewProvider["summarizeUiKpiWindow"]>;
+    series_14d: Array<{ date: string; auto_route_rate: number }>;
+  } {
+    const latest = history.length > 0 ? history[history.length - 1] : null;
+    const bucket = new Map<string, { total: number; count: number }>();
+    for (const entry of history) {
+      const date = new Date(entry.timestamp).toISOString().slice(0, 10);
+      const existing = bucket.get(date) ?? { total: 0, count: 0 };
+      existing.total += entry.auto_route_rate;
+      existing.count += 1;
+      bucket.set(date, existing);
+    }
+    const series_14d = Array.from(bucket.entries())
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .slice(-14)
+      .map(([date, value]) => ({
+        date,
+        auto_route_rate: value.count > 0 ? value.total / value.count : 0,
+      }));
+
+    return {
+      sample_count: history.length,
+      latest,
+      summary_7d: this.summarizeUiKpiWindow(history, 7 * 24 * 60 * 60 * 1000),
+      summary_30d: this.summarizeUiKpiWindow(history, 30 * 24 * 60 * 60 * 1000),
+      series_14d,
+    };
+  }
+
+  private async refreshUiKpiHistorySnapshot(): Promise<void> {
+    const history = this.context.globalState.get<UiKpiSnapshot[]>("sentinel.uiKpiHistory", []);
+    const normalizedHistory = history
+      .filter((entry) => this.isRecord(entry))
+      .map((entry) => entry as UiKpiSnapshot)
+      .sort((a, b) => a.timestamp - b.timestamp);
+    this.postMessage({
+      type: "uiKpiHistoryUpdate",
+      history: this.buildUiKpiHistoryPayload(normalizedHistory),
+    });
   }
 
   private async callToolTracked(
@@ -442,6 +564,7 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
           void this.refreshRuntimePolicySnapshot();
           void this.refreshRuntimeCapabilitiesSnapshot();
           void this.refreshAlignmentSnapshot();
+          void this.refreshUiKpiHistorySnapshot();
         } else {
           this.postMessage({ type: "disconnected" });
         }
@@ -1419,7 +1542,7 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
           };
         }
 
-        const invalid = parsedModes.filter((mode) => !ORCHESTRATE_ALLOWED_MODES.has(mode));
+        const invalid = parsedModes.filter((mode) => !ORCHESTRATION_ALLOWED_MODES.has(mode));
         if (invalid.length > 0) {
           return {
             ok: false,
@@ -1452,93 +1575,33 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
     };
   }
 
-  private regexCount(source: string, pattern: RegExp): number {
-    return source.match(pattern)?.length ?? 0;
-  }
-
-  private inferOrchestrationCommandFromIntent(text: string): ParsedOrchestrationCommand {
-    const lower = text.toLowerCase();
-    const complexityScore =
-      (text.length > 120 ? 1 : 0) +
-      (text.length > 220 ? 1 : 0) +
-      (/\b(end-to-end|end to end|e2e)\b/.test(lower) ? 1 : 0) +
-      (/\b(security|performance|scalability|reliability|migration|compliance)\b/.test(lower)
-        ? 1
-        : 0) +
-      (this.regexCount(lower, /,|;|\band\b|\be\b/g) >= 3 ? 1 : 0);
-
-    const includeDeploy = /\b(deploy|release|rollout|production|prod)\b/.test(lower);
-    const maxParallel = Math.max(1, Math.min(4, complexityScore >= 3 ? 3 : 2));
-    const subtaskCount = Math.max(2, Math.min(6, includeDeploy ? 5 : complexityScore >= 3 ? 5 : 4));
-    const modes = includeDeploy
-      ? ["plan", "build", "review", "deploy"]
-      : ["plan", "build", "review"];
-
-    return {
-      task: text.trim(),
-      maxParallel,
-      subtaskCount,
-      modes,
-    };
-  }
-
-  private async resolveIntentRoute(trimmedText: string): Promise<IntentRouteDecision> {
+  private async resolveIntentRoute(trimmedText: string): Promise<ResolvedIntentRouteDecision> {
     if (!trimmedText || trimmedText.startsWith("/")) {
       return { kind: "none" };
     }
 
-    const lower = trimmedText.toLowerCase();
-    const asksExecutePending =
-      /\b(execute first pending|first pending goal|next pending goal|primo goal pending)\b/.test(
-        lower,
-      );
-    if (
-      asksExecutePending &&
+    const supportsGoalExecution =
       (await this.client.supportsTool("get_goal_graph")) &&
-      (await this.client.supportsTool("chat"))
-    ) {
-      return {
-        kind: "execute_first_pending",
-        reason: "Detected intent to execute the next pending goal.",
-      };
+      (await this.client.supportsTool("chat"));
+    const supportsOrchestration = await this.client.supportsTool("orchestrate_task");
+
+    const routed = decideIntentRoute({
+      trimmedText,
+      hasAppSpecDraft: Boolean(this.lastAppSpecDraft),
+      supportsOrchestration,
+      supportsGoalExecution,
+    });
+    if (routed.kind !== "none") {
+      return routed;
     }
 
-    const mentionsAppSpec = /\b(appspec|app spec)\b/.test(lower);
-    const asksRefine = /\b(refine|improve|migliora|tighten|harden|revise)\b/.test(lower);
-    const asksPlan = /\b(plan|planning|roadmap|steps|phases|decompose|scomponi)\b/.test(lower);
-    if (mentionsAppSpec && asksRefine && this.lastAppSpecDraft) {
+    const blueprint = detectBlueprintFromIntent(trimmedText);
+    if (blueprint && (await this.client.supportsTool("chat"))) {
       return {
-        kind: "appspec_refine",
-        reason: "Detected AppSpec refinement request with available draft.",
-      };
-    }
-    if (mentionsAppSpec && asksPlan && this.lastAppSpecDraft) {
-      return {
-        kind: "appspec_plan",
-        reason: "Detected AppSpec planning request with available draft.",
-      };
-    }
-
-    const explicitOrchestration =
-      /\b(orchestrate|orchestration|orchestrator|orchestrazione|decompose|scomponi|break down)\b/.test(lower);
-    const actionVerb =
-      /\b(build|implement|create|design|refactor|optimi[sz]e|ship|deliver|harden|migrate|upgrade|setup|add|fix|improve|sviluppa|implementa|crea|ottimizza|migliora)\b/.test(
-        lower,
-      );
-    const planningSignal =
-      /\b(roadmap|subtasks?|step-by-step|step by step|phases?|milestones?|piano|fasi)\b/.test(lower);
-    const complexitySignal =
-      trimmedText.length > 160 ||
-      this.regexCount(lower, /,|;|\band\b|\be\b/g) >= 3 ||
-      /\b(end-to-end|end to end|e2e)\b/.test(lower);
-
-    const shouldOrchestrate =
-      explicitOrchestration || (actionVerb && planningSignal) || (actionVerb && complexitySignal);
-    if (shouldOrchestrate && (await this.client.supportsTool("orchestrate_task"))) {
-      return {
-        kind: "orchestrate",
-        reason: "Detected complex implementation intent; auto-routing to bounded orchestration.",
-        command: this.inferOrchestrationCommandFromIntent(trimmedText),
+        kind: "blueprint",
+        reason: `Detected blueprint intent: ${blueprint.title}.`,
+        prompt: buildBlueprintPrompt(blueprint, trimmedText),
+        blueprintId: blueprint.id,
       };
     }
 
@@ -1833,13 +1896,58 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
       return;
     }
 
+    if (trimmedText === "/blueprints") {
+      this.emitTimeline("plan", "Slash command /blueprints", "Listing blueprint catalog", messageId);
+      this.postMessage({
+        type: "chatResponse",
+        id: messageId,
+        content:
+          `Blueprint catalog (${BLUEPRINTS.length}):\n${listBlueprintsForChat()}\n\n` +
+          "Usage: `/blueprint <id> [custom objective]`",
+      });
+      return;
+    }
+
+    if (/^\/blueprint(?:\s|$)/i.test(trimmedText)) {
+      const payload = trimmedText.replace(/^\/blueprint\b/i, "").trim();
+      if (!payload) {
+        this.postMessage({
+          type: "chatResponse",
+          id: messageId,
+          content: "Usage: /blueprint <id> [custom objective]. Run /blueprints to list IDs.",
+        });
+        return;
+      }
+      const [id, ...customParts] = payload.split(/\s+/);
+      const blueprint = getBlueprintById(id ?? "");
+      if (!blueprint) {
+        this.postMessage({
+          type: "chatResponse",
+          id: messageId,
+          content:
+            `Unknown blueprint "${id}".\n` +
+            `Available:\n${listBlueprintsForChat()}`,
+        });
+        return;
+      }
+
+      const customObjective = customParts.join(" ").trim();
+      effectiveText = buildBlueprintPrompt(blueprint, customObjective);
+      this.emitTimeline(
+        "plan",
+        "Slash command /blueprint",
+        `${blueprint.id} ${customObjective ? "with customization" : "default objective"}`,
+        messageId,
+      );
+    }
+
     if (trimmedText === "/help") {
       this.emitTimeline("plan", "Slash command /help", "Help menu requested", messageId);
       this.postMessage({
         type: "chatResponse",
         id: messageId,
         content:
-          "Comandi disponibili:\n- `/init <descrizione>`\n- `/execute-first-pending`\n- `/orchestrate <task> [--parallel=1..4] [--count=2..6] [--modes=plan,build,review,deploy]`\n- `/appspec-refine`\n- `/appspec-plan`\n- `/clear-memory`\n- `/memory-status`\n- `/memory-search <query>`\n- `/memory-export [path]`\n- `/memory-import <path> [merge=true|false]`\n\nTip: puoi anche scrivere l'obiettivo in linguaggio naturale. L'Intent Router sceglie automaticamente il percorso più sicuro (chat/appspec/orchestrate).",
+          "Comandi disponibili:\n- `/init <descrizione>`\n- `/execute-first-pending`\n- `/orchestrate <task> [--parallel=1..4] [--count=2..6] [--modes=plan,build,review,deploy]`\n- `/blueprints`\n- `/blueprint <id> [custom objective]`\n- `/appspec-refine`\n- `/appspec-plan`\n- `/clear-memory`\n- `/memory-status`\n- `/memory-search <query>`\n- `/memory-export [path]`\n- `/memory-import <path> [merge=true|false]`\n\nTip: puoi anche scrivere l'obiettivo in linguaggio naturale. L'Intent Router sceglie automaticamente il percorso più sicuro (chat/appspec/orchestrate/blueprint).",
       });
       return;
     }
@@ -1989,6 +2097,16 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
       if (intentRoute.kind === "appspec_plan" && this.lastAppSpecDraft) {
         this.emitTimeline("plan", "Intent router /appspec-plan", intentRoute.reason, messageId);
         effectiveText = this.buildAppSpecPlanPrompt(this.lastAppSpecDraft);
+      }
+
+      if (intentRoute.kind === "blueprint") {
+        this.emitTimeline(
+          "plan",
+          "Intent router /blueprint",
+          `${intentRoute.blueprintId} auto-detected`,
+          messageId,
+        );
+        effectiveText = intentRoute.prompt;
       }
     }
 
