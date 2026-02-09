@@ -4,6 +4,9 @@ import tailwindcss from '@tailwindcss/vite';
 import { resolve } from 'path';
 
 export default defineConfig({
+    // Relative asset URLs are required for VSCode/Cursor webviews.
+    // Absolute `/assets/...` paths can fail with ERR_ACCESS_DENIED behind webview service workers.
+    base: './',
     plugins: [
         react(),
         tailwindcss(),

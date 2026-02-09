@@ -30,17 +30,17 @@ function getProductionHtml(
 ): string {
     let html = fs.readFileSync(indexPath, 'utf-8');
 
-    const webviewUri = webview.asWebviewUri(
-        vscode.Uri.joinPath(extensionUri, 'out', 'webview')
-    );
-
-    // Rewrite asset paths to use webview URIs (support /assets/ and assets/)
-    const webviewUriStr = webviewUri.toString();
+    // Rewrite asset paths to use webview URIs.
+    // Supports /assets/, assets/, and ./assets/ to stay robust across Vite base modes.
     html = html.replace(
-        /(href|src)="(\/?(?:assets\/)[^"]+)"/g,
+        /(href|src)="((?:\.\/)?\/?(?:assets\/)[^"]+)"/g,
         (_match, attr, assetPath) => {
-            const path = assetPath.startsWith('/') ? assetPath : `/${assetPath}`;
-            return `${attr}="${webviewUriStr}${path}"`;
+            const normalized = assetPath.replace(/^\.\//, '');
+            const relativeAssetPath = normalized.replace(/^\/+/, '');
+            const assetUri = webview.asWebviewUri(
+                vscode.Uri.joinPath(extensionUri, 'out', 'webview', ...relativeAssetPath.split('/'))
+            );
+            return `${attr}="${assetUri.toString()}"`;
         }
     );
 
@@ -62,18 +62,23 @@ function getProductionHtml(
         "</script>",
     ].join('');
 
-    // CSP: allow nonced scripts; no require-trusted-types-for so our default policy can be used
+    // CSP: allow nonced bootstrap + webview-origin module chunks (Vite dynamic imports/preloads).
+    // Keep TT policy bootstrap allowed without forcing require-trusted-types-for.
     const csp = [
         `default-src 'none'`,
+        `base-uri 'none'`,
+        `object-src 'none'`,
         `img-src ${webview.cspSource} data:`,
-        `script-src 'nonce-${nonce}'`,
+        `script-src ${webview.cspSource} 'nonce-${nonce}'`,
+        `connect-src ${webview.cspSource} https:`,
+        `worker-src ${webview.cspSource} blob:`,
         `style-src ${webview.cspSource} 'unsafe-inline'`,
         `font-src ${webview.cspSource}`,
     ].join('; ');
 
     html = html.replace(
         '<head>',
-        `<head>\n<meta http-equiv="Content-Security-Policy" content="${csp}">\n${trustedTypesScript}`
+        `<head>\n<meta http-equiv="Content-Security-Policy" content="${csp}">\n<meta property="csp-nonce" nonce="${nonce}">\n${trustedTypesScript}`
     );
 
     // Add nonce to script tags that don't already have it (e.g. module bundle)
