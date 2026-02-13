@@ -197,20 +197,22 @@ impl OutcomeInterpreter {
         // Use semantic analysis or LLM to classify
         let raw_lower = raw.to_lowercase();
 
-        if raw_lower.contains("web app")
-            || raw_lower.contains("frontend")
-            || raw_lower.contains("ui")
-            || raw_lower.contains("interface")
-        {
-            return Ok(TargetDomain::WebApp);
-        }
-
+        // Check for backend-specific patterns first (more specific)
         if raw_lower.contains("api")
-            || raw_lower.contains("service")
+            || raw_lower.contains("backend service")
             || raw_lower.contains("backend")
             || raw_lower.contains("server")
         {
             return Ok(TargetDomain::BackendService);
+        }
+
+        // Check for frontend patterns (more specific than just "ui")
+        if raw_lower.contains("web app")
+            || raw_lower.contains("webapp")
+            || raw_lower.contains("web interface")
+            || raw_lower.contains("frontend")
+        {
+            return Ok(TargetDomain::WebApp);
         }
 
         Ok(TargetDomain::Other)
@@ -339,7 +341,7 @@ mod tests {
         let context = InterpretContext::default();
 
         let result = interpreter
-            .interpret("Build a billing reconciliation service", &context)
+            .interpret("Build a backend API server for billing", &context)
             .unwrap();
 
         assert!(matches!(

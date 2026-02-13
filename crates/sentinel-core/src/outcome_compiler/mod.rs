@@ -14,7 +14,7 @@
 //! # Examples
 //!
 //! ```no_run
-//! use sentinel_core::outcome_compiler::{OutcomeInterpreter, AtomicModuleCompiler};
+//! use sentinel_core::outcome_compiler::{OutcomeInterpreter, AtomicModuleCompiler, InterpretContext};
 //!
 //! let interpreter = OutcomeInterpreter::new();
 //! let envelope = interpreter.interpret(

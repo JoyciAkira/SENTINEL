@@ -40,6 +40,14 @@ pub enum SentinelError {
     #[error("Network error: {0}")]
     Network(#[from] reqwest::Error),
 
+    /// Invalid input
+    #[error("Invalid input: {0}")]
+    InvalidInput(String),
+
+    /// Not implemented
+    #[error("Not implemented: {0}")]
+    NotImplemented(String),
+
     /// Generic error with context
     #[error("{context}: {source}")]
     WithContext {

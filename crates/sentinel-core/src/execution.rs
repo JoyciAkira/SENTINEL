@@ -1,10 +1,142 @@
 //! Execution contract types shared across Sentinel runtime layers.
 
+use crate::quality::{Artifact, QualityContext, QualityMaximizer, QualityReport};
+use crate::error::{Result, SentinelError};
+
 /// Explicit execution contract:
 /// - where we are
 /// - where we must go
 /// - how we will get there
 /// - why this execution is justified
+
+/// Execution status (AC6 state machine transitions)
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
+pub enum ExecutionStatus {
+    #[serde(rename = "INTENT_CAPTURED")]
+    IntentCaptured,
+    #[serde(rename = "PLAN_COMPILED")]
+    PlanCompiled,
+    #[serde(rename = "READY")]
+    Ready,
+    #[serde(rename = "EXECUTING")]
+    Executing,
+    #[serde(rename = "QUALITY_EVALUATING")]
+    QualityEvaluating,
+    #[serde(rename = "REVISION_REQUIRED")]
+    RevisionRequired,
+    #[serde(rename = "VALIDATED")]
+    Validated,
+    #[serde(rename = "DELIVERED")]
+    Delivered,
+    #[serde(rename = "FAILED")]
+    Failed,
+}
+
+/// Result of an execution with quality gate
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct ExecutionResult {
+    pub status: ExecutionStatus,
+    pub quality_report: Option<QualityReport>,
+    pub artifacts: Vec<Artifact>,
+    pub error_message: Option<String>,
+}
+
+impl Default for ExecutionResult {
+    fn default() -> Self {
+        Self {
+            status: ExecutionStatus::Ready,
+            quality_report: None,
+            artifacts: Vec::new(),
+            error_message: None,
+        }
+    }
+}
+
+/// Execution engine with quality gate integration (AC6 compliant)
+pub struct ExecutionEngine {
+    quality_maximizer: QualityMaximizer,
+    quality_context: QualityContext,
+}
+
+impl ExecutionEngine {
+    /// Create a new execution engine
+    pub fn new(run_id: String) -> Self {
+        let quality_context = QualityContext {
+            run_id,
+            quality_config: crate::quality::QualityConfig::default(),
+            evaluation_suite: None,
+        };
+
+        Self {
+            quality_maximizer: QualityMaximizer::new(),
+            quality_context,
+        }
+    }
+
+    /// Execute with quality gate (AC6: EXECUTING -> QUALITY_EVALUATING -> VALIDATED/REVISION_REQUIRED)
+    pub async fn execute_with_quality_gate(
+        &self,
+        module_id: &str,
+        artifact: &Artifact,
+    ) -> std::result::Result<ExecutionResult, SentinelError> {
+        // 1. Pre-execution quality check (QUALITY_EVALUATING state)
+        let quality_report = self
+            .quality_maximizer
+            .maximize_quality(module_id, artifact, &self.quality_context)
+            .await?;
+
+        // 2. Check hard gates (AC6 G4: Quality Acceptance)
+        if !quality_report.passes_hard_gates() {
+            return Ok(ExecutionResult {
+                status: ExecutionStatus::RevisionRequired,
+                quality_report: Some(quality_report),
+                ..Default::default()
+            });
+        }
+
+        // 3. Execute if passed
+        let execution_artifacts = self.execute_module(module_id).await?;
+
+        // 4. Post-execution validation
+        let mut result = ExecutionResult {
+            status: ExecutionStatus::Validated,
+            quality_report: Some(quality_report),
+            artifacts: execution_artifacts,
+            ..Default::default()
+        };
+
+        // Link quality report to artifacts
+        if let Some(ref report) = result.quality_report {
+            for artifact in &mut result.artifacts {
+                // AC6 linkage: artifact produced after quality evaluation
+                // In full implementation, would add quality_report_id to artifact metadata
+            }
+        }
+
+        Ok(result)
+    }
+
+    /// Execute a module (placeholder)
+    async fn execute_module(&self, _module_id: &str) -> std::result::Result<Vec<Artifact>, SentinelError> {
+        // TODO: Implement actual module execution
+        // For now, return empty artifacts
+        Ok(Vec::new())
+    }
+
+    /// Check if hard gates pass
+    fn passes_hard_gates(&self, report: &QualityReport) -> bool {
+        report.passes_hard_gates()
+    }
+
+    /// Validate output (placeholder)
+    async fn validate_output(&self, _result: &ExecutionResult, _report: &QualityReport) -> std::result::Result<QualityReport, SentinelError> {
+        // TODO: Implement post-execution validation
+        // For now, return a dummy report
+        Err(crate::SentinelError::NotImplemented(
+            "Post-execution validation not yet implemented".to_string(),
+        ))
+    }
+}
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ExecutionNorthStar {
     pub where_we_are: String,
@@ -15,18 +147,18 @@ pub struct ExecutionNorthStar {
 }
 
 impl ExecutionNorthStar {
-    pub fn validate(&self) -> Result<(), &'static str> {
+    pub fn validate(&self) -> Result<()> {
         if self.where_we_are.trim().is_empty() {
-            return Err("where_we_are is empty");
+            return Err(SentinelError::InvalidInput("where_we_are is empty".to_string()));
         }
         if self.where_we_must_go.trim().is_empty() {
-            return Err("where_we_must_go is empty");
+            return Err(SentinelError::InvalidInput("where_we_must_go is empty".to_string()));
         }
         if self.how.trim().is_empty() {
-            return Err("how is empty");
+            return Err(SentinelError::InvalidInput("how is empty".to_string()));
         }
         if self.why.trim().is_empty() {
-            return Err("why is empty");
+            return Err(SentinelError::InvalidInput("why is empty".to_string()));
         }
         Ok(())
     }
