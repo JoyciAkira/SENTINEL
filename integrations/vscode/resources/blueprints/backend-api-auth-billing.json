@@ -1,0 +1,124 @@
+{
+  "blueprint_id": "backend-api-auth-billing-v1",
+  "name": "Backend API with Auth and Billing",
+  "description": "REST API with authentication, Stripe billing integration",
+  "outcome_envelope": {
+    "schema_version": "1.0",
+    "intent": {
+      "goal": "Build a billing reconciliation service",
+      "target_domain": "backend_service",
+      "success_narrative": "API ingests provider events, reconciles with invoices, exposes discrepancy reports"
+    },
+    "constraints": {
+      "non_negotiables": [
+        "Idempotent event processing",
+        "Immutable audit trail",
+        "Payment card data never stored directly"
+      ],
+      "tech_constraints": [
+        "Rust",
+        "Kafka",
+        "PostgreSQL"
+      ],
+      "time_budget": "10d",
+      "cost_budget": "low"
+    },
+    "quality_metrics": [
+      {
+        "name": "reconciliation_accuracy",
+        "measurement": "percent",
+        "target": ">=99.9",
+        "gate": "hard"
+      },
+      {
+        "name": "api_latency_p95",
+        "measurement": "milliseconds",
+        "target": "<=200",
+        "gate": "hard"
+      }
+    ],
+    "acceptance_criteria": [
+      "Ingest webhook events from provider",
+      "Reconcile with Stripe invoices",
+      "Generate discrepancy reports"
+    ],
+    "assumptions": [
+      "Stripe webhook signatures available",
+      "Kafka cluster available"
+    ],
+    "risk_register": [
+      {
+        "risk": "Webhook replay attacks",
+        "mitigation": "Signature validation with timestamp checking"
+      },
+      {
+        "risk": "Race conditions in reconciliation",
+        "mitigation": "Idempotency keys on all events"
+      }
+    ]
+  },
+  "precompiled_dag": {
+    "modules": [
+      {
+        "module_id": "event-ingest",
+        "module_name": "Event Ingest",
+        "objective": "Webhook receiver with signature validation",
+        "tech_stack": ["Rust", "Axum", "Kafka Producer"],
+        "estimated_hours": 12,
+        "dependencies": [],
+        "invariants": [
+          "Duplicate events are deduplicated by idempotency key",
+          "Invalid signatures are rejected with 401"
+        ]
+      },
+      {
+        "module_id": "reconcile-engine",
+        "module_name": "Reconciliation Engine",
+        "objective": "Match provider events with invoice records",
+        "tech_stack": ["Rust", "Tokio", "PostgreSQL"],
+        "estimated_hours": 20,
+        "dependencies": ["event-ingest"],
+        "invariants": [
+          "Sum calculations are always consistent",
+          "Reconciliation is deterministic and reproducible"
+        ]
+      },
+      {
+        "module_id": "reporting-api",
+        "module_name": "Reporting API",
+        "objective": "REST API for discrepancy reports and audit logs",
+        "tech_stack": ["Rust", "Axum"],
+        "estimated_hours": 10,
+        "dependencies": ["reconcile-engine"],
+        "invariants": [
+          "Read-only operations never modify data",
+          "All responses include pagination metadata"
+        ]
+      }
+    ]
+  },
+  "guardrail_baseline": {
+    "scope_guardrails": [
+      "No direct database writes from API endpoints",
+      "All mutations go through reconciliation engine"
+    ],
+    "quality_guardrails": [
+      "99.9% reconciliation accuracy requirement",
+      "API response time <200ms p95"
+    ],
+    "dependency_guardrails": [
+      "Event ingest must be healthy before reconciliation",
+      "Reconciliation must complete before reporting"
+    ]
+  },
+  "benchmark_tags": {
+    "scenario_id": "backend-api-billing",
+    "difficulty_tier": "intermediate",
+    "rubric_profile": "backend-v1"
+  },
+  "ttfs_baseline": {
+    "p50_seconds": 1800,
+    "p90_seconds": 2700,
+    "first_success_rate_target": 0.45
+  }
+}

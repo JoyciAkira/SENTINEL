@@ -23,6 +23,10 @@ import {
   CMD_VALIDATE_ACTION,
   CMD_SHOW_ALIGNMENT,
   CMD_CODEX_LOGIN,
+  CMD_BLUEPRINT_LIST,
+  CMD_BLUEPRINT_SHOW,
+  CMD_BLUEPRINT_APPLY,
+  CMD_BLUEPRINT_QUICKSTART,
   POLL_INTERVAL_MS,
 } from "./shared/constants";
 
@@ -352,6 +356,176 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.window.showErrorMessage(
           `Failed to get alignment: ${err.message}`,
         );
+      }
+    }),
+
+    // Blueprint commands
+    vscode.commands.registerCommand(CMD_BLUEPRINT_LIST, async () => {
+      outputChannel.appendLine("Listing blueprints...");
+      try {
+        const result = spawn(sentinelPath, ["blueprint", "list", "--json"], {
+          cwd: workspaceRoot,
+          shell: true,
+        });
+
+        let stdout = "";
+        let stderr = "";
+
+        result.stdout?.on("data", (chunk: Buffer) => {
+          stdout += chunk.toString();
+        });
+
+        result.stderr?.on("data", (chunk: Buffer) => {
+          stderr += chunk.toString();
+        });
+
+        result.on("close", async (code) => {
+          if (code === 0 && stdout) {
+            try {
+              const blueprints = JSON.parse(stdout);
+              const items = blueprints.map((bp: any) => ({
+                label: bp.name,
+                description: bp.description,
+                detail: `${bp.category} | ${bp.difficulty} | ${bp.estimated_time}`,
+              }));
+
+              const selected = await vscode.window.showQuickPick(items, {
+                placeHolder: "Select a blueprint to view details",
+              });
+
+              if (selected) {
+                await vscode.commands.executeCommand(CMD_BLUEPRINT_SHOW, selected.label);
+              }
+            } catch (e) {
+              outputChannel.appendLine(`Failed to parse blueprint list: ${e}`);
+            }
+          } else {
+            vscode.window.showErrorMessage(`Failed to list blueprints: ${stderr}`);
+          }
+        });
+      } catch (err: any) {
+        vscode.window.showErrorMessage(`Failed to list blueprints: ${err.message}`);
+      }
+    }),
+
+    vscode.commands.registerCommand(CMD_BLUEPRINT_SHOW, async (name?: string) => {
+      const blueprintName = name ?? await vscode.window.showInputBox({
+        prompt: "Enter blueprint name",
+        placeHolder: "e.g., web-app-auth-crud-board",
+      });
+
+      if (!blueprintName) return;
+
+      outputChannel.appendLine(`Showing blueprint: ${blueprintName}`);
+      try {
+        const result = spawn(sentinelPath, ["blueprint", "show", blueprintName], {
+          cwd: workspaceRoot,
+          shell: true,
+        });
+
+        let stdout = "";
+        let stderr = "";
+
+        result.stdout?.on("data", (chunk: Buffer) => {
+          stdout += chunk.toString();
+        });
+
+        result.stderr?.on("data", (chunk: Buffer) => {
+          stderr += chunk.toString();
+        });
+
+        result.on("close", (code) => {
+          if (code === 0) {
+            // Create a new untitled document with the blueprint details
+            vscode.workspace.openTextDocument({
+              content: stdout,
+              language: "markdown",
+            }).then(doc => {
+                vscode.window.showTextDocument(doc);
+              });
+          } else {
+            vscode.window.showErrorMessage(`Failed to show blueprint: ${stderr}`);
+          }
+        });
+      } catch (err: any) {
+        vscode.window.showErrorMessage(`Failed to show blueprint: ${err.message}`);
+      }
+    }),
+
+    vscode.commands.registerCommand(CMD_BLUEPRINT_APPLY, async (name?: string) => {
+      const blueprintName = name ?? await vscode.window.showInputBox({
+        prompt: "Enter blueprint name to apply",
+        placeHolder: "e.g., web-app-auth-crud-board",
+      });
+
+      if (!blueprintName) return;
+
+      const confirm = await vscode.window.showWarningMessage(
+        `Apply blueprint '${blueprintName}' to current workspace?`,
+        { modal: true },
+        "Apply",
+      );
+
+      if (confirm !== "Apply") return;
+
+      outputChannel.appendLine(`Applying blueprint: ${blueprintName}`);
+      try {
+        await vscode.window.withProgress(
+          {
+            location: vscode.ProgressLocation.Notification,
+            title: `Applying blueprint '${blueprintName}'...`,
+            cancellable: false,
+          },
+          async () => {
+            const result = spawn(sentinelPath, ["blueprint", "apply", blueprintName], {
+              cwd: workspaceRoot,
+              shell: true,
+            });
+
+            let stdout = "";
+            let stderr = "";
+
+            result.stdout?.on("data", (chunk: Buffer) => {
+              stdout += chunk.toString();
+            });
+
+            result.stderr?.on("data", (chunk: Buffer) => {
+              stderr += chunk.toString();
+            });
+
+            return new Promise<void>((resolve, reject) => {
+              result.on("close", (code) => {
+                if (code === 0) {
+                  vscode.window.showInformationMessage(`Blueprint applied successfully!\n${stdout}`);
+                  resolve();
+                } else {
+                  vscode.window.showErrorMessage(`Failed to apply blueprint: ${stderr}`);
+                  reject(new Error(stderr));
+                }
+              });
+            });
+          },
+        );
+      } catch (err: any) {
+        vscode.window.showErrorMessage(`Failed to apply blueprint: ${err.message}`);
+      }
+    }),
+
+    vscode.commands.registerCommand(CMD_BLUEPRINT_QUICKSTART, async () => {
+      // Show quickstart dialog with blueprint options
+      const options = [
+        { label: "$(browser) Web App with Auth", value: "web-app-auth-crud-board", description: "Full-stack web app with authentication, CRUD, and kanban board" },
+        { label: "$(server) Backend API", value: "backend-api-auth-billing", description: "REST API with authentication and Stripe billing" },
+        { label: "$(beaker) CI/CD Pipeline", value: "integration-ci-quality-gates", description: "CI/CD integration with automated quality gates" },
+        { label: "$(git-branch) Migration Blueprint", value: "migration-monolith-to-modular", description: "Monolith to microservices migration guide" },
+      ];
+
+      const selected = await vscode.window.showQuickPick(options, {
+        placeHolder: "Choose a blueprint to quickstart your project",
+      });
+
+      if (selected) {
+        await vscode.commands.executeCommand(CMD_BLUEPRINT_APPLY, selected.value);
       }
     }),
   );

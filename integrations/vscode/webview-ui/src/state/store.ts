@@ -22,6 +22,8 @@ export const useStore = create<AppState>((set) => ({
     uiKpiHistory: null,
     goalsCollapsed: true,
     inputText: '',
+    pinnedTranscript: null,
+    qualityDashboard: null,
 
     setConnected: (connected: boolean) => set({ connected }),
 
@@ -132,4 +134,8 @@ export const useStore = create<AppState>((set) => ({
     setInputText: (text: string) => set({ inputText: text }),
 
     clearMessages: () => set({ messages: [] }),
+
+    setPinnedTranscript: (transcript) => set({ pinnedTranscript: transcript }),
+
+    setQualityDashboard: (dashboard) => set({ qualityDashboard: dashboard }),
 }));

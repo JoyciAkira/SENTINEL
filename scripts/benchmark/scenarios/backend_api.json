@@ -1,0 +1,24 @@
+{
+  "scenario_id": "backend-api-v1",
+  "name": "Backend API Service",
+  "description": "Build a billing reconciliation service",
+  "difficulty_tier": "intermediate",
+  "estimated_duration_minutes": 60,
+  "outcome_envelope": {
+    "goal": "Build a billing reconciliation service",
+    "target_domain": "backend_service",
+    "success_narrative": "Invoices reconcile daily with provider events"
+  },
+  "verification_steps": [
+    {
+      "step": 1,
+      "action": "run_tests",
+      "expected": "all_tests_pass"
+    },
+    {
+      "step": 2,
+      "action": "check_outcome_fidelity",
+      "expected": "fidelity >= 0.85"
+    }
+  ]
+}

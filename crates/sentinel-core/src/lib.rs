@@ -88,6 +88,7 @@ pub mod memory;
 pub mod outcome_compiler;
 pub mod quality;
 pub mod security;
+pub mod telemetry;
 pub mod types;
 
 // Re-export commonly used types for convenience
@@ -114,6 +115,10 @@ pub use outcome_compiler::{
 pub use quality::{
     Artifact, ArtifactType, DimensionScore, GateType, QualityContext, QualityEvaluator,
     QualityMaximizer, QualityMetadata, QualityMetric, QualityReport, QualityRubric, Verdict,
+};
+pub use telemetry::{
+    OnboardingEvent, OnboardingMilestone, OnboardingReport, OnboardingSession, TelemetryClient,
+    TelemetryConfig, TelemetryEvent as TelemetryEventRecord, TelemetryStorage,
 };
 pub use types::{Blake3Hash, GoalStatus, ProbabilityDistribution, Timestamp};
 pub use uuid::Uuid;

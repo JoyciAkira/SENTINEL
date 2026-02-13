@@ -4,6 +4,10 @@ export const CMD_REFRESH_GOALS = "sentinel.refreshGoals";
 export const CMD_VALIDATE_ACTION = "sentinel.validateAction";
 export const CMD_SHOW_ALIGNMENT = "sentinel.showAlignment";
 export const CMD_CODEX_LOGIN = "sentinel.codexLogin";
+export const CMD_BLUEPRINT_LIST = "sentinel.blueprint.list";
+export const CMD_BLUEPRINT_SHOW = "sentinel.blueprint.show";
+export const CMD_BLUEPRINT_APPLY = "sentinel.blueprint.apply";
+export const CMD_BLUEPRINT_QUICKSTART = "sentinel.blueprint.quickstart";
 
 // View IDs
 export const VIEW_CHAT = "sentinel-chat";

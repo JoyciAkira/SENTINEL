@@ -1,0 +1,12 @@
+{
+  "name": "Memory Compaction Benchmark",
+  "description": "Tests PLT compaction performance for large conversation histories",
+  "intent": "Test memory compaction with 10k turns of conversation history",
+  "threshold_ms": 1500,
+  "complexity": "high",
+  "goals": 1,
+  "dependencies": "none",
+  "test_type": "compaction",
+  "turn_count": 10000,
+  "target_compression": "10x"
+}

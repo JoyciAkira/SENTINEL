@@ -89,6 +89,27 @@
         "command": "sentinel.showAlignment",
         "title": "Show Alignment Report",
         "category": "Sentinel"
+      },
+      {
+        "command": "sentinel.blueprint.quickstart",
+        "title": "Blueprint Quickstart...",
+        "category": "Sentinel",
+        "icon": "$(rocket)"
+      },
+      {
+        "command": "sentinel.blueprint.list",
+        "title": "List Blueprints",
+        "category": "Sentinel"
+      },
+      {
+        "command": "sentinel.blueprint.show",
+        "title": "Show Blueprint Details",
+        "category": "Sentinel"
+      },
+      {
+        "command": "sentinel.blueprint.apply",
+        "title": "Apply Blueprint",
+        "category": "Sentinel"
       }
     ],
     "menus": {

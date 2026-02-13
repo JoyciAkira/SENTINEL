@@ -1,0 +1,11 @@
+{
+  "name": "Quality Evaluation Benchmark",
+  "description": "Tests quality evaluation loop with multiple dimensions",
+  "intent": "Evaluate code quality across correctness, security, performance, maintainability, and testability dimensions",
+  "threshold_ms": 800,
+  "complexity": "medium",
+  "goals": 1,
+  "dependencies": "none",
+  "test_type": "quality",
+  "dimensions": ["correctness", "security", "performance", "maintainability", "testability"]
+}

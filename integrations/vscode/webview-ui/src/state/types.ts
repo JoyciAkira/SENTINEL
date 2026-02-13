@@ -310,6 +310,77 @@ export interface UiKpiHistoryState {
     }>;
 }
 
+// Pinned Transcript (Memory Compaction) types
+export type CompressionLevel = 'L0' | 'L1' | 'L2';
+export type TurnType = 'Normal' | 'Decision' | 'Error';
+
+export interface TranscriptFrame {
+    frame_id: string;
+    turn_range: [number, number];
+    content_summary: string;
+    compression_ratio: number;
+    metadata: {
+        created_at: string;
+        level: CompressionLevel;
+    };
+}
+
+export interface TranscriptAnchor {
+    turn_id: number;
+    turn_type: TurnType;
+    reason: string;
+}
+
+export interface PinnedTranscriptState {
+    transcript_id: string;
+    run_id: string;
+    total_turns: number;
+    compression_ratio: number;
+    frames: TranscriptFrame[];
+    anchors: TranscriptAnchor[];
+    metadata: {
+        created_at: string;
+        compression_level: CompressionLevel;
+    };
+}
+
+// Quality Dashboard types
+export type QualityMetric = 'Correctness' | 'Reliability' | 'Maintainability' | 'Security' | 'UXDevEx';
+export type GateType = 'Hard' | 'Soft';
+export type Verdict = 'Pass' | 'Fail';
+
+export interface QualityDimensionScore {
+    metric: QualityMetric;
+    value: number;
+    threshold: number;
+    gate: GateType;
+    result: Verdict;
+}
+
+export interface QualityReportState {
+    schema_version: string;
+    quality_report_id: string;
+    run_id: string;
+    module_id: string;
+    scores: QualityDimensionScore[];
+    overall: Verdict;
+    linked_artifact_ids: string[];
+    metadata: {
+        llm_provider: string;
+        model: string;
+        evaluated_at: string;
+        evaluation_duration_ms: number;
+        iteration: number;
+    };
+}
+
+export interface QualityDashboardState {
+    latest_report: QualityReportState | null;
+    historical_reports: QualityReportState[];
+    rubric_version: string;
+    total_evaluations: number;
+}
+
 export interface AppState {
     connected: boolean;
     messages: ChatMessage[];
@@ -327,10 +398,15 @@ export interface AppState {
     uiKpiHistory: UiKpiHistoryState | null;
     goalsCollapsed: boolean;
     inputText: string;
+    // New: Pinned Transcript and Quality Dashboard
+    pinnedTranscript: PinnedTranscriptState | null;
+    qualityDashboard: QualityDashboardState | null;
 
     // Actions
     setConnected: (connected: boolean) => void;
     addMessage: (msg: ChatMessage) => void;
+    setPinnedTranscript: (transcript: PinnedTranscriptState) => void;
+    setQualityDashboard: (dashboard: QualityDashboardState) => void;
     updateLastAssistant: (
         content: string,
         thoughts?: string[],

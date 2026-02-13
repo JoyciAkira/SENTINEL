@@ -6,7 +6,6 @@ use crate::error::Result;
 use crate::quality::{
     Artifact, QualityContext, QualityEvaluator, QualityReport,
 };
-use chrono::Utc;
 use std::time::Duration;
 
 /// Quality Maximizer - iterative quality improvement loop
@@ -188,6 +187,7 @@ impl Default for QualityMaximizer {
 mod tests {
     use super::*;
     use crate::quality::{ArtifactType, QualityConfig};
+    use chrono::Utc;
 
     fn create_test_context() -> QualityContext {
         QualityContext {

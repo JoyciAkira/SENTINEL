@@ -69,6 +69,12 @@ enum Commands {
     /// Verifica l'integrità del sistema e dei protocolli (MCP/LSP)
     Doctor,
 
+    /// Gestione blueprint (quickstart templates)
+    Blueprint {
+        #[command(subcommand)]
+        action: BlueprintAction,
+    },
+
     /// Progetta l'architettura dei goal partendo da un intento
     Design {
         /// Descrizione dell'intento (es. "Voglio un'API sicura in Rust")
@@ -105,6 +111,32 @@ enum Commands {
     Governance {
         #[command(subcommand)]
         action: GovernanceAction,
+    },
+}
+
+#[derive(Subcommand)]
+enum BlueprintAction {
+    /// Elenca tutti i blueprint disponibili
+    List {
+        /// Output in formato JSON
+        #[arg(long)]
+        json: bool,
+    },
+    /// Mostra i dettagli di un blueprint specifico
+    Show {
+        /// Nome del blueprint (senza estensione .json)
+        name: String,
+        /// Output in formato JSON
+        #[arg(long)]
+        json: bool,
+    },
+    /// Applica un blueprint al progetto corrente
+    Apply {
+        /// Nome del blueprint (senza estensione .json)
+        name: String,
+        /// Percorso dove applicare il blueprint (default: directory corrente)
+        #[arg(short, long)]
+        path: Option<PathBuf>,
     },
 }
 
@@ -660,6 +692,9 @@ async fn main() -> anyhow::Result<()> {
                 "Sync completata (placeholder operativo): nessuna sorgente esterna configurata."
             );
         }
+        Commands::Blueprint { action } => {
+            handle_blueprint(action)?;
+        }
         Commands::Federate { relay } => {
             let relay_info = relay.unwrap_or_else(|| "no-relay".to_string());
             println!(
@@ -725,6 +760,229 @@ fn governance_seed_diff(
             "remove": current_ports.difference(&next_ports).cloned().collect::<Vec<_>>()
         }
     })
+}
+
+// Blueprint management
+const BLUEPRINTS_DIR: &str = "integrations/vscode/resources/blueprints";
+
+#[derive(serde::Serialize, serde::Deserialize)]
+struct BlueprintMetadata {
+    name: String,
+    description: String,
+    category: String,
+    tags: Vec<String>,
+    difficulty: String,
+    estimated_time: String,
+    tech_stack: Vec<String>,
+    modules: Vec<serde_json::Value>,
+    quality_gates: Vec<serde_json::Value>,
+    guardrails: Vec<serde_json::Value>,
+}
+
+fn handle_blueprint(action: BlueprintAction) -> anyhow::Result<()> {
+    match action {
+        BlueprintAction::List { json } => {
+            list_blueprints(json)?;
+        }
+        BlueprintAction::Show { name, json } => {
+            show_blueprint(&name, json)?;
+        }
+        BlueprintAction::Apply { name, path } => {
+            apply_blueprint(&name, path)?;
+        }
+    }
+    Ok(())
+}
+
+fn list_blueprints(json: bool) -> anyhow::Result<()> {
+    let blueprints_dir = std::path::Path::new(BLUEPRINTS_DIR);
+    let mut blueprints = Vec::new();
+
+    if !blueprints_dir.exists() {
+        return Err(anyhow::anyhow!(
+            "Blueprints directory not found: {}",
+            BLUEPRINTS_DIR
+        ));
+    }
+
+    for entry in std::fs::read_dir(blueprints_dir)? {
+        let entry = entry?;
+        let path = entry.path();
+        if path.extension().and_then(|s| s.to_str()) == Some("json") {
+            let content = std::fs::read_to_string(&path)?;
+            if let Ok(metadata) = serde_json::from_str::<BlueprintMetadata>(&content) {
+                blueprints.push((
+                    path.file_stem()
+                        .and_then(|s| s.to_str())
+                        .unwrap_or("unknown")
+                        .to_string(),
+                    metadata,
+                ));
+            }
+        }
+    }
+
+    blueprints.sort_by(|a, b| a.0.cmp(&b.0));
+
+    if json {
+        let result: Vec<_> = blueprints
+            .iter()
+            .map(|(name, meta)| {
+                serde_json::json!({
+                    "name": name,
+                    "description": meta.description,
+                    "category": meta.category,
+                    "tags": meta.tags,
+                    "difficulty": meta.difficulty,
+                    "estimated_time": meta.estimated_time,
+                    "tech_stack": meta.tech_stack
+                })
+            })
+            .collect();
+        println!("{}", serde_json::to_string_pretty(&result)?);
+    } else {
+        println!("📋 SENTINEL BLUEPRINTS");
+        println!();
+        for (name, meta) in &blueprints {
+            println!("📦 {} ({})", name, meta.category);
+            println!("   {}", meta.description);
+            println!("   Tags: {}", meta.tags.join(", "));
+            println!("   Difficulty: {} | Time: {}", meta.difficulty, meta.estimated_time);
+            println!("   Tech: {}", meta.tech_stack.join(", "));
+            println!();
+        }
+    }
+
+    Ok(())
+}
+
+fn show_blueprint(name: &str, json: bool) -> anyhow::Result<()> {
+    let blueprint_path =
+        std::path::Path::new(BLUEPRINTS_DIR).join(format!("{}.json", name));
+
+    if !blueprint_path.exists() {
+        return Err(anyhow::anyhow!(
+            "Blueprint not found: {}. Available blueprints: use `sentinel blueprint list`",
+            name
+        ));
+    }
+
+    let content = std::fs::read_to_string(&blueprint_path)?;
+    let metadata: BlueprintMetadata = serde_json::from_str(&content)?;
+
+    if json {
+        println!("{}", serde_json::to_string_pretty(&metadata)?);
+    } else {
+        println!("📦 {}", metadata.name);
+        println!("📝 {}", metadata.description);
+        println!();
+        println!("Category: {}", metadata.category);
+        println!("Tags: {}", metadata.tags.join(", "));
+        println!("Difficulty: {}", metadata.difficulty);
+        println!("Estimated Time: {}", metadata.estimated_time);
+        println!();
+        println!("Tech Stack:");
+        for tech in &metadata.tech_stack {
+            println!("  - {}", tech);
+        }
+        println!();
+        println!("Modules ({}):", metadata.modules.len());
+        for (i, module) in metadata.modules.iter().enumerate() {
+            println!("  {}. {}", i + 1, module);
+        }
+        println!();
+        println!("Quality Gates ({}):", metadata.quality_gates.len());
+        for (i, gate) in metadata.quality_gates.iter().enumerate() {
+            println!("  {}. {}", i + 1, gate);
+        }
+        println!();
+        println!("Guardrails ({}):", metadata.guardrails.len());
+        for (i, guardrail) in metadata.guardrails.iter().enumerate() {
+            println!("  {}. {}", i + 1, guardrail);
+        }
+    }
+
+    Ok(())
+}
+
+fn apply_blueprint(name: &str, target_path: Option<PathBuf>) -> anyhow::Result<()> {
+    let blueprint_path =
+        std::path::Path::new(BLUEPRINTS_DIR).join(format!("{}.json", name));
+
+    if !blueprint_path.exists() {
+        return Err(anyhow::anyhow!("Blueprint not found: {}", name));
+    }
+
+    let content = std::fs::read_to_string(&blueprint_path)?;
+    let metadata: BlueprintMetadata = serde_json::from_str(&content)?;
+
+    let target = target_path.unwrap_or_else(|| std::env::current_dir().unwrap());
+
+    println!("🚀 Applying blueprint: {}", metadata.name);
+    println!("📝 {}", metadata.description);
+    println!();
+
+    // Create sentinel.json with the blueprint's goal
+    let root_intent = sentinel_core::goal_manifold::Intent::new(
+        metadata.description.clone(),
+        metadata.tech_stack.clone(),
+    );
+    let mut manifold = sentinel_core::GoalManifold::new(root_intent.clone());
+
+    // Add modules as goals
+    for module in &metadata.modules {
+        if let Some(obj) = module.as_object() {
+            if let Some(description) = obj.get("objective").and_then(|v| v.as_str()) {
+                if let Ok(g) = sentinel_core::goal_manifold::goal::Goal::builder()
+                    .description(description.to_string())
+                    .add_success_criterion(
+                        sentinel_core::goal_manifold::predicate::Predicate::AlwaysTrue,
+                    )
+                    .build()
+                {
+                    let _ = manifold.add_goal(g);
+                }
+            }
+        }
+    }
+
+    // Add quality gates as invariants
+    use sentinel_core::goal_manifold::{Invariant, InvariantSeverity};
+    use sentinel_core::goal_manifold::predicate::{Predicate, PredicateLanguage};
+    for gate in &metadata.quality_gates {
+        if let Some(obj) = gate.as_object() {
+            if let Some(check) = obj.get("check").and_then(|v| v.as_str()) {
+                if let Some(description) = obj.get("description").and_then(|v| v.as_str()) {
+                    let invariant = Invariant::new(
+                        description.to_string(),
+                        Predicate::Custom {
+                            code: check.to_string(),
+                            language: PredicateLanguage::Shell,
+                            description: description.to_string(),
+                        },
+                        InvariantSeverity::Error,
+                    );
+                    let _ = manifold.add_invariant(invariant);
+                }
+            }
+        }
+    }
+
+    let manifold_path = target.join("sentinel.json");
+    let manifold_content = serde_json::to_string_pretty(&manifold)?;
+    std::fs::write(&manifold_path, manifold_content)?;
+
+    println!("✅ Blueprint applied successfully!");
+    println!();
+    println!("Created {} goals from {} modules", manifold.goal_count(), metadata.modules.len());
+    println!("Added {} quality gates as invariants", metadata.quality_gates.len());
+    println!();
+    println!("Next steps:");
+    println!("  1. Review the generated sentinel.json");
+    println!("  2. Run: sentinel status");
+    println!("  3. Start building with: sentinel ui");
+
+    Ok(())
 }
 
 #[cfg(test)]

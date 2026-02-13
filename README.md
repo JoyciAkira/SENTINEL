@@ -100,6 +100,48 @@ If a Sentinel node in the network detects a rogue AI behavior or a corrupted dep
 | **LLM Confidence** | Min 0.3 | Rejects low-confidence LLM outputs | ✅ Active |
 | **Token Cost Limit** | 10,000 tokens | Prevents expensive LLM operations | ✅ Active |
 
+### 🎯 Wave 3: Quality-Driven Development
+
+**Status**: ✅ Complete
+
+Wave 3 introduces comprehensive quality assessment and performance validation tools:
+
+#### Performance Budgets
+
+| Metric | Budget | Status |
+|---------|---------|--------|
+| PLT Memory | 1.5 MB per 10k turns | ✅ Enforced |
+| Frame Render | 4 ms (p95) | ✅ Measured |
+| Compaction Latency | 45 ms (p95) | ✅ Validated |
+| Main-thread Blocking | 12 ms (max) | ✅ Monitored |
+
+**Validation Tool**: `bash scripts/benchmark/measure_performance.sh`
+
+#### Quality Dimensions
+
+| Dimension | Weight | Threshold |
+|-----------|--------|------------|
+| Correctness | 30% | >= 85 |
+| Reliability | 20% | - |
+| Outcome Fidelity | 20% | >= 85 |
+| Cost Efficiency | 15% | - |
+| Latency Efficiency | 15% | - |
+
+**Formula**: `B = 0.30*C + 0.20*R + 0.20*O + 0.15*E + 0.15*L`
+
+#### New VSCode Features
+
+1. **Quality Dashboard**: Multi-dimensional quality assessment with real-time updates
+2. **Pinned Transcript**: Lightweight conversation history with smart anchoring
+3. **Performance Panel**: Real-time performance metrics and budget alerts
+
+#### Documentation
+
+- [Wave 3 Implementation Guide](docs/WAVE3_IMPLEMENTATION_GUIDE.md)
+- [Quality Dashboard Example](examples/vscode-quality-dashboard/README.md)
+- [Pinned Transcript Example](examples/vscode-pinned-transcript/README.md)
+- [Benchmark Suite](benchmarks/README.md)
+
 #### Multi-Stage Validation Pipeline
 
 **Stage 1: Pre-Validation (LLM Quality Check)**

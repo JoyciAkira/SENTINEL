@@ -1,0 +1,125 @@
+{
+  "blueprint_id": "web-app-auth-crud-board-v1",
+  "name": "Web App with Auth, CRUD Board",
+  "description": "Quickstart template for typical web application with authentication, CRUD operations, and drag-and-drop board",
+  "outcome_envelope": {
+    "schema_version": "1.0",
+    "intent": {
+      "goal": "Build a team task board web app",
+      "target_domain": "web_app",
+      "success_narrative": "Users can sign up, log in, create tasks, assign to team members, and drag tasks across a kanban board."
+    },
+    "constraints": {
+      "non_negotiables": [
+        "Authentication required for all pages",
+        "TypeScript strict mode enabled",
+        "No hardcoded credentials"
+      ],
+      "tech_constraints": [
+        "TypeScript",
+        "Next.js",
+        "PostgreSQL"
+      ],
+      "time_budget": "2w",
+      "cost_budget": "medium"
+    },
+    "quality_metrics": [
+      {
+        "name": "e2e_pass_rate",
+        "measurement": "percent",
+        "target": ">=95",
+        "gate": "hard"
+      },
+      {
+        "name": "accessibility_score",
+        "measurement": "percent",
+        "target": ">=80",
+        "gate": "soft"
+      }
+    ],
+    "acceptance_criteria": [
+      "User signup and login",
+      "Task CRUD operations",
+      "Drag-and-drop board functionality"
+    ],
+    "assumptions": [
+      "PostgreSQL database available",
+      "Next.js project structure"
+    ],
+    "risk_register": [
+      {
+        "risk": "Authentication complexity",
+        "mitigation": "Use NextAuth.js with built-in providers"
+      },
+      {
+        "risk": "DnD performance issues",
+        "mitigation": "Use react-dnd with optimization"
+      }
+    ]
+  },
+  "precompiled_dag": {
+    "modules": [
+      {
+        "module_id": "auth-core",
+        "module_name": "Authentication Core",
+        "objective": "User signup, login, session management",
+        "tech_stack": ["TypeScript", "NextAuth", "PostgreSQL"],
+        "estimated_hours": 8,
+        "dependencies": [],
+        "invariants": [
+          "Session tokens are cryptographically secure",
+          "Passwords are hashed before storage"
+        ]
+      },
+      {
+        "module_id": "task-domain",
+        "module_name": "Task Domain",
+        "objective": "Task CRUD with team associations",
+        "tech_stack": ["TypeScript", "Prisma", "PostgreSQL"],
+        "estimated_hours": 12,
+        "dependencies": ["auth-core"],
+        "invariants": [
+          "Task ownership always validated",
+          "Deleted tasks are soft-deleted"
+        ]
+      },
+      {
+        "module_id": "board-ui",
+        "module_name": "Board UI",
+        "objective": "Kanban board with drag-and-drop",
+        "tech_stack": ["TypeScript", "@dnd-kit/core", "React DnD"],
+        "estimated_hours": 16,
+        "dependencies": ["task-domain"],
+        "invariants": [
+          "Board state syncs atomically",
+          "Drag operations are idempotent"
+        ]
+      }
+    ]
+  },
+  "guardrail_baseline": {
+    "scope_guardrails": [
+      "No direct database mutations from UI components",
+      "All API calls go through server actions"
+    ],
+    "quality_guardrails": [
+      "E2E tests must pass before merge",
+      "TypeScript strict mode, no any",
+      "Accessibility WCAG 2.1 AA compliant"
+    ],
+    "dependency_guardrails": [
+      "Auth module must complete before board access",
+      "Task module must complete before board UI"
+    ]
+  },
+  "benchmark_tags": {
+    "scenario_id": "web-app-crud",
+    "difficulty_tier": "beginner",
+    "rubric_profile": "web-app-v1"
+  },
+  "ttfs_baseline": {
+    "p50_seconds": 1500,
+    "p90_seconds": 2400,
+    "first_success_rate_target": 0.55
+  }
+}

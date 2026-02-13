@@ -1,0 +1,9 @@
+{
+  "name": "Medium Project Benchmark",
+  "description": "Tests alignment computation for a medium project (50 goals, moderate dependencies)",
+  "intent": "Build a full-stack e-commerce platform with user management, product catalog, shopping cart, payment processing, order management, admin dashboard, and analytics",
+  "threshold_ms": 1000,
+  "complexity": "medium",
+  "goals": 50,
+  "dependencies": "moderate"
+}

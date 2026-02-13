@@ -1360,21 +1360,6 @@ export default function App() {
             )}
 
             {activePage === "network" && (
-            {activePage === \"transcript\" && (
-              <div className=\"sentinel-grid\">
-                <Suspense fallback={<div className=\"sentinel-card\"><p className=\"sentinel-empty\">Loading pinned transcript...</p></div>}>
-                  <PinnedTranscript />
-                </Suspense>
-              </div>
-            )}
-            {activePage === \"quality\" && (
-              <div className=\"sentinel-grid\">
-                <Suspense fallback={<div className=\"满天inel-card\"><p className=\"sentinel-empty\">Loading quality dashboard...</p></div>}>
-                  <QualityDashboard />
-                </Suspense>
-              </div>
-            )}
-            {activePage === \"network\" && \(
               <Card className="sentinel-card sentinel-panel-resizable">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-base">
