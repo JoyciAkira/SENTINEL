@@ -85,6 +85,8 @@ pub mod goal_manifold;
 pub mod guardrail;
 pub mod learning;
 pub mod memory;
+pub mod outcome_compiler;
+pub mod quality;
 pub mod security;
 pub mod types;
 
@@ -103,6 +105,16 @@ pub use learning::{
     PatternMiningEngine, Strategy, StrategySynthesizer, SuccessPattern,
 };
 pub use memory::{MemoryItem, MemoryManifold, MemoryType};
+pub use outcome_compiler::{
+    AtomicModule, AtomicModuleCompiler, CompilationResult, DecompositionAuditLog, GuardrailRuleType,
+    GuardrailSeverity, InterpretContext, ModuleBoundaries, ModuleGuardrail, ModuleIO,
+    OutcomeInterpreter as OutcomeCompilerInterpreter, OutcomeEnvelope, ScaffoldGenerator,
+    TemplateManager, VerificationSpec,
+};
+pub use quality::{
+    Artifact, ArtifactType, DimensionScore, GateType, QualityContext, QualityEvaluator,
+    QualityMaximizer, QualityMetadata, QualityMetric, QualityReport, QualityRubric, Verdict,
+};
 pub use types::{Blake3Hash, GoalStatus, ProbabilityDistribution, Timestamp};
 pub use uuid::Uuid;
 
