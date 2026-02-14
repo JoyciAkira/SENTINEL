@@ -1,0 +1,9 @@
+{
+  "name": "Large Project Benchmark",
+  "description": "Tests alignment computation for a large project (100+ goals, complex dependencies)",
+  "intent": "Build a comprehensive enterprise SaaS platform with multi-tenant architecture, authentication, authorization, RBAC, audit logging, real-time notifications, webhooks, API gateway, microservices, database sharding, caching, message queue, background jobs, monitoring, alerting, CI/CD integration, testing framework, documentation site, admin portal, customer dashboard, mobile apps, and integrations",
+  "threshold_ms": 2000,
+  "complexity": "high",
+  "goals": 100,
+  "dependencies": "complex"
+}

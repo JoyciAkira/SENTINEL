@@ -1,0 +1,46 @@
+[package]
+name = "sentinel-agent-native"
+version = "0.1.0"
+edition = "2021"
+authors = ["Sentinel Team <team@sentinel-protocol.org>"]
+description = "Native coding agent with integrated Sentinel OS - Revolutionary AI for perfect goal alignment"
+license = "MIT"
+repository = "https://github.com/JoyciAkira/SENTINEL"
+keywords = ["ai", "coding", "agent", "sentinel", "alignment"]
+categories = ["development-tools", "command-line-utilities"]
+
+[dependencies]
+sentinel-core = { path = "../sentinel-core", version = "0.1.0" }
+tokio = { version = "1.35", features = ["full"] }
+async-trait = "0.1"
+reqwest = { version = "0.11", features = ["json", "rustls-tls"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+anyhow = "1.0"
+thiserror = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+toml = "0.8"
+uuid = { version = "1.6", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+regex = "1.10"
+tree-sitter = "0.20"
+tree-sitter-rust = "0.20"
+tree-sitter-typescript = "0.20"
+tree-sitter-python = "0.20"
+git2 = "0.18"
+ignore = "0.4"
+walkdir = "2.4"
+tempfile = "3.8"
+colored = "2.1"
+indicatif = "0.17"
+console = "0.15"
+libp2p = { version = "0.53", features = ["tcp", "noise", "yamux", "gossipsub", "kad", "identify", "macros", "tokio"] }
+ed25519-dalek = "2.1"
+rand = "0.8"
+bincode = "1.3"
+dotenvy = "0.15"
+
+[dev-dependencies]
+tokio-test = "0.4"
+criterion = { version = "0.5", features = ["html_reports"] }

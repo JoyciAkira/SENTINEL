@@ -1,0 +1,10 @@
+{
+    "mcpServers": {
+        "sentinel": {
+            "command": "/Users/danielecorrao/Documents/REPOSITORIES_GITHUB/SENTINEL /target/debug/sentinel-cli",
+            "args": ["mcp"],
+            "disabled": false,
+            "autoApprove": []
+        }
+    }
+}

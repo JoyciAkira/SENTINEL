@@ -1,0 +1,14 @@
+.vscode/**
+.vscode-test/**
+out/test/**
+src/**
+webview-ui/**
+node_modules/**
+tsconfig.json
+vite.config.ts
+VSCODE_EXTENSION_TEST_GUIDE.md
+test_mcp_e2e.py
+test_mcp_e2e.sh
+../../sdks/typescript/node_modules/**
+../../sdks/typescript/src/**
+../../sdks/typescript/tsconfig.json

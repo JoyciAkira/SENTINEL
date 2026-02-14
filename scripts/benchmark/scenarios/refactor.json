@@ -1,0 +1,24 @@
+{
+  "scenario_id": "refactor-v1",
+  "name": "Complex Refactor",
+  "description": "Refactor monolithic service into modular microservices",
+  "difficulty_tier": "advanced",
+  "estimated_duration_minutes": 120,
+  "outcome_envelope": {
+    "goal": "Refactor monolithic service into modular microservices",
+    "target_domain": "other",
+    "success_narrative": "Service is split into independent modules with clear boundaries"
+  },
+  "verification_steps": [
+    {
+      "step": 1,
+      "action": "run_tests",
+      "expected": "all_tests_pass"
+    },
+    {
+      "step": 2,
+      "action": "check_outcome_fidelity",
+      "expected": "fidelity >= 0.85"
+    }
+  ]
+}

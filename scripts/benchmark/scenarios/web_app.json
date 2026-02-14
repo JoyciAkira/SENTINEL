@@ -1,0 +1,24 @@
+{
+  "scenario_id": "web-app-v1",
+  "name": "Web App with Auth and CRUD",
+  "description": "Build a task management web app with authentication and CRUD operations",
+  "difficulty_tier": "beginner",
+  "estimated_duration_minutes": 45,
+  "outcome_envelope": {
+    "goal": "Build a task management web app",
+    "target_domain": "web_app",
+    "success_narrative": "Users can sign up, log in, create/read/update/delete tasks"
+  },
+  "verification_steps": [
+    {
+      "step": 1,
+      "action": "run_tests",
+      "expected": "all_tests_pass"
+    },
+    {
+      "step": 2,
+      "action": "check_outcome_fidelity",
+      "expected": "fidelity >= 0.85"
+    }
+  ]
+}

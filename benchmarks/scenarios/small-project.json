@@ -1,0 +1,9 @@
+{
+  "name": "Small Project Benchmark",
+  "description": "Tests alignment computation for a small project (10 goals, simple dependencies)",
+  "intent": "Build a simple REST API with authentication and CRUD operations",
+  "threshold_ms": 500,
+  "complexity": "low",
+  "goals": 10,
+  "dependencies": "minimal"
+}

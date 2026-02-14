@@ -1,0 +1,55 @@
+{
+  "name": "@sentinel/sdk",
+  "version": "0.1.0",
+  "description": "TypeScript SDK for SENTINEL - Goal-aligned AI coding agent system",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "test": "jest",
+    "lint": "eslint src --ext .ts",
+    "format": "prettier --write \"src/**/*.ts\"",
+    "docs": "typedoc --out docs src"
+  },
+  "keywords": [
+    "sentinel",
+    "ai",
+    "agent",
+    "coding",
+    "alignment",
+    "goals"
+  ],
+  "author": "Sentinel Team <hello@sentinel-protocol.org>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/JoyciAkira/SENTINEL.git",
+    "directory": "sdks/typescript"
+  },
+  "bugs": {
+    "url": "https://github.com/JoyciAkira/SENTINEL/issues"
+  },
+  "homepage": "https://github.com/JoyciAkira/SENTINEL#readme",
+  "devDependencies": {
+    "@types/jest": "^29.5.0",
+    "@types/node": "^20.0.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "eslint": "^8.0.0",
+    "jest": "^29.5.0",
+    "prettier": "^3.0.0",
+    "ts-jest": "^29.1.0",
+    "ts-node": "^10.9.1",
+    "typedoc": "^0.25.0",
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "ws": "^8.14.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

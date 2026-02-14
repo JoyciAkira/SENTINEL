@@ -1,0 +1,972 @@
+<!doctype html>
+<html lang="it">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Sentinel Webview Mockup - Clean Chat First</title>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap");
+
+      :root {
+        --font-ui: "Space Grotesk", "Avenir Next", "Segoe UI", sans-serif;
+        --font-mono: "IBM Plex Mono", "JetBrains Mono", monospace;
+
+        --bg: #eef2f8;
+        --surface: #ffffff;
+        --surface-muted: #f7f9fc;
+        --line: #d8deea;
+        --line-strong: #c6cedd;
+
+        --text: #122033;
+        --text-muted: #576884;
+        --text-soft: #7a899f;
+
+        --accent: #0f65d8;
+        --accent-soft: #eaf2ff;
+        --ok: #0d8a5f;
+        --warn: #b97a12;
+        --danger: #ba3043;
+
+        --shadow-1: 0 6px 22px rgba(19, 37, 68, 0.08);
+        --shadow-2: 0 14px 38px rgba(19, 37, 68, 0.1);
+        --radius-xl: 18px;
+        --radius-lg: 14px;
+        --radius-md: 11px;
+      }
+
+      [data-theme="graphite"] {
+        --bg: #141a23;
+        --surface: #1c2430;
+        --surface-muted: #212b39;
+        --line: #344154;
+        --line-strong: #41506a;
+
+        --text: #e8eef8;
+        --text-muted: #b6c2d4;
+        --text-soft: #90a0b7;
+
+        --accent: #6fbcff;
+        --accent-soft: rgba(111, 188, 255, 0.16);
+        --ok: #66d8a9;
+        --warn: #ebb462;
+        --danger: #f28696;
+
+        --shadow-1: 0 10px 28px rgba(2, 5, 11, 0.34);
+        --shadow-2: 0 18px 44px rgba(2, 5, 11, 0.44);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+      }
+
+      body {
+        font-family: var(--font-ui);
+        background:
+          radial-gradient(900px 420px at 105% -20%, rgba(15, 101, 216, 0.1), transparent 55%),
+          radial-gradient(880px 420px at -15% 110%, rgba(13, 138, 95, 0.08), transparent 58%),
+          var(--bg);
+        color: var(--text);
+      }
+
+      .app {
+        height: 100vh;
+        width: 100%;
+        display: grid;
+        grid-template-columns: 70px 1fr 360px;
+        gap: 14px;
+        padding: 14px;
+      }
+
+      .rail {
+        border: 1px solid var(--line);
+        border-radius: var(--radius-xl);
+        background: color-mix(in oklab, var(--surface) 92%, var(--surface-muted));
+        box-shadow: var(--shadow-1);
+        padding: 10px 8px;
+        display: grid;
+        grid-template-rows: auto 1fr auto;
+        gap: 12px;
+      }
+
+      .logo {
+        width: 44px;
+        height: 44px;
+        margin: 0 auto;
+        border-radius: 12px;
+        border: 1px solid var(--line-strong);
+        background: linear-gradient(160deg, var(--surface), var(--surface-muted));
+        display: grid;
+        place-items: center;
+        font-weight: 700;
+        font-size: 17px;
+      }
+
+      .rail-nav {
+        display: grid;
+        gap: 8px;
+        align-content: start;
+      }
+
+      .rail-btn {
+        width: 100%;
+        height: 44px;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: var(--surface-muted);
+        color: var(--text-muted);
+        font-size: 17px;
+        cursor: pointer;
+        transition: 120ms ease;
+      }
+
+      .rail-btn:hover {
+        border-color: color-mix(in oklab, var(--accent) 30%, var(--line));
+        color: var(--text);
+        transform: translateY(-1px);
+      }
+
+      .rail-btn.active {
+        border-color: color-mix(in oklab, var(--accent) 48%, var(--line));
+        background: var(--accent-soft);
+        color: var(--accent);
+      }
+
+      .rail-footer {
+        display: grid;
+        gap: 8px;
+      }
+
+      .status-dot {
+        margin: 0 auto;
+        width: 12px;
+        height: 12px;
+        border-radius: 999px;
+        background: var(--ok);
+        box-shadow: 0 0 0 5px color-mix(in oklab, var(--ok) 20%, transparent);
+      }
+
+      .workspace {
+        min-width: 0;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-xl);
+        background: var(--surface);
+        box-shadow: var(--shadow-2);
+        display: grid;
+        grid-template-rows: auto 1fr auto;
+        overflow: hidden;
+      }
+
+      .topbar {
+        border-bottom: 1px solid var(--line);
+        background: linear-gradient(
+          180deg,
+          color-mix(in oklab, var(--surface-muted) 86%, var(--surface)),
+          var(--surface)
+        );
+        padding: 14px 18px;
+        display: grid;
+        gap: 10px;
+      }
+
+      .top-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 14px;
+      }
+
+      .title {
+        min-width: 0;
+      }
+
+      .title h1 {
+        margin: 0;
+        font-size: 16px;
+        letter-spacing: 0.02em;
+      }
+
+      .title p {
+        margin: 2px 0 0;
+        color: var(--text-muted);
+        font-size: 12px;
+      }
+
+      .actions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
+      .btn {
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        height: 34px;
+        padding: 0 11px;
+        background: var(--surface);
+        color: var(--text-muted);
+        font-size: 12px;
+        font-family: inherit;
+        cursor: pointer;
+        transition: 120ms ease;
+      }
+
+      .btn:hover {
+        border-color: color-mix(in oklab, var(--accent) 42%, var(--line));
+        color: var(--text);
+      }
+
+      .btn.primary {
+        background: var(--accent);
+        border-color: color-mix(in oklab, var(--accent) 76%, black);
+        color: #fff;
+      }
+
+      .chips {
+        display: flex;
+        gap: 7px;
+        flex-wrap: wrap;
+      }
+
+      .chip {
+        font-size: 11px;
+        line-height: 1;
+        padding: 7px 10px;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        background: var(--surface-muted);
+        color: var(--text-muted);
+      }
+
+      .chip.ok {
+        color: var(--ok);
+        border-color: color-mix(in oklab, var(--ok) 35%, var(--line));
+      }
+
+      .chip.warn {
+        color: var(--warn);
+        border-color: color-mix(in oklab, var(--warn) 45%, var(--line));
+      }
+
+      .chat-shell {
+        min-height: 0;
+        display: grid;
+        grid-template-rows: auto 1fr;
+      }
+
+      .quick-actions {
+        border-bottom: 1px solid var(--line);
+        padding: 12px 18px;
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        background: var(--surface);
+      }
+
+      .quick-btn {
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: var(--surface-muted);
+        color: var(--text-muted);
+        font-family: inherit;
+        font-size: 11px;
+        padding: 7px 11px;
+        cursor: pointer;
+      }
+
+      .quick-btn:hover {
+        color: var(--text);
+        border-color: color-mix(in oklab, var(--accent) 35%, var(--line));
+      }
+
+      .chat-stream {
+        min-height: 0;
+        overflow: auto;
+        padding: 18px 18px 8px;
+        display: grid;
+        gap: 14px;
+        align-content: start;
+        background:
+          linear-gradient(180deg, color-mix(in oklab, var(--surface) 97%, transparent), transparent),
+          var(--surface);
+      }
+
+      .message {
+        max-width: 86%;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-lg);
+        background: var(--surface-muted);
+        padding: 12px 13px;
+        box-shadow: 0 1px 0 color-mix(in oklab, white 20%, transparent) inset;
+      }
+
+      .message.user {
+        justify-self: end;
+        background: color-mix(in oklab, var(--accent-soft) 72%, var(--surface));
+        border-color: color-mix(in oklab, var(--accent) 32%, var(--line));
+      }
+
+      .message .meta {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        margin-bottom: 7px;
+        font-size: 10px;
+        color: var(--text-soft);
+      }
+
+      .message p {
+        margin: 0;
+        font-size: 13px;
+        line-height: 1.62;
+      }
+
+      .tool-row {
+        margin-top: 9px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+
+      .tool-chip {
+        border: 1px solid var(--line-strong);
+        border-radius: 8px;
+        background: var(--surface);
+        padding: 5px 7px;
+        font-size: 10px;
+        color: var(--text-muted);
+        font-family: var(--font-mono);
+      }
+
+      details {
+        margin-top: 10px;
+        border-top: 1px dashed var(--line-strong);
+        padding-top: 8px;
+      }
+
+      details summary {
+        cursor: pointer;
+        color: var(--text-muted);
+        font-size: 11px;
+      }
+
+      details pre {
+        margin: 8px 0 0;
+        white-space: pre-wrap;
+        font-size: 11px;
+        line-height: 1.5;
+        color: var(--text-muted);
+        font-family: var(--font-mono);
+      }
+
+      .safe-plan {
+        margin-top: 10px;
+        border: 1px solid color-mix(in oklab, var(--accent) 34%, var(--line));
+        border-radius: 11px;
+        background: var(--surface);
+        padding: 10px;
+      }
+
+      .safe-plan h4 {
+        margin: 0 0 8px;
+        font-size: 11px;
+        color: var(--text);
+      }
+
+      .safe-item {
+        display: grid;
+        grid-template-columns: auto 1fr auto;
+        gap: 8px;
+        align-items: center;
+        padding: 6px 0;
+        border-top: 1px solid var(--line);
+      }
+
+      .safe-item:first-of-type {
+        border-top: 0;
+      }
+
+      .safe-item code {
+        font-family: var(--font-mono);
+        font-size: 10px;
+      }
+
+      .composer {
+        border-top: 1px solid var(--line);
+        background: color-mix(in oklab, var(--surface) 86%, var(--surface-muted));
+        padding: 12px 16px 14px;
+      }
+
+      .composer-row {
+        border: 1px solid var(--line-strong);
+        border-radius: 14px;
+        background: var(--surface);
+        padding: 10px;
+        display: grid;
+        gap: 8px;
+      }
+
+      .composer textarea {
+        width: 100%;
+        border: 0;
+        resize: none;
+        outline: none;
+        font: inherit;
+        font-size: 13px;
+        line-height: 1.5;
+        min-height: 74px;
+        background: transparent;
+        color: var(--text);
+      }
+
+      .composer textarea::placeholder {
+        color: var(--text-soft);
+      }
+
+      .composer-actions {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .left-actions {
+        display: flex;
+        gap: 8px;
+      }
+
+      .hint {
+        font-size: 11px;
+        color: var(--text-soft);
+      }
+
+      .inspector {
+        border: 1px solid var(--line);
+        border-radius: var(--radius-xl);
+        background: var(--surface);
+        box-shadow: var(--shadow-1);
+        display: grid;
+        grid-template-rows: auto auto 1fr;
+        overflow: hidden;
+      }
+
+      .inspect-head {
+        padding: 14px;
+        border-bottom: 1px solid var(--line);
+        display: grid;
+        gap: 6px;
+      }
+
+      .inspect-head h2 {
+        margin: 0;
+        font-size: 14px;
+      }
+
+      .inspect-head p {
+        margin: 0;
+        color: var(--text-muted);
+        font-size: 11px;
+      }
+
+      .inspect-tabs {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 6px;
+        padding: 10px 12px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .tab-btn {
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        background: var(--surface-muted);
+        color: var(--text-muted);
+        height: 30px;
+        font-size: 10px;
+        cursor: pointer;
+      }
+
+      .tab-btn.active {
+        border-color: color-mix(in oklab, var(--accent) 46%, var(--line));
+        background: var(--accent-soft);
+        color: var(--accent);
+      }
+
+      .tab-panels {
+        min-height: 0;
+        overflow: auto;
+      }
+
+      .tab-panel {
+        display: none;
+        padding: 14px 13px 18px;
+        align-content: start;
+        gap: 10px;
+      }
+
+      .tab-panel.active {
+        display: grid;
+      }
+
+      .panel-card {
+        border: 1px solid var(--line);
+        border-radius: var(--radius-md);
+        background: var(--surface-muted);
+        padding: 10px;
+      }
+
+      .panel-card h3 {
+        margin: 0 0 8px;
+        font-size: 12px;
+      }
+
+      .panel-card p {
+        margin: 0;
+        color: var(--text-muted);
+        font-size: 12px;
+        line-height: 1.5;
+      }
+
+      .kv {
+        display: grid;
+        gap: 6px;
+      }
+
+      .kv .row {
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+        font-size: 11px;
+      }
+
+      .kv .row span:last-child {
+        font-family: var(--font-mono);
+      }
+
+      .timeline {
+        display: grid;
+        gap: 7px;
+      }
+
+      .timeline .event {
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        background: var(--surface);
+        padding: 8px;
+      }
+
+      .timeline .event strong {
+        display: block;
+        font-size: 11px;
+      }
+
+      .timeline .event small {
+        color: var(--text-soft);
+        font-size: 10px;
+      }
+
+      .search {
+        width: 100%;
+        height: 34px;
+        border-radius: 9px;
+        border: 1px solid var(--line);
+        background: var(--surface);
+        color: var(--text);
+        font-family: inherit;
+        font-size: 12px;
+        padding: 0 10px;
+      }
+
+      .overlay-toggle {
+        display: none;
+      }
+
+      @media (max-width: 1220px) {
+        .app {
+          grid-template-columns: 64px 1fr 320px;
+        }
+      }
+
+      @media (max-width: 1020px) {
+        .app {
+          grid-template-columns: 58px 1fr;
+        }
+
+        .inspector {
+          position: fixed;
+          right: 12px;
+          top: 12px;
+          bottom: 12px;
+          width: min(92vw, 360px);
+          transform: translateX(120%);
+          transition: transform 160ms ease;
+          z-index: 40;
+        }
+
+        .app.show-inspector .inspector {
+          transform: translateX(0);
+        }
+
+        .overlay-toggle {
+          display: inline-flex;
+        }
+      }
+
+      @media (max-width: 760px) {
+        .app {
+          padding: 8px;
+          gap: 8px;
+          grid-template-columns: 1fr;
+          grid-template-rows: auto 1fr;
+        }
+
+        .rail {
+          height: 60px;
+          grid-template-columns: auto 1fr auto;
+          grid-template-rows: 1fr;
+          align-items: center;
+          padding: 8px;
+        }
+
+        .rail-nav {
+          grid-auto-flow: column;
+          justify-content: center;
+          gap: 7px;
+        }
+
+        .rail-btn {
+          width: 42px;
+          height: 42px;
+        }
+
+        .logo,
+        .rail-footer {
+          margin: 0;
+        }
+
+        .workspace {
+          min-height: 0;
+        }
+
+        .top-row {
+          flex-direction: column;
+          align-items: flex-start;
+        }
+
+        .message {
+          max-width: 100%;
+        }
+
+        .inspector {
+          left: 8px;
+          right: 8px;
+          width: auto;
+        }
+      }
+
+      body.compact .message {
+        padding: 9px 10px;
+      }
+
+      body.compact .message p {
+        font-size: 12px;
+      }
+    </style>
+  </head>
+  <body data-theme="light">
+    <div class="app" id="appRoot">
+      <aside class="rail">
+        <div class="logo">S</div>
+        <div class="rail-nav">
+          <button class="rail-btn active" title="Chat">💬</button>
+          <button class="rail-btn" title="Forge">🎯</button>
+          <button class="rail-btn" title="Audit">📜</button>
+          <button class="rail-btn" title="Runtime">🛡️</button>
+          <button class="rail-btn overlay-toggle" id="openInspector" title="Inspector">📋</button>
+        </div>
+        <div class="rail-footer">
+          <div class="status-dot" title="Connected"></div>
+        </div>
+      </aside>
+
+      <main class="workspace">
+        <header class="topbar">
+          <div class="top-row">
+            <div class="title">
+              <h1>Sentinel Chat Runtime (Default)</h1>
+              <p>Chat-first layout, minimal noise, full control surface.</p>
+            </div>
+            <div class="actions">
+              <button class="btn" id="themeToggle">Theme</button>
+              <button class="btn" id="densityToggle">Density</button>
+              <button class="btn overlay-toggle" id="openInspectorTop">Inspector</button>
+              <button class="btn">Regenerate</button>
+              <button class="btn primary">Apply Safe Plan</button>
+            </div>
+          </div>
+          <div class="chips">
+            <span class="chip">Alignment 92.4%</span>
+            <span class="chip ok">Reliability Healthy</span>
+            <span class="chip warn">Governance Pending: 1</span>
+            <span class="chip">Context: free_stack_primary</span>
+            <span class="chip">Tools: 26</span>
+          </div>
+        </header>
+
+        <section class="chat-shell">
+          <div class="quick-actions">
+            <button class="quick-btn">/execute-first-pending</button>
+            <button class="quick-btn">/memory-status</button>
+            <button class="quick-btn">Run Quality Harness</button>
+            <button class="quick-btn">Governance Seed Preview</button>
+            <button class="quick-btn">Show Goal Graph</button>
+          </div>
+
+          <div class="chat-stream">
+            <article class="message user">
+              <div class="meta">
+                <span>User</span>
+                <span>09:24</span>
+              </div>
+              <p>Implementa solo il primo goal pending, niente scaffolding iniziale.</p>
+            </article>
+
+            <article class="message">
+              <div class="meta">
+                <span>Sentinel</span>
+                <span>09:24</span>
+              </div>
+              <p>
+                Primo goal pending selezionato: <strong>GOAL-02 API validation</strong>.
+                Ho preparato file changes minimi e test essenziali mantenendo invarianti e policy.
+              </p>
+              <div class="tool-row">
+                <span class="tool-chip">tool:get_goal_graph</span>
+                <span class="tool-chip">tool:chat</span>
+                <span class="tool-chip">mode:goal_execution_strict</span>
+              </div>
+              <details>
+                <summary>Explainability</summary>
+                <pre>intent_summary: execute first pending goal
+evidence: memory_hits=3, governance_pending=none
+alignment_score: 92.4
+risk_flag: low</pre>
+              </details>
+              <section class="safe-plan">
+                <h4>Safe write plan (2 files)</h4>
+                <div class="safe-item">
+                  <input type="checkbox" checked />
+                  <code>todo-app/server/index.js</code>
+                  <span>+38 -2</span>
+                </div>
+                <div class="safe-item">
+                  <input type="checkbox" checked />
+                  <code>todo-app/server/index.test.js</code>
+                  <span>+46 -0</span>
+                </div>
+              </section>
+            </article>
+
+            <article class="message user">
+              <div class="meta">
+                <span>User</span>
+                <span>09:26</span>
+              </div>
+              <p>Esegui quality harness e mostrami eventuali violazioni.</p>
+            </article>
+
+            <article class="message">
+              <div class="meta">
+                <span>Sentinel</span>
+                <span>09:27</span>
+              </div>
+              <p>
+                Harness completato in 22s. PASS: 118/120 test. Violazioni: 1 (`rollback_rate` sopra soglia).
+                Ti consiglio di correggere prima di procedere al prossimo goal.
+              </p>
+              <div class="tool-row">
+                <span class="tool-chip">tool:run_quality_harness</span>
+                <span class="tool-chip">tool:get_quality_status</span>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <footer class="composer">
+          <div class="composer-row">
+            <textarea placeholder="Scrivi una richiesta… usa / per comandi, @ per contesto, Shift+Enter per newline"></textarea>
+            <div class="composer-actions">
+              <div class="left-actions">
+                <button class="btn">Attach</button>
+                <button class="btn">Context</button>
+              </div>
+              <div class="left-actions">
+                <span class="hint">Enter invia • Shift+Enter newline</span>
+                <button class="btn primary">Send</button>
+              </div>
+            </div>
+          </div>
+        </footer>
+      </main>
+
+      <aside class="inspector" id="inspectorPanel">
+        <header class="inspect-head">
+          <h2>Inspector</h2>
+          <p>Tutte le feature disponibili senza sovraccaricare la chat.</p>
+        </header>
+
+        <nav class="inspect-tabs">
+          <button class="tab-btn active" data-tab="workflow">Workflow</button>
+          <button class="tab-btn" data-tab="policy">Policy</button>
+          <button class="tab-btn" data-tab="quality">Quality</button>
+          <button class="tab-btn" data-tab="memory">Memory</button>
+          <button class="tab-btn" data-tab="timeline">Timeline</button>
+        </nav>
+
+        <section class="tab-panels">
+          <div class="tab-panel active" data-panel="workflow">
+            <article class="panel-card">
+              <h3>Workflow Assistant</h3>
+              <p>
+                Next action: completa review su safe_write plan, applica i file approvati e riesegui quality harness.
+              </p>
+            </article>
+            <article class="panel-card">
+              <h3>Goal Snapshot</h3>
+              <div class="kv">
+                <div class="row"><span>Pending</span><span>3</span></div>
+                <div class="row"><span>In progress</span><span>1</span></div>
+                <div class="row"><span>Completed</span><span>9</span></div>
+              </div>
+            </article>
+            <article class="panel-card">
+              <h3>Recommended Command</h3>
+              <p><code>/execute-first-pending</code> per mantenere flusso atomico deterministico.</p>
+            </article>
+          </div>
+
+          <div class="tab-panel" data-panel="policy">
+            <article class="panel-card">
+              <h3>Governance Status</h3>
+              <div class="kv">
+                <div class="row"><span>Pending proposal</span><span>PRP-8fd21a</span></div>
+                <div class="row"><span>Missing required</span><span>1 framework</span></div>
+                <div class="row"><span>Integrity hash</span><span>8b2fa91d…</span></div>
+              </div>
+            </article>
+            <article class="panel-card">
+              <h3>Actions</h3>
+              <div class="actions">
+                <button class="btn">Approve</button>
+                <button class="btn">Reject</button>
+                <button class="btn">Seed Preview</button>
+              </div>
+            </article>
+          </div>
+
+          <div class="tab-panel" data-panel="quality">
+            <article class="panel-card">
+              <h3>Quality Harness</h3>
+              <div class="kv">
+                <div class="row"><span>Last run</span><span>20260208T092700Z</span></div>
+                <div class="row"><span>Overall</span><span>PASS</span></div>
+                <div class="row"><span>Pass rate</span><span>98.3%</span></div>
+                <div class="row"><span>Duration</span><span>22s</span></div>
+              </div>
+            </article>
+            <article class="panel-card">
+              <h3>Reliability SLO</h3>
+              <p>1 violation: rollback_rate 6.2% &gt; 5.0%.</p>
+            </article>
+          </div>
+
+          <div class="tab-panel" data-panel="memory">
+            <article class="panel-card">
+              <h3>Memory Search</h3>
+              <input class="search" type="text" value="api validation" />
+            </article>
+            <article class="panel-card">
+              <h3>Recent Hits</h3>
+              <div class="timeline">
+                <div class="event">
+                  <strong>f12ac190</strong>
+                  <small>goal decomposition API endpoints + tests</small>
+                </div>
+                <div class="event">
+                  <strong>4d7e90f2</strong>
+                  <small>safe_write plan on server/index.js</small>
+                </div>
+              </div>
+            </article>
+          </div>
+
+          <div class="tab-panel" data-panel="timeline">
+            <article class="panel-card">
+              <h3>Execution Timeline</h3>
+              <div class="timeline">
+                <div class="event">
+                  <strong>plan</strong>
+                  <small>Slash command /execute-first-pending</small>
+                </div>
+                <div class="event">
+                  <strong>tool</strong>
+                  <small>get_goal_graph -> chat -> safe_write</small>
+                </div>
+                <div class="event">
+                  <strong>result</strong>
+                  <small>2 files ready for approval</small>
+                </div>
+                <div class="event">
+                  <strong>tool</strong>
+                  <small>run_quality_harness (22s)</small>
+                </div>
+              </div>
+            </article>
+          </div>
+        </section>
+      </aside>
+    </div>
+
+    <script>
+      const root = document.getElementById("appRoot");
+      const tabButtons = Array.from(document.querySelectorAll(".tab-btn"));
+      const tabPanels = Array.from(document.querySelectorAll(".tab-panel"));
+      const themeToggle = document.getElementById("themeToggle");
+      const densityToggle = document.getElementById("densityToggle");
+      const openInspector = document.getElementById("openInspector");
+      const openInspectorTop = document.getElementById("openInspectorTop");
+
+      tabButtons.forEach((button) => {
+        button.addEventListener("click", () => {
+          const id = button.dataset.tab;
+          tabButtons.forEach((b) => b.classList.toggle("active", b === button));
+          tabPanels.forEach((panel) => {
+            panel.classList.toggle("active", panel.dataset.panel === id);
+          });
+        });
+      });
+
+      themeToggle.addEventListener("click", () => {
+        const current = document.body.getAttribute("data-theme");
+        document.body.setAttribute("data-theme", current === "graphite" ? "light" : "graphite");
+      });
+
+      densityToggle.addEventListener("click", () => {
+        document.body.classList.toggle("compact");
+      });
+
+      function toggleInspector() {
+        root.classList.toggle("show-inspector");
+      }
+
+      openInspector?.addEventListener("click", toggleInspector);
+      openInspectorTop?.addEventListener("click", toggleInspector);
+    </script>
+  </body>
+</html>

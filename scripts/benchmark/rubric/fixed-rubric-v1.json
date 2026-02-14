@@ -1,0 +1,49 @@
+{
+  "rubric_id": "sentinel-fixed-rubric-v1",
+  "name": "Sentinel Fixed Benchmark Rubric v1.0",
+  "description": "Fixed rubric for evaluating AI coding agent performance across different LLM providers",
+  "dimensions": [
+    {
+      "name": "Correctness",
+      "weight": 0.30,
+      "measurement": "test_pass_rate",
+      "description": "Percentage of tests passing",
+      "higher_is_better": true
+    },
+    {
+      "name": "Reliability",
+      "weight": 0.20,
+      "measurement": "no_crash",
+      "description": "Absence of crashes or errors during execution",
+      "higher_is_better": true
+    },
+    {
+      "name": "OutcomeFidelity",
+      "weight": 0.20,
+      "measurement": "acceptance_criteria_match",
+      "description": "How well the result matches acceptance criteria",
+      "higher_is_better": true
+    },
+    {
+      "name": "CostEfficiency",
+      "weight": 0.15,
+      "measurement": "tokens_used",
+      "description": "Total tokens consumed for the task",
+      "higher_is_better": false
+    },
+    {
+      "name": "LatencyEfficiency",
+      "weight": 0.15,
+      "measurement": "duration_seconds",
+      "description": "Total time taken to complete the task",
+      "higher_is_better": false
+    }
+  ],
+  "hard_gates": {
+    "Correctness >= 85": true,
+    "OutcomeFidelity >= 85": true,
+    "B >= 80": true
+  },
+  "scoring_function": "B = 0.30*Correctness + 0.20*Reliability + 0.20*OutcomeFidelity + 0.15*CostEfficiency + 0.15*LatencyEfficiency",
+  "hard_gate_condition": "B >= 80 && Correctness >= 85 && OutcomeFidelity >= 85"
+}

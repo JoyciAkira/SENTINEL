@@ -1,0 +1,138 @@
+{
+  "blueprint_id": "migration-monolith-to-modular-v1",
+  "name": "Monolith to Modular Service Migration",
+  "description": "Strangler fig pattern migration from monolith to microservices",
+  "outcome_envelope": {
+    "schema_version": "1.0",
+    "intent": {
+      "goal": "Migrate monolith application to modular microservices",
+      "target_domain": "backend_service",
+      "success_narrative": "Traffic routes to new services incrementally, monolith deprecated when complete"
+    },
+    "constraints": {
+      "non_negotiables": [
+        "Zero downtime during migration",
+        "Data consistency maintained",
+        "Rollback always available"
+      ],
+      "tech_constraints": [
+        "Rust",
+        "Kubernetes",
+        "PostgreSQL",
+        "NGINX"
+      ],
+      "time_budget": "4w",
+      "cost_budget": "high"
+    },
+    "quality_metrics": [
+      {
+        "name": "data_consistency",
+        "measurement": "percent",
+        "target": "100",
+        "gate": "hard"
+      },
+      {
+        "name": "rollback_time",
+        "measurement": "seconds",
+        "target": "<60",
+        "gate": "hard"
+      }
+    ],
+    "acceptance_criteria": [
+      "Feature flag routing operational",
+      "First service migrated and verified",
+      "Rollback tested and documented"
+    ],
+    "assumptions": [
+      "Monolith source code available",
+      "Kubernetes cluster available",
+      "Database migration strategy planned"
+    ],
+    "risk_register": [
+      {
+        "risk": "Data divergence between systems",
+        "mitigation": "Dual-write pattern with verification"
+      },
+      {
+        "risk": "Performance degradation during migration",
+        "mitigation": "Load testing before each cutover"
+      }
+    ]
+  },
+  "precompiled_dag": {
+    "modules": [
+      {
+        "module_id": "feature-flag-infrastructure",
+        "module_name": "Feature Flag Infrastructure",
+        "objective": "Routing layer with feature flags",
+        "tech_stack": ["Rust", "LaunchDarkly", "NGINX"],
+        "estimated_hours": 16,
+        "dependencies": [],
+        "invariants": [
+          "Feature flag changes take <100ms to propagate",
+          "Default to monolith routing"
+        ]
+      },
+      {
+        "module_id": "data-synchronization",
+        "module_name": "Data Synchronization",
+        "objective": "Dual-write pattern for data consistency",
+        "tech_stack": ["Rust", "Kafka", "PostgreSQL CDC"],
+        "estimated_hours": 24,
+        "dependencies": ["feature-flag-infrastructure"],
+        "invariants": [
+          "Writes are atomic within each system",
+          "Eventual consistency is acceptable temporarily"
+        ]
+      },
+      {
+        "module_id": "service-extraction",
+        "module_name": "Service Extraction",
+        "objective": "Extract first bounded context from monolith",
+        "tech_stack": ["Rust", "Actix-web", "PostgreSQL"],
+        "estimated_hours": 20,
+        "dependencies": ["data-synchronization"],
+        "invariants": [
+          "Service has its own database schema",
+          "API contract versioned from v1"
+        ]
+      },
+      {
+        "module_id": "verification-dashboard",
+        "module_name": "Verification Dashboard",
+        "objective": "Monitoring and comparison dashboard",
+        "tech_stack": ["TypeScript", "React", "Grafana"],
+        "estimated_hours": 12,
+        "dependencies": ["service-extraction"],
+        "invariants": [
+          "Metrics are collected from both systems",
+          "Alerts fire on consistency drift"
+        ]
+      }
+    ]
+  },
+  "guardrail_baseline": {
+    "scope_guardrails": [
+      "No direct monolith database modifications from services",
+      "All traffic routing goes through feature flags"
+    ],
+    "quality_guardrails": [
+      "100% data consistency requirement",
+      "<60s rollback time requirement"
+    ],
+    "dependency_guardrails": [
+      "Feature flags before data sync",
+      "Data sync before service extraction"
+    ]
+  },
+  "benchmark_tags": {
+    "scenario_id": "migration-modular",
+    "difficulty_tier": "advanced",
+    "rubric_profile": "migration-v1"
+  },
+  "ttfs_baseline": {
+    "p50_seconds": 3600,
+    "p90_seconds": 5400,
+    "first_success_rate_target": 0.30
+  }
+}

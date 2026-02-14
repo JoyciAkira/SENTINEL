@@ -1,0 +1,124 @@
+{
+  "blueprint_id": "integration-ci-quality-gates-v1",
+  "name": "CI/CD Pipeline with Quality Gates",
+  "description": "GitHub Actions workflow with Sentinel quality gate integration",
+  "outcome_envelope": {
+    "schema_version": "1.0",
+    "intent": {
+      "goal": "Set up CI/CD pipeline with quality gates",
+      "target_domain": "other",
+      "success_narrative": "Pipeline runs tests, quality checks, and only merges on passing gates"
+    },
+    "constraints": {
+      "non_negotiables": [
+        "No merge without passing quality gates",
+        "All tests must pass before merge",
+        "Security scans must pass"
+      ],
+      "tech_constraints": [
+        "GitHub Actions",
+        "Sentinel MCP",
+        "Docker"
+      ],
+      "time_budget": "1w",
+      "cost_budget": "low"
+    },
+    "quality_metrics": [
+      {
+        "name": "pipeline_success_rate",
+        "measurement": "percent",
+        "target": ">=95",
+        "gate": "hard"
+      },
+      {
+        "name": "gate_enforcement_rate",
+        "measurement": "percent",
+        "target": "100",
+        "gate": "hard"
+      }
+    ],
+    "acceptance_criteria": [
+      "GitHub Actions workflow configured",
+      "Quality gate checks integrated",
+      "Docker build and test stage"
+    ],
+    "assumptions": [
+      "GitHub repository available",
+      "DockerHub registry access"
+    ],
+    "risk_register": [
+      {
+        "risk": "Pipeline flakiness",
+        "mitigation": "Retry logic with exponential backoff"
+      },
+      {
+        "risk": "Quality gate false positives",
+        "mitigation": "Configurable thresholds with manual override"
+      }
+    ]
+  },
+  "precompiled_dag": {
+    "modules": [
+      {
+        "module_id": "workflow-setup",
+        "module_name": "Workflow Setup",
+        "objective": "GitHub Actions workflow files",
+        "tech_stack": ["YAML", "Bash"],
+        "estimated_hours": 6,
+        "dependencies": [],
+        "invariants": [
+          "Workflow files are valid YAML",
+          "Secrets are stored in GitHub Actions secrets"
+        ]
+      },
+      {
+        "module_id": "quality-gate-integration",
+        "module_name": "Quality Gate Integration",
+        "objective": "Sentinel MCP calls for quality evaluation",
+        "tech_stack": ["TypeScript", "Sentinel MCP"],
+        "estimated_hours": 10,
+        "dependencies": ["workflow-setup"],
+        "invariants": [
+          "Quality gate blocks failing PRs",
+          "Gate results are logged for audit"
+        ]
+      },
+      {
+        "module_id": "docker-build-stage",
+        "module_name": "Docker Build Stage",
+        "objective": "Containerized build and test execution",
+        "tech_stack": ["Dockerfile", "Bash"],
+        "estimated_hours": 8,
+        "dependencies": ["quality-gate-integration"],
+        "invariants": [
+          "Docker images are tagged with commit SHA",
+          "Build cache is invalidated properly"
+        ]
+      }
+    ]
+  },
+  "guardrail_baseline": {
+    "scope_guardrails": [
+      "No direct workflow modifications without PR review",
+      "Production secrets never logged"
+    ],
+    "quality_guardrails": [
+      "All quality gates must pass for merge",
+      "Test coverage >= 80% maintained"
+    ],
+    "dependency_guardrails": [
+      "Workflow setup before quality gates",
+      "Quality gates before Docker build"
+    ]
+  },
+  "benchmark_tags": {
+    "scenario_id": "ci-cd-quality",
+    "difficulty_tier": "beginner",
+    "rubric_profile": "devops-v1"
+  },
+  "ttfs_baseline": {
+    "p50_seconds": 900,
+    "p90_seconds": 1500,
+    "first_success_rate_target": 0.70
+  }
+}
