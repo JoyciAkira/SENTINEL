@@ -240,7 +240,7 @@ impl OutcomeInterpreter {
         Ok(ConstraintEnvelope {
             non_negotiables,
             tech_constraints,
-            time_budget: "2w".to_string(), // Default
+            time_budget: "2w".to_string(),     // Default
             cost_budget: "medium".to_string(), // Default
         })
     }

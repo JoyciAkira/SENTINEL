@@ -83,6 +83,10 @@ pub mod external;
 pub mod federation;
 pub mod goal_manifold;
 pub mod guardrail;
+pub mod intent_preservation;
+pub mod consensus_validation;
+pub mod distributed_memory;
+pub mod killer_orchestrator;
 pub mod learning;
 pub mod memory;
 pub mod outcome_compiler;
@@ -101,6 +105,17 @@ pub use execution::{
     ExecutionNorthStar, ReliabilityEvaluation, ReliabilitySnapshot, ReliabilityThresholds,
 };
 pub use goal_manifold::{GoalManifold, Intent};
+pub use intent_preservation::{
+    DriftDetector, DriftAnalysis, GuardrailAction, IntentAnchor, IntentPreservationGuardrails,
+};
+pub use consensus_validation::{
+    ConsensusResult, ConsensusStatus, ConsensusValidationOrchestrator, ValidationDimension,
+    ValidationProposal, Vote,
+};
+pub use distributed_memory::{
+    DistributedMemory, Episode, EpisodeType, LearnedPattern, MemoryQuery, WorkingMemory,
+};
+pub use killer_orchestrator::KillerFeaturesOrchestrator;
 pub use learning::{
     CompletedProject, DeviationPattern, DeviationRisk, KnowledgeBase, LearningReport,
     PatternMiningEngine, Strategy, StrategySynthesizer, SuccessPattern,

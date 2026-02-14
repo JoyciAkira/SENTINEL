@@ -1,26 +1,75 @@
-# VS Code Extension Test Guide
+# VS Code / Cursor Extension Test Guide
 ## Sentinel v2.0 - Complete UI Testing
+
+---
+
+## Installare l’estensione in Cursor (o VS Code)
+
+1. **Build (se non già fatto):**
+   ```bash
+   # Dalla root del repo Sentinel
+   cd sdks/typescript && npm install && npm run build && cd ../..
+   cd integrations/vscode && npm run build
+   ```
+
+2. **Creare il VSIX:**
+   ```bash
+   cd integrations/vscode && npx --yes @vscode/vsce package --no-dependencies
+   ```
+   File generato: `integrations/vscode/sentinel-vscode-2.0.1.vsix`
+
+3. **Installare in Cursor:**
+   - Apri Cursor.
+   - `Cmd+Shift+P` (Mac) / `Ctrl+Shift+P` (Windows/Linux) → **“Extensions: Install from VSIX...”**.
+   - Scegli il file `sentinel-vscode-2.0.1.vsix` (path assoluto: `.../sentinel/integrations/vscode/sentinel-vscode-2.0.1.vsix`).
+   - Ricarica la finestra se richiesto.
+
+4. **Binario `sentinel` in PATH:** l’estensione avvia `sentinel` (es. `sentinel mcp`, `sentinel lsp`). Assicurati che il binario sia in PATH (es. `~/.local/bin/sentinel` o `cargo install --path crates/sentinel-cli` dalla root del repo).
 
 ---
 
 ## Setup (Already Done)
 - ✅ Extension built: `out/` directory ready
-- ✅ Extension packaged: `sentinel-vscode-2.0.0.vsix`
-- ✅ Extension installed in VS Code
-- ✅ Binary symlinked: `~/.local/bin/sentinel`
+- ✅ Extension packaged: `sentinel-vscode-2.0.1.vsix`
+- ✅ Extension installed in VS Code / Cursor (vedi sopra)
+- ✅ Binary in PATH: `sentinel` (required for MCP + LSP)
 
 ---
 
-## Launch VS Code for Testing
+## Launch Cursor / VS Code for Testing
 
 ```bash
 # Make sure sentinel is in PATH
 export PATH="$HOME/.local/bin:$PATH"
 
-# Open VS Code in the Sentinel project (recommended for testing)
-cd "/Users/danielecorrao/Documents/REPOSITORIES_GITHUB/SENTINEL "
-code .
+# Apri Cursor nella cartella del progetto Sentinel (consigliato)
+cursor .   # oppure: code .
 ```
+
+---
+
+## Cosa funziona al momento / Requisiti per la chat LLM
+
+**Funziona senza configurazione aggiuntiva (se `sentinel` è in PATH):**
+- Sidebar Sentinel con pannello Chat (webview unica con tab: Command, Chat, Forge, Network, Audit, Settings).
+- Connessione MCP (estensione avvia `sentinel` e parla in JSON-RPC su stdio).
+- Status bar con alignment (se MCP risponde a `get_alignment`).
+- CodeLens su file Rust/TS/JS/Python (se LSP è attivo).
+- Comandi: Open Chat, Refresh Goals, Validate Action, Show Alignment, Blueprint List/Show/Apply/Quickstart.
+- Slash command in chat: `/init`, `/execute-first-pending`, `/help`, `/memory-status`, `/memory-search`, `/memory-export`, `/memory-import`.
+- Workflow Assistant (card che suggerisce la prossima azione).
+- Timeline, temi, approval safe-write (flusso UI).
+
+**Inferenza LLM in chat:** la chat invia il messaggio al tool MCP `chat`; il backend (`sentinel-cli`) chiama `chat_with_llm()` che usa `ProviderRouter::from_env()`. Per avere risposte dall’LLM serve **almeno uno** di questi configurato:
+- `OPENROUTER_API_KEY` (e opzionale `OPENROUTER_MODEL`)
+- `OPENAI_API_KEY` (e opzionale `OPENAI_MODEL`)
+- `ANTHROPIC_API_KEY` (e opzionale `ANTHROPIC_MODEL`)
+- `GEMINI_API_KEY` (e opzionale `GEMINI_MODEL`)
+- Oppure: `SENTINEL_LLM_BASE_URL` + `SENTINEL_LLM_MODEL` (e opzionale `SENTINEL_LLM_API_KEY`)
+
+Se nessun provider è configurato, il tool `chat` risponde con messaggio di errore tipo “Errore durante l'inferenza dell'agente. Verifica le API key.” (vedi `mcp.rs`).
+
+**Nota:** in questo workspace `cargo build -p sentinel-cli` può fallire (errori di compilazione). Se hai già un binario `sentinel` funzionante in PATH (es. installato in precedenza), l’estensione lo userà; altrimenti va sistemato il build di `sentinel-cli` prima di avere MCP e chat operativi.
 
 ---
 

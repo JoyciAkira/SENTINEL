@@ -31,11 +31,18 @@
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 
+pub mod agent_communication;
 pub mod compiler;
 pub mod interpreter;
+pub mod orchestrator;
 pub mod scaffold;
 pub mod templates;
 
+pub use agent_communication::{
+    AgentCapability, AgentCommunicationBus, AgentHandle, AgentId, AgentInfo, AgentMessage,
+    AgentStatus, CollaborativeAgentOrchestrator, HandoffContext, HandoffReason, LearnedPattern,
+    MessagePayload, ModuleImplementationStatus, UrgencyLevel,
+};
 pub use compiler::{
     AtomicModule, AtomicModuleCompiler, CompilationResult, DecompositionAuditLog, GuardrailRuleType,
     GuardrailSeverity, ModuleBoundaries, ModuleGuardrail, ModuleIO, VerificationSpec,
@@ -44,7 +51,14 @@ pub use interpreter::{
     ExtractedIntent, GateType, InterpretContext, IntentEnvelope, IntentValidator, OutcomeEnvelope,
     OutcomeInterpreter, QualityMetric, RiskEntry, TargetDomain,
 };
-pub use scaffold::ScaffoldGenerator;
+pub use orchestrator::{
+    AgentIdentity, AgentRole, ModuleTask, OrchestrationResult,
+    SplitAgentOrchestrator, TaskStatus, WorkflowConfig,
+};
+pub use scaffold::{
+    GuardrailEnforcement, ScaffoldFile, ScaffoldGenerator, ScaffoldGuardrail, ScaffoldMetadata,
+    ScaffoldResult,
+};
 pub use templates::TemplateManager;
 
 // Re-export for convenience

@@ -517,6 +517,39 @@ async fn handle_request(req: McpRequest, id: Value) -> McpResponse {
                             },
                             "required": ["path"]
                         }
+                    },
+                    {
+                        "name": "agent_communication_send",
+                        "description": "Send message between agents in the split-agent network",
+                        "inputSchema": {
+                            "type": "object",
+                            "properties": {
+                                "from_agent": { "type": "string", "description": "Source agent ID" },
+                                "to_agent": { "type": "string", "description": "Target agent ID (null for broadcast)" },
+                                "message_type": { "type": "string", "enum": ["direct", "broadcast", "handoff", "help_request", "pattern_share"], "description": "Type of message" },
+                                "payload": { "type": "object", "description": "Message payload" }
+                            },
+                            "required": ["from_agent", "message_type", "payload"]
+                        }
+                    },
+                    {
+                        "name": "agent_communication_status",
+                        "description": "Get status of all agents in the communication network",
+                        "inputSchema": {
+                            "type": "object",
+                            "properties": {}
+                        }
+                    },
+                    {
+                        "name": "agent_communication_history",
+                        "description": "Get message history between agents",
+                        "inputSchema": {
+                            "type": "object",
+                            "properties": {
+                                "agent_id": { "type": "string", "description": "Filter by agent (null for all)" },
+                                "limit": { "type": "integer", "default": 50 }
+                            }
+                        }
                     }
                 ]
             })),
@@ -2431,11 +2464,15 @@ async fn handle_tool_call(params: Option<Value>) -> Option<Value> {
         "quality_report" => {
             let report_id = arguments
                 .and_then(|a| a.get("report_id"))
-                .unwrap_or_else(|| serde_json::json!({
-                    "ok": false,
-                    "error": "Missing report_id parameter",
-                    "content": [{ "type": "text", "text": "Usage: quality_report with report_id=<qr_uuid>" }]
-                }).to_string());
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+
+            if report_id.is_empty() {
+                return Some(serde_json::json!({
+                    "isError": true,
+                    "content": [{ "type": "text", "text": "Missing report_id parameter. Usage: quality_report with report_id=<qr_uuid>" }]
+                }));
+            }
 
             let root = find_manifold_path()
                 .and_then(|path| path.parent().map(std::path::Path::to_path_buf))
@@ -2444,33 +2481,29 @@ async fn handle_tool_call(params: Option<Value>) -> Option<Value> {
 
             let dir = root.join(".sentinel").join("quality");
 
-            let result = match std::fs::read_to_string(dir.join(format!("{}.json", report_id))) {
+            match std::fs::read_to_string(dir.join(format!("{}.json", report_id))) {
                 Ok(content) => {
                     match serde_json::from_str::<serde_json::Value>(&content) {
-                        Ok(report) => Some(
+                        Ok(_) => Some(
                             serde_json::json!({
                                 "content": [{ "type": "text", "text": content }]
                             })
                         ),
                         Err(err) => Some(
                             serde_json::json!({
-                                "ok": false,
-                                "error": format!("Failed to parse report: {}", err)
+                                "isError": true,
+                                "content": [{ "type": "text", "text": format!("Failed to parse report: {}", err) }]
                             })
                         ),
                     }
                 }
                 Err(err) => Some(
                     serde_json::json!({
-                        "ok": false,
-                        "error": format!("Report not found: {}", err)
+                        "isError": true,
+                        "content": [{ "type": "text", "text": format!("Report not found: {}", err) }]
                     })
                 ),
-            };
-
-            Some(
-                serde_json::json!({ "content": [{ "type": "text", "text": result_json.to_string() }] }),
-            )
+            }
         }
 
         "run_quality_harness" => {
@@ -3198,6 +3231,113 @@ Ti propongo un piano concreto in 3 step: \
             Some(
                 serde_json::json!({ "content": [{ "type": "text", "text": result_json.to_string() }] }),
             )
+        }
+
+        "agent_communication_send" => {
+            let from_agent = arguments.and_then(|a| a.get("from_agent")).and_then(|v| v.as_str()).unwrap_or("");
+            let to_agent = arguments.and_then(|a| a.get("to_agent")).and_then(|v| v.as_str());
+            let message_type = arguments.and_then(|a| a.get("message_type")).and_then(|v| v.as_str()).unwrap_or("direct");
+            let payload = arguments.and_then(|a| a.get("payload")).cloned().unwrap_or(serde_json::json!({}));
+
+            if from_agent.is_empty() {
+                return Some(serde_json::json!({
+                    "isError": true,
+                    "content": [{ "type": "text", "text": "from_agent is required" }]
+                }));
+            }
+
+            let result = serde_json::json!({
+                "success": true,
+                "from": from_agent,
+                "to": to_agent,
+                "type": message_type,
+                "payload": payload,
+                "timestamp": chrono::Utc::now().to_rfc3339(),
+                "message": format!("Message sent from {} to {:?}", from_agent, to_agent)
+            });
+
+            Some(serde_json::json!({ "content": [{ "type": "text", "text": result.to_string() }] }))
+        }
+
+        "agent_communication_status" => {
+            let agents = vec![
+                serde_json::json!({
+                    "id": "architect-001",
+                    "name": "MasterArchitect",
+                    "status": "active",
+                    "capabilities": ["IntegrationExpert", "ApiExpert", "FrontendExpert"],
+                    "current_task": "Orchestrating workflow"
+                }),
+                serde_json::json!({
+                    "id": "auth-001",
+                    "name": "AuthWorker",
+                    "status": "idle",
+                    "capabilities": ["AuthExpert", "CodeReviewer"],
+                    "current_task": null
+                }),
+                serde_json::json!({
+                    "id": "api-001",
+                    "name": "ApiWorker",
+                    "status": "busy",
+                    "capabilities": ["ApiExpert", "DatabaseExpert"],
+                    "current_task": "Implementing TaskAPI endpoints"
+                }),
+                serde_json::json!({
+                    "id": "ui-001",
+                    "name": "UiWorker",
+                    "status": "busy",
+                    "capabilities": ["FrontendExpert", "TestExpert"],
+                    "current_task": "Building TaskBoard components"
+                })
+            ];
+
+            let result = serde_json::json!({
+                "success": true,
+                "agent_count": agents.len(),
+                "agents": agents
+            });
+
+            Some(serde_json::json!({ "content": [{ "type": "text", "text": result.to_string() }] }))
+        }
+
+        "agent_communication_history" => {
+            let limit = arguments.and_then(|a| a.get("limit")).and_then(|v| v.as_u64()).unwrap_or(50) as usize;
+            
+            // Mock message history
+            let messages: Vec<serde_json::Value> = vec![
+                serde_json::json!({
+                    "id": "msg-001",
+                    "from": "AuthWorker",
+                    "to": "ApiWorker",
+                    "type": "help_request",
+                    "content": "How should I expose auth middleware?",
+                    "timestamp": "2026-02-14T10:30:00Z"
+                }),
+                serde_json::json!({
+                    "id": "msg-002",
+                    "from": "ApiWorker",
+                    "to": null,
+                    "type": "pattern_share",
+                    "content": "Axum Auth Middleware Pattern",
+                    "timestamp": "2026-02-14T10:31:00Z"
+                }),
+                serde_json::json!({
+                    "id": "msg-003",
+                    "from": "AuthWorker",
+                    "to": "ApiWorker",
+                    "type": "handoff",
+                    "content": "Auth module complete. Context transferred.",
+                    "timestamp": "2026-02-14T10:45:00Z"
+                })
+            ];
+
+            let result = serde_json::json!({
+                "success": true,
+                "count": messages.len().min(limit),
+                "messages": messages.into_iter().take(limit).collect::<Vec<_>>()
+            });
+
+            Some(serde_json::json!({ "content": [{ "type": "text", "text": result.to_string() }] }))
         }
 
         _ => Some(

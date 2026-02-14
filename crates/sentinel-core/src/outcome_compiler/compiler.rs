@@ -58,7 +58,10 @@ impl AtomicModuleCompiler {
         })
     }
 
-    fn normalize_constraints(&self, constraints: &super::interpreter::ConstraintEnvelope) -> NormalizedConstraints {
+    fn normalize_constraints(
+        &self,
+        constraints: &super::interpreter::ConstraintEnvelope,
+    ) -> NormalizedConstraints {
         let mut non_negotiables = constraints.non_negotiables.clone();
         let mut tech_constraints = constraints.tech_constraints.clone();
 
@@ -136,17 +139,17 @@ impl AtomicModuleCompiler {
             let guardrails = Vec::new();
 
             // Build dependencies list
-            let dependencies: Vec<String> = node
-                .dependencies
-                .iter()
-                .map(|id| id.to_string())
-                .collect();
+            let dependencies: Vec<String> =
+                node.dependencies.iter().map(|id| id.to_string()).collect();
 
             modules.push(AtomicModule {
                 module_id: module_id.clone(),
                 module_name: module_name.clone(),
                 objective: envelope.intent.goal.clone(),
-                boundaries: ModuleBoundaries { in_scope, out_of_scope },
+                boundaries: ModuleBoundaries {
+                    in_scope,
+                    out_of_scope,
+                },
                 inputs,
                 outputs,
                 dependencies,
@@ -201,8 +204,7 @@ impl AtomicModuleCompiler {
                 required: true,
             }]
         } else {
-            node
-                .dependencies
+            node.dependencies
                 .iter()
                 .enumerate()
                 .map(|(i, dep_id)| ModuleIO {
@@ -267,7 +269,12 @@ impl AtomicModuleCompiler {
                 severity: GuardrailSeverity::Block,
                 rule: format!(
                     "Stay within scope: {:?}",
-                    module.boundaries.in_scope.iter().take(3).collect::<Vec<_>>()
+                    module
+                        .boundaries
+                        .in_scope
+                        .iter()
+                        .take(3)
+                        .collect::<Vec<_>>()
                 ),
                 check: format!("verify_out_of_scope_check('{}')", module.module_id),
             });
@@ -290,7 +297,10 @@ impl AtomicModuleCompiler {
                     rule_type: GuardrailRuleType::Dependency,
                     severity: GuardrailSeverity::Block,
                     rule: format!("Dependency {} must be satisfied", dep),
-                    check: format!("verify_dependency_complete('{}', '{}')", module.module_id, dep),
+                    check: format!(
+                        "verify_dependency_complete('{}', '{}')",
+                        module.module_id, dep
+                    ),
                 });
             }
         }
@@ -318,10 +328,7 @@ impl AtomicModuleCompiler {
         input_hash = normalized_hash;
 
         // Step 2: Extract capabilities
-        let capabilities_hash = self.hash_string(&format!(
-            "{:?}",
-            envelope.acceptance_criteria
-        ));
+        let capabilities_hash = self.hash_string(&format!("{:?}", envelope.acceptance_criteria));
         steps.push(AuditStep {
             index: 2,
             action: "extract_capabilities".to_string(),
@@ -355,10 +362,7 @@ impl AtomicModuleCompiler {
         input_hash = modules_hash_combined;
 
         // Step 5: Generate guardrails
-        let guardrails_hash: String = self.hash_string(&format!(
-            "{}",
-            guardrails.len()
-        ));
+        let guardrails_hash: String = self.hash_string(&format!("{}", guardrails.len()));
         steps.push(AuditStep {
             index: 5,
             action: "generate_guardrails".to_string(),
@@ -396,11 +400,7 @@ impl AtomicModuleCompiler {
 
     fn compute_decomposition_hash(&self, guardrails: &[ModuleGuardrail]) -> String {
         let ids: Vec<String> = guardrails.iter().map(|g| g.module_id.clone()).collect();
-        self.hash_string(&format!(
-            "{}_{}",
-            guardrails.len(),
-            ids.join("_")
-        ))
+        self.hash_string(&format!("{}_{}", guardrails.len(), ids.join("_")))
     }
 
     fn validate_compliance(
@@ -588,9 +588,7 @@ struct ModuleNode {
 
 #[cfg(test)]
 mod tests {
-    use super::super::interpreter::{
-        ConstraintEnvelope, IntentEnvelope, TargetDomain,
-    };
+    use super::super::interpreter::{ConstraintEnvelope, IntentEnvelope, TargetDomain};
     use super::*;
 
     fn create_test_envelope() -> OutcomeEnvelope {
@@ -669,7 +667,11 @@ mod tests {
                 .iter()
                 .any(|g| matches!(g.severity, GuardrailSeverity::Block));
 
-            assert!(has_block, "Module {} should have BLOCK guardrail", module.module_id);
+            assert!(
+                has_block,
+                "Module {} should have BLOCK guardrail",
+                module.module_id
+            );
         }
     }
 

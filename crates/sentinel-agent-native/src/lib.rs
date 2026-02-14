@@ -35,6 +35,7 @@
     private_interfaces
 )]
 
+pub mod agent_communication_llm;
 pub mod codegen;
 pub mod consensus;
 pub mod context;

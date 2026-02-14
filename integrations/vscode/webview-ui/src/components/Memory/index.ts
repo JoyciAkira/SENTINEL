@@ -1,4 +1,5 @@
 export { PinnedTranscript } from './PinnedTranscript';
+export { ChatContextHeader, MinimalContextBadge } from './ChatContextHeader';
 export type {
   PinnedTranscriptState,
   TranscriptFrame,
