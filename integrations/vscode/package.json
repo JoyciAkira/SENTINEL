@@ -9,7 +9,8 @@
     "url": "https://github.com/JoyciAkira/SENTINEL.git"
   },
   "engines": {
-    "vscode": "^1.75.0"
+    "vscode": "^1.75.0",
+    "node": ">=18.0.0"
   },
   "categories": [
     "Programming Languages",
@@ -48,18 +49,18 @@
     "viewsContainers": {
       "activitybar": [
         {
-          "id": "sentinel-explorer",
+          "id": "sentinel",
           "title": "Sentinel",
-          "icon": "media/sentinel.svg"
+          "icon": "$(shield)"
         }
       ]
     },
     "views": {
-      "sentinel-explorer": [
+      "sentinel": [
         {
           "id": "sentinel-chat",
           "type": "webview",
-          "name": "Sentinel Chat"
+          "name": "Chat"
         },
         {
           "id": "sentinel-live-preview",
@@ -133,9 +134,20 @@
         "category": "Sentinel"
       },
       {
+        "command": "sentinel.preview.viewportTablet",
+        "title": "Tablet View",
+        "category": "Sentinel"
+      },
+      {
         "command": "sentinel.preview.viewportMobile",
         "title": "Mobile View",
         "category": "Sentinel"
+      },
+      {
+        "command": "sentinel.configureProviders",
+        "title": "Configure LLM Providers",
+        "category": "Sentinel",
+        "icon": "$(key)"
       }
     ],
     "menus": {
