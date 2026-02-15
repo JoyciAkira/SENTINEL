@@ -19,7 +19,10 @@ export default defineConfig({
     build: {
         outDir: resolve(__dirname, 'out/webview'),
         rollupOptions: {
-            input: resolve(__dirname, 'webview-ui/index.html'),
+            input: {
+                main: resolve(__dirname, 'webview-ui/index.html'),
+                preview: resolve(__dirname, 'webview-ui/preview.html'),
+            },
             output: {
                 manualChunks(id) {
                     if (id.includes('node_modules/reactflow')) {

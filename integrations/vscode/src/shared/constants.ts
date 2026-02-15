@@ -44,3 +44,13 @@ export const MCP_TOOL_GET_ENFORCEMENT_RULES = "get_enforcement_rules";
 // Reconnection
 export const RECONNECT_BASE_MS = 1000;
 export const RECONNECT_MAX_MS = 30_000;
+
+// Live Preview Commands
+export const CMD_PREVIEW_TOGGLE = "sentinel.preview.toggle";
+export const CMD_PREVIEW_REFRESH = "sentinel.preview.refresh";
+export const CMD_PREVIEW_VIEWPORT_DESKTOP = "sentinel.preview.viewportDesktop";
+export const CMD_PREVIEW_VIEWPORT_TABLET = "sentinel.preview.viewportTablet";
+export const CMD_PREVIEW_VIEWPORT_MOBILE = "sentinel.preview.viewportMobile";
+
+// Live Preview View ID
+export const VIEW_PREVIEW = "sentinel-live-preview";

@@ -60,6 +60,11 @@
           "id": "sentinel-chat",
           "type": "webview",
           "name": "Sentinel Chat"
+        },
+        {
+          "id": "sentinel-live-preview",
+          "type": "webview",
+          "name": "Live Preview"
         }
       ]
     },
@@ -109,6 +114,27 @@
       {
         "command": "sentinel.blueprint.apply",
         "title": "Apply Blueprint",
+        "category": "Sentinel"
+      },
+      {
+        "command": "sentinel.preview.toggle",
+        "title": "Toggle Live Preview",
+        "category": "Sentinel",
+        "icon": "$(preview)"
+      },
+      {
+        "command": "sentinel.preview.refresh",
+        "title": "Refresh Live Preview",
+        "category": "Sentinel"
+      },
+      {
+        "command": "sentinel.preview.viewportDesktop",
+        "title": "Desktop View",
+        "category": "Sentinel"
+      },
+      {
+        "command": "sentinel.preview.viewportMobile",
+        "title": "Mobile View",
         "category": "Sentinel"
       }
     ],

@@ -15,6 +15,7 @@ import {
   SentinelChatViewProvider,
 } from "./webview-providers/SentinelChatViewProvider";
 import { sentinelService } from "./services/SentinelService";
+import { LivePreviewProvider, devServerDetector, DevServer } from "./services";
 import {
   CONFIG_SENTINEL_PATH,
   CONFIG_DEFAULT_PATH,
@@ -27,6 +28,11 @@ import {
   CMD_BLUEPRINT_SHOW,
   CMD_BLUEPRINT_APPLY,
   CMD_BLUEPRINT_QUICKSTART,
+  CMD_PREVIEW_TOGGLE,
+  CMD_PREVIEW_REFRESH,
+  CMD_PREVIEW_VIEWPORT_DESKTOP,
+  CMD_PREVIEW_VIEWPORT_TABLET,
+  CMD_PREVIEW_VIEWPORT_MOBILE,
   POLL_INTERVAL_MS,
 } from "./shared/constants";
 
@@ -227,7 +233,17 @@ export function activate(context: vscode.ExtensionContext) {
     ),
   );
 
-  // ── 6. Commands ──────────────────────────────────────────
+  // ── 6. Live Preview ──────────────────────────────────────
+  const livePreviewProvider = new LivePreviewProvider(context);
+  context.subscriptions.push(
+    vscode.window.registerWebviewViewProvider(
+      LivePreviewProvider.viewType,
+      livePreviewProvider,
+      { webviewOptions: { retainContextWhenHidden: true } }
+    )
+  );
+
+  // ── 7. Commands ──────────────────────────────────────────
   context.subscriptions.push(
     vscode.commands.registerCommand(CMD_OPEN_CHAT, () => {
       void vscode.commands.executeCommand("sentinel-chat.focus").then(
@@ -527,6 +543,43 @@ export function activate(context: vscode.ExtensionContext) {
       if (selected) {
         await vscode.commands.executeCommand(CMD_BLUEPRINT_APPLY, selected.value);
       }
+    }),
+
+    // Live Preview Commands
+    vscode.commands.registerCommand(CMD_PREVIEW_TOGGLE, async () => {
+      const state = livePreviewProvider.getState();
+      if (state.server) {
+        livePreviewProvider.stopPreview();
+        vscode.window.showInformationMessage("Live Preview stopped");
+      } else {
+        const result = await devServerDetector.detectServers();
+        if (result.servers.length > 0) {
+          await livePreviewProvider.startPreview(result.servers[0]);
+          void vscode.commands.executeCommand("sentinel-live-preview.focus");
+          vscode.window.showInformationMessage(`Live Preview started: ${result.servers[0].type} on port ${result.servers[0].port}`);
+        } else {
+          vscode.window.showWarningMessage(
+            "No development server detected. Start your dev server (e.g., npm run dev) and try again."
+          );
+        }
+      }
+    }),
+
+    vscode.commands.registerCommand(CMD_PREVIEW_REFRESH, () => {
+      livePreviewProvider.refresh();
+      vscode.window.showInformationMessage("Live Preview refreshed");
+    }),
+
+    vscode.commands.registerCommand(CMD_PREVIEW_VIEWPORT_DESKTOP, () => {
+      void livePreviewProvider.changeViewport('desktop');
+    }),
+
+    vscode.commands.registerCommand(CMD_PREVIEW_VIEWPORT_TABLET, () => {
+      void livePreviewProvider.changeViewport('tablet');
+    }),
+
+    vscode.commands.registerCommand(CMD_PREVIEW_VIEWPORT_MOBILE, () => {
+      void livePreviewProvider.changeViewport('mobile');
     }),
   );
 
