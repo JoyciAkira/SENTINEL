@@ -72,6 +72,18 @@
         "risk_flag=elevated",
         "governance_pending=none"
       ]
+    },
+    {
+      "id": "5bf94ee3-499a-40e8-aaeb-9c9faba9ea23",
+      "timestamp": 1771201491218,
+      "user": "Build this application using the \"Ops Dashboard\" blueprint.\nPrimary goal: Turn this spreadsheet workflow into a web app with forms, approval steps, and an admin dashboard.\nAudience: developer\n\nRequired modules:\n- KPI monitoring board\n- Incident workflow\n- Approval queue\n- Reliability and policy center\n\nNon-negotiable guardrails:\n- Read/write separation\n- Policy checks before action\n- SLO-based rollback triggers\n\nOutput policy:\n- outcome-first summary\n- bounded and deterministic implementation plan\n- explicit approvals before sensitive writes\n- minimal, reversible file changes\n",
+      "assistant": "Errore durante l'inferenza dell'agente. Verifica le API key.",
+      "intent_summary": "Build this application using the \"Ops Dashboard\" blueprint. Primary goal: Turn this spreadsheet workflow",
+      "evidence": [
+        "memory_hits=5",
+        "risk_flag=elevated",
+        "governance_pending=none"
+      ]
     }
   ]
 }

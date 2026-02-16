@@ -1,5 +1,5 @@
 {
-  "edge_count": 6,
+  "edge_count": 9,
   "edges": [
     {
       "relation": "temporal",
@@ -32,15 +32,33 @@
       "weight": 1.0
     },
     {
+      "relation": "temporal",
+      "source": "de978d8e-4694-4171-9a60-b7eea73acf93",
+      "target": "5bf94ee3-499a-40e8-aaeb-9c9faba9ea23",
+      "weight": 1.0
+    },
+    {
       "relation": "semantic_overlap",
       "source": "cbbea885-7a7d-4d94-b39f-045e33ecb05a",
       "target": "de978d8e-4694-4171-9a60-b7eea73acf93",
       "weight": 6.0
+    },
+    {
+      "relation": "semantic_overlap",
+      "source": "cbbea885-7a7d-4d94-b39f-045e33ecb05a",
+      "target": "5bf94ee3-499a-40e8-aaeb-9c9faba9ea23",
+      "weight": 6.0
+    },
+    {
+      "relation": "semantic_overlap",
+      "source": "de978d8e-4694-4171-9a60-b7eea73acf93",
+      "target": "5bf94ee3-499a-40e8-aaeb-9c9faba9ea23",
+      "weight": 6.0
     }
   ],
-  "generated_at": 1771200694837,
-  "graph_hash": "284e86f1521b15dfdb7c11cba5a68eba023ae7d914436ec2e2f773e7bcb421d9",
-  "node_count": 6,
+  "generated_at": 1771201491222,
+  "graph_hash": "5a3fc66c9e39cd8f5dcfa21038a0fca5db1d2a8bfa2d623cc2497a378fccab01",
+  "node_count": 7,
   "nodes": [
     {
       "id": "cbbea885-7a7d-4d94-b39f-045e33ecb05a",
@@ -83,9 +101,16 @@
       "lamport": 1771200694834,
       "provenance_hash": "b912db045dc0b4db49a8a5e9ecd95cbcbde78febbdddc937bed915fc4e5cda4d",
       "timestamp": 1771200694834
+    },
+    {
+      "id": "5bf94ee3-499a-40e8-aaeb-9c9faba9ea23",
+      "intent_summary": "Build this application using the \"Ops Dashboard\" blueprint. Primary goal: Turn this spreadsheet workflow",
+      "lamport": 1771201491218,
+      "provenance_hash": "e16d63c94b2bdd060214d6d0edc78f672beb2ff91b15b41bd586665c6994e912",
+      "timestamp": 1771201491218
     }
   ],
-  "signature": "afc09be7e220c2bc99d8925573ee3cda38229f773247267ad5983408dbf73d75734bb775da2210919d8a7b18836c7073225e9d80dea529929fca14cb397ea20d",
+  "signature": "f36d73b8aacb8f9c2ea451c15efe6f8cda700403abe2eec3f280aead11bb1c98bc34150dcb13ef49cd77118b8ef9b7d418940e8f2943baa1cdd0dcafd532a20a",
   "signature_scheme": "ed25519-blake3-v1",
   "signer_public_key": "6785d1ba3d2323d085baede5085b456c8efb7e70456bc8670c920e63519d8292",
   "version": 1

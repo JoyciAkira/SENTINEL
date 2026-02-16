@@ -265,6 +265,19 @@ export default function App() {
     vscodeApi.postMessage({ type: "chatMessage", text });
   };
 
+  const toggleOrchestration = () => {
+    const newState = !orchestrationRunning;
+    setOrchestrationRunning(newState);
+    vscodeApi.postMessage({ 
+      type: newState ? "startOrchestration" : "pauseOrchestration" 
+    });
+  };
+
+  const stopOrchestration = () => {
+    setOrchestrationRunning(false);
+    vscodeApi.postMessage({ type: "stopOrchestration" });
+  };
+
   return (
     <div className={cn("sentinel-ide", isFullscreen && "fullscreen")}>
       {/* Top Bar - Minimal Professional */}
@@ -288,18 +301,19 @@ export default function App() {
             <Button
               size="sm"
               variant={orchestrationRunning ? "destructive" : "default"}
-              onClick={() => setOrchestrationRunning(!orchestrationRunning)}
+              onClick={toggleOrchestration}
+              disabled={!connected}
               className="gap-2"
             >
               {orchestrationRunning ? (
                 <><Pause className="size-4" /> Pause</>
               ) : (
-                <><Play className="size-4" /> Start Orchestration</>
+                <><Play className="size-4" /> Start</>
               )}
             </Button>
             
             {orchestrationRunning && (
-              <Button size="sm" variant="outline" className="gap-2">
+              <Button size="sm" variant="outline" onClick={stopOrchestration} className="gap-2">
                 <Square className="size-4" /> Stop
               </Button>
             )}

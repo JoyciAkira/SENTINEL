@@ -595,6 +595,19 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
       case "testProviderConnection":
         await this.handleTestProviderConnection(msg.provider);
         break;
+
+      // Orchestration Messages
+      case "startOrchestration":
+        await this.handleStartOrchestration();
+        break;
+
+      case "pauseOrchestration":
+        await this.handlePauseOrchestration();
+        break;
+
+      case "stopOrchestration":
+        await this.handleStopOrchestration();
+        break;
     }
   }
 
@@ -2904,5 +2917,110 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
       });
       this.emitTimeline("error", "Quality harness failed", err.message, undefined);
     }
+  }
+
+  // Orchestration Handlers
+  private async handleStartOrchestration(): Promise<void> {
+    if (!this.client.connected) {
+      this.postMessage({
+        type: "orchestrationStatus",
+        status: "error",
+        message: "Sentinel not connected",
+      });
+      return;
+    }
+
+    this.outputChannel.appendLine("🚀 Starting Split Agent Orchestration...");
+    
+    // Notify frontend that orchestration has started
+    this.postMessage({
+      type: "orchestrationStatus",
+      status: "running",
+      message: "Orchestration started",
+      phase: "scaffold",
+    });
+
+    // Emit timeline event
+    this.emitTimeline("tool", "Orchestration started", "Split Agent Orchestration", undefined);
+
+    // TODO: Implement actual orchestration logic with split agent
+    // For now, simulate the phases
+    await this.simulateOrchestrationPhases();
+  }
+
+  private async handlePauseOrchestration(): Promise<void> {
+    this.outputChannel.appendLine("⏸️ Pausing Orchestration...");
+    
+    this.postMessage({
+      type: "orchestrationStatus",
+      status: "paused",
+      message: "Orchestration paused",
+    });
+
+    this.emitTimeline("tool", "Orchestration paused", "User requested pause", undefined);
+  }
+
+  private async handleStopOrchestration(): Promise<void> {
+    this.outputChannel.appendLine("🛑 Stopping Orchestration...");
+    
+    this.postMessage({
+      type: "orchestrationStatus",
+      status: "stopped",
+      message: "Orchestration stopped",
+    });
+
+    this.emitTimeline("tool", "Orchestration stopped", "User requested stop", undefined);
+  }
+
+  private async simulateOrchestrationPhases(): Promise<void> {
+    // Phase 1: Scaffold
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    this.postMessage({
+      type: "orchestrationStatus",
+      status: "running",
+      phase: "scaffold",
+      progress: 50,
+      message: "Scaffolding modules...",
+    });
+
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    this.postMessage({
+      type: "orchestrationStatus",
+      status: "running",
+      phase: "execute",
+      progress: 0,
+      message: "Executing with worker agents...",
+    });
+
+    // Phase 2: Execute
+    await new Promise(resolve => setTimeout(resolve, 3000));
+    this.postMessage({
+      type: "orchestrationStatus",
+      status: "running",
+      phase: "execute",
+      progress: 50,
+      message: "Worker agents processing...",
+    });
+
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    this.postMessage({
+      type: "orchestrationStatus",
+      status: "running",
+      phase: "verify",
+      progress: 0,
+      message: "Running verification...",
+    });
+
+    // Phase 3: Verify
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    this.postMessage({
+      type: "orchestrationStatus",
+      status: "completed",
+      phase: "verify",
+      progress: 100,
+      message: "Orchestration completed successfully",
+    });
+
+    this.emitTimeline("result", "Orchestration completed", "All phases finished", undefined);
   }
 }
