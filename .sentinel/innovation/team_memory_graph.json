@@ -1,5 +1,5 @@
 {
-  "edge_count": 4,
+  "edge_count": 6,
   "edges": [
     {
       "relation": "temporal",
@@ -24,11 +24,23 @@
       "source": "427fd361-9f1c-45ce-a382-dc3b8eacec28",
       "target": "43790353-2ca1-4801-8b63-fac7102e90bc",
       "weight": 1.0
+    },
+    {
+      "relation": "temporal",
+      "source": "43790353-2ca1-4801-8b63-fac7102e90bc",
+      "target": "de978d8e-4694-4171-9a60-b7eea73acf93",
+      "weight": 1.0
+    },
+    {
+      "relation": "semantic_overlap",
+      "source": "cbbea885-7a7d-4d94-b39f-045e33ecb05a",
+      "target": "de978d8e-4694-4171-9a60-b7eea73acf93",
+      "weight": 6.0
     }
   ],
-  "generated_at": 1771199998549,
-  "graph_hash": "4050c2211a42362fab24c2a756a88faebae0a70fdbac0d435b66bafc406a4257",
-  "node_count": 5,
+  "generated_at": 1771200694837,
+  "graph_hash": "284e86f1521b15dfdb7c11cba5a68eba023ae7d914436ec2e2f773e7bcb421d9",
+  "node_count": 6,
   "nodes": [
     {
       "id": "cbbea885-7a7d-4d94-b39f-045e33ecb05a",
@@ -64,9 +76,16 @@
       "lamport": 1771199998543,
       "provenance_hash": "68e3f46a66a72cee13fc8b3abcaca279f2f3aa95d8720e811dbd58010b55bbe0",
       "timestamp": 1771199998543
+    },
+    {
+      "id": "de978d8e-4694-4171-9a60-b7eea73acf93",
+      "intent_summary": "Build this application using the \"Ops Dashboard\" blueprint. Primary goal: Turn this spreadsheet workflow",
+      "lamport": 1771200694834,
+      "provenance_hash": "b912db045dc0b4db49a8a5e9ecd95cbcbde78febbdddc937bed915fc4e5cda4d",
+      "timestamp": 1771200694834
     }
   ],
-  "signature": "6ad3c37f4cab9f022081d83501bef48075306ffe4d01452d878239a31a7acea70d23c17bc9a169c22bcf9e4101ca2c26bd5076ab726213f3fc375a734c283c04",
+  "signature": "afc09be7e220c2bc99d8925573ee3cda38229f773247267ad5983408dbf73d75734bb775da2210919d8a7b18836c7073225e9d80dea529929fca14cb397ea20d",
   "signature_scheme": "ed25519-blake3-v1",
   "signer_public_key": "6785d1ba3d2323d085baede5085b456c8efb7e70456bc8670c920e63519d8292",
   "version": 1
