@@ -17,8 +17,8 @@ use uuid::Uuid;
 
 use crate::llm_integration::{LLMChatClient, LLMChatCompletion, LLMContext};
 use sentinel_core::outcome_compiler::agent_communication::{
-    AgentCapability, AgentId, AgentInfo, AgentMessage, AgentStatus, HandoffContext,
-    MessagePayload, ModuleImplementationStatus, UrgencyLevel,
+    AgentCapability, AgentId, AgentInfo, AgentMessage, AgentStatus, HandoffContext, MessagePayload,
+    ModuleImplementationStatus, UrgencyLevel,
 };
 
 /// An intelligent agent that can communicate and reason with LLM
@@ -105,7 +105,7 @@ impl IntelligentAgent {
     /// Start the agent's message processing loop
     pub async fn run(&mut self) -> Result<()> {
         tracing::info!("Agent {} starting message loop", self.info.name);
-        
+
         loop {
             tokio::select! {
                 // Receive direct messages
@@ -122,7 +122,7 @@ impl IntelligentAgent {
                 else => break,
             }
         }
-        
+
         Ok(())
     }
 
@@ -148,10 +148,10 @@ impl IntelligentAgent {
 
         // Generate LLM response
         let response = self.generate_llm_response(&payload).await?;
-        
+
         // Process the LLM response into actions
         self.execute_response_action(&payload, &response).await?;
-        
+
         Ok(())
     }
 
@@ -184,7 +184,7 @@ impl IntelligentAgent {
     ) -> Result<()> {
         // Parse LLM response to determine action
         // This is simplified - in production would use structured parsing
-        
+
         if llm_response.to_lowercase().contains("share pattern") {
             let pattern_msg = AgentOutboundMessage {
                 from: self.id.clone(),
@@ -220,10 +220,10 @@ impl IntelligentAgent {
             to: Some(to.clone()),
             payload,
         };
-            self.outbound_tx
-                .send(msg)
-                .await
-                .map_err(|e| anyhow::anyhow!("Send failed: {}", e))?;
+        self.outbound_tx
+            .send(msg)
+            .await
+            .map_err(|e| anyhow::anyhow!("Send failed: {}", e))?;
         Ok(())
     }
 
@@ -415,7 +415,12 @@ impl LLMAgentOrchestrator {
     }
 
     /// Send message to specific agent
-    pub async fn send_to(&self, to: &AgentId, from: &AgentId, payload: MessagePayload) -> Result<()> {
+    pub async fn send_to(
+        &self,
+        to: &AgentId,
+        from: &AgentId,
+        payload: MessagePayload,
+    ) -> Result<()> {
         let channels = self.direct_channels.read().await;
         if let Some(tx) = channels.get(to) {
             let msg = AgentMessage::Direct {
@@ -446,20 +451,49 @@ impl LLMAgentOrchestrator {
 /// Format payload for display
 fn format_payload(payload: &MessagePayload) -> String {
     match payload {
-        MessagePayload::PatternShare { title, description, .. } => {
+        MessagePayload::PatternShare {
+            title, description, ..
+        } => {
             format!("Pattern: {} - {}", title, description)
         }
-        MessagePayload::HelpRequest { question, context, urgency } => {
-            format!("Help Request ({:?}): {} - Context: {}", urgency, question, context)
+        MessagePayload::HelpRequest {
+            question,
+            context,
+            urgency,
+        } => {
+            format!(
+                "Help Request ({:?}): {} - Context: {}",
+                urgency, question, context
+            )
         }
-        MessagePayload::LessonLearned { situation, solution, .. } => {
+        MessagePayload::LessonLearned {
+            situation,
+            solution,
+            ..
+        } => {
             format!("Lesson: {} - Solution: {}", situation, solution)
         }
-        MessagePayload::StatusUpdate { module_id, status, completion_percentage, .. } => {
-            format!("Status: {} is {:?} ({:.0}%)", module_id, status, completion_percentage)
+        MessagePayload::StatusUpdate {
+            module_id,
+            status,
+            completion_percentage,
+            ..
+        } => {
+            format!(
+                "Status: {} is {:?} ({:.0}%)",
+                module_id, status, completion_percentage
+            )
         }
-        MessagePayload::ValidationResult { module_id, passed, issues, .. } => {
-            format!("Validation: {} - Passed: {} - Issues: {:?}", module_id, passed, issues)
+        MessagePayload::ValidationResult {
+            module_id,
+            passed,
+            issues,
+            ..
+        } => {
+            format!(
+                "Validation: {} - Passed: {} - Issues: {:?}",
+                module_id, passed, issues
+            )
         }
         _ => "Unknown message type".to_string(),
     }
@@ -501,12 +535,19 @@ mod tests {
         let orchestrator = LLMAgentOrchestrator::new(llm_client);
 
         let (handle, agent) = orchestrator
-            .register_agent("TestAgent", vec![AgentCapability::AuthExpert], "You are a test agent.")
+            .register_agent(
+                "TestAgent",
+                vec![AgentCapability::AuthExpert],
+                "You are a test agent.",
+            )
             .await
             .unwrap();
 
         assert_eq!(handle.info.name, "TestAgent");
-        assert!(handle.info.capabilities.contains(&AgentCapability::AuthExpert));
+        assert!(handle
+            .info
+            .capabilities
+            .contains(&AgentCapability::AuthExpert));
     }
 
     #[tokio::test]
@@ -516,12 +557,20 @@ mod tests {
 
         // Register two agents
         let (handle1, mut agent1) = orchestrator
-            .register_agent("Agent1", vec![AgentCapability::AuthExpert], "You are agent 1.")
+            .register_agent(
+                "Agent1",
+                vec![AgentCapability::AuthExpert],
+                "You are agent 1.",
+            )
             .await
             .unwrap();
 
         let (handle2, mut agent2) = orchestrator
-            .register_agent("Agent2", vec![AgentCapability::ApiExpert], "You are agent 2.")
+            .register_agent(
+                "Agent2",
+                vec![AgentCapability::ApiExpert],
+                "You are agent 2.",
+            )
             .await
             .unwrap();
 
@@ -555,7 +604,10 @@ mod tests {
             urgency: UrgencyLevel::Medium,
         };
 
-        orchestrator.send_to(&handle2.id, &handle1.id, msg).await.unwrap();
+        orchestrator
+            .send_to(&handle2.id, &handle1.id, msg)
+            .await
+            .unwrap();
 
         // Give time for processing
         tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;

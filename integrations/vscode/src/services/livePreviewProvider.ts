@@ -20,7 +20,8 @@ import {
 import { devServerDetector } from './devServerDetector';
 
 export class LivePreviewProvider implements vscode.WebviewViewProvider {
-  public static readonly viewType = 'sentinel.livePreview';
+  /** Must match the view id in package.json "views.sentinel-explorer" */
+  public static readonly viewType = "sentinel-live-preview";
   
   private webviewView: vscode.WebviewView | undefined;
   private state: PreviewPanelState = {

@@ -46,7 +46,8 @@ function getProductionHtml(
 
     const nonce = getNonce();
 
-    // Trusted Types: default policy so bundled code (e.g. new Function) is allowed in strict environments (Cursor)
+    // Trusted Types: MUST be the FIRST script to run before any other scripts
+    // This policy allows inline scripts and Function constructor usage required by React/Vite bundles
     const trustedTypesScript = [
         `<script nonce="${nonce}">`,
         "(function(){",
@@ -54,9 +55,33 @@ function getProductionHtml(
         "  try {",
         "    window.trustedTypes.createPolicy('default', {",
         "      createScript: function(s) { return s; },",
-        "      createScriptURL: function(s) { return s; }",
+        "      createScriptURL: function(s) { return s; },",
+        "      createHTML: function(s) { return s; }",
         "    });",
-        "  } catch(e) {}",
+        "  } catch(e) { console.log('TT default policy exists'); }",
+        "}",
+        // Additional policy for environments that require explicit TrustedScript assignment
+        "if (typeof window.trustedTypes !== 'undefined' && window.trustedTypes.createPolicy) {",
+        "  try {",
+        "    window.trustedTypes.createPolicy('allow-scripts', {",
+        "      createScript: function(s) { return s; }",
+        "    });",
+        "  } catch(e) { console.log('TT allow-scripts policy exists'); }",
+        "}",
+        // Monkey-patch Function constructor to use TrustedScript if needed
+        "if (typeof window.trustedTypes !== 'undefined') {",
+        "  try {",
+        "    var originalFunction = window.Function;",
+        "    window.Function = function() {",
+        "      var args = Array.prototype.slice.call(arguments);",
+        "      var body = args.pop() || '';",
+        "      var params = args.join(',');",
+        "      if (window.trustedTypes && window.trustedTypes.defaultPolicy) {",
+        "        body = window.trustedTypes.defaultPolicy.createScript(body);",
+        "      }",
+        "      return originalFunction.apply(this, [params, body]);",
+        "    };",
+        "  } catch(e) { console.log('Function patch failed:', e); }",
         "}",
         "})();",
         "</script>",
@@ -64,21 +89,24 @@ function getProductionHtml(
 
     // CSP: allow nonced bootstrap + webview-origin module chunks (Vite dynamic imports/preloads).
     // Keep TT policy bootstrap allowed without forcing require-trusted-types-for.
+    // Added 'unsafe-eval' for Cursor compatibility with bundled React/Vite code that uses Function constructor
     const csp = [
         `default-src 'none'`,
         `base-uri 'none'`,
         `object-src 'none'`,
         `img-src ${webview.cspSource} data:`,
-        `script-src ${webview.cspSource} 'nonce-${nonce}'`,
+        `script-src ${webview.cspSource} 'nonce-${nonce}' 'unsafe-eval'`,
         `connect-src ${webview.cspSource} https:`,
         `worker-src ${webview.cspSource} blob:`,
         `style-src ${webview.cspSource} 'unsafe-inline'`,
         `font-src ${webview.cspSource}`,
     ].join('; ');
 
+    // Insert Trusted Types script as the VERY FIRST element after <head> tag
+    // This ensures it runs before any Vite bundle scripts
     html = html.replace(
         '<head>',
-        `<head>\n<meta http-equiv="Content-Security-Policy" content="${csp}">\n<meta property="csp-nonce" nonce="${nonce}">\n${trustedTypesScript}`
+        `<head>\n${trustedTypesScript}\n<meta http-equiv="Content-Security-Policy" content="${csp}">\n<meta property="csp-nonce" nonce="${nonce}">\n<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">\n<meta http-equiv="Pragma" content="no-cache">`
     );
 
     // Add nonce to script tags that don't already have it (e.g. module bundle)

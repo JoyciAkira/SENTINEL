@@ -1,0 +1,73 @@
+{
+  "edge_count": 4,
+  "edges": [
+    {
+      "relation": "temporal",
+      "source": "cbbea885-7a7d-4d94-b39f-045e33ecb05a",
+      "target": "2dab52cd-88e8-4c29-9a24-cafcccff3f39",
+      "weight": 1.0
+    },
+    {
+      "relation": "temporal",
+      "source": "2dab52cd-88e8-4c29-9a24-cafcccff3f39",
+      "target": "0da1ef75-b46b-43af-be7f-dd5a3832e126",
+      "weight": 1.0
+    },
+    {
+      "relation": "temporal",
+      "source": "0da1ef75-b46b-43af-be7f-dd5a3832e126",
+      "target": "427fd361-9f1c-45ce-a382-dc3b8eacec28",
+      "weight": 1.0
+    },
+    {
+      "relation": "temporal",
+      "source": "427fd361-9f1c-45ce-a382-dc3b8eacec28",
+      "target": "43790353-2ca1-4801-8b63-fac7102e90bc",
+      "weight": 1.0
+    }
+  ],
+  "generated_at": 1771199998549,
+  "graph_hash": "4050c2211a42362fab24c2a756a88faebae0a70fdbac0d435b66bafc406a4257",
+  "node_count": 5,
+  "nodes": [
+    {
+      "id": "cbbea885-7a7d-4d94-b39f-045e33ecb05a",
+      "intent_summary": "Build this application using the \"Ops Dashboard\" blueprint. Primary goal: Turn this spreadsheet workflow",
+      "lamport": 1771135485917,
+      "provenance_hash": "a8923ef6fdf1de37bdf9a4a7bdd9028c55307611ff18a69038ecd41f50ab77f8",
+      "timestamp": 1771135485917
+    },
+    {
+      "id": "2dab52cd-88e8-4c29-9a24-cafcccff3f39",
+      "intent_summary": "inizia il progetto",
+      "lamport": 1771135501074,
+      "provenance_hash": "175cbce3a238ca6467c305426962d0c10a5cac995788e073a78dec3e0f88857d",
+      "timestamp": 1771135501074
+    },
+    {
+      "id": "0da1ef75-b46b-43af-be7f-dd5a3832e126",
+      "intent_summary": "Refine the current AppSpec while preserving contracts and deterministic behavior. Return: 1) Outcome-first sections:",
+      "lamport": 1771135521484,
+      "provenance_hash": "4e659f46e40a38b6125ca9851da6925165ec817414af014447b452c4144f180a",
+      "timestamp": 1771135521484
+    },
+    {
+      "id": "427fd361-9f1c-45ce-a382-dc3b8eacec28",
+      "intent_summary": "Implementa SOLO il primo goal pending del manifold. Goal ID: 0c2a35f8-4eae-4e53-bf96-c21b2be077ea Goal descrizione: Configure",
+      "lamport": 1771199952878,
+      "provenance_hash": "2246b67f59b67a5be35a6fee6c3511320715ab331cded8b6cc7ef4b1f43c7f18",
+      "timestamp": 1771199952878
+    },
+    {
+      "id": "43790353-2ca1-4801-8b63-fac7102e90bc",
+      "intent_summary": "procedi",
+      "lamport": 1771199998543,
+      "provenance_hash": "68e3f46a66a72cee13fc8b3abcaca279f2f3aa95d8720e811dbd58010b55bbe0",
+      "timestamp": 1771199998543
+    }
+  ],
+  "signature": "6ad3c37f4cab9f022081d83501bef48075306ffe4d01452d878239a31a7acea70d23c17bc9a169c22bcf9e4101ca2c26bd5076ab726213f3fc375a734c283c04",
+  "signature_scheme": "ed25519-blake3-v1",
+  "signer_public_key": "6785d1ba3d2323d085baede5085b456c8efb7e70456bc8670c920e63519d8292",
+  "version": 1
+}

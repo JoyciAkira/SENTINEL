@@ -13,8 +13,8 @@
 
 use anyhow::Result;
 use sentinel_agent_native::agent_communication_llm::LLMAgentOrchestrator;
-use sentinel_agent_native::openrouter::{OpenRouterClient, OpenRouterModel};
 use sentinel_agent_native::llm_integration::LLMChatClient;
+use sentinel_agent_native::openrouter::{OpenRouterClient, OpenRouterModel};
 use sentinel_core::outcome_compiler::agent_communication::{
     AgentCapability, MessagePayload, UrgencyLevel,
 };
@@ -35,7 +35,7 @@ impl LLMChatClient for MockLLMClient {
         _user_prompt: &str,
     ) -> anyhow::Result<sentinel_agent_native::llm_integration::LLMChatCompletion> {
         sleep(Duration::from_millis(50)).await;
-        
+
         Ok(sentinel_agent_native::llm_integration::LLMChatCompletion {
             llm_name: self.model_name.clone(),
             content: "I acknowledge this message and will process it appropriately.".to_string(),
@@ -48,7 +48,7 @@ impl LLMChatClient for MockLLMClient {
 async fn main() -> Result<()> {
     // Load .env file
     dotenvy::dotenv().ok();
-    
+
     // Initialize tracing
     tracing_subscriber::fmt::init();
 
@@ -65,7 +65,7 @@ async fn main() -> Result<()> {
         if api_key.starts_with("sk-or-") {
             println!("🤖 Initializing OpenRouter LLM client (REAL)...");
             println!("   Model: {}\n", model_name);
-            
+
             let model = match model_name.as_str() {
                 "meta-llama/llama-3.3-70b-instruct:free" => OpenRouterModel::MetaLlama3_3_70B,
                 "google/gemini-2.0-flash-exp:free" => OpenRouterModel::GoogleGemini2Flash,
@@ -77,12 +77,14 @@ async fn main() -> Result<()> {
             Arc::new(
                 OpenRouterClient::new(api_key, model)
                     .with_temperature(0.7)
-                    .with_max_tokens(1500)
+                    .with_max_tokens(1500),
             )
         } else {
             println!("⚠️  API key appears invalid (should start with 'sk-or-')");
             println!("   Using MOCK LLM for demonstration\n");
-            Arc::new(MockLLMClient { model_name: format!("Mock ({})", model_name) })
+            Arc::new(MockLLMClient {
+                model_name: format!("Mock ({})", model_name),
+            })
         }
     } else {
         println!("⚠️  No OPENROUTER_API_KEY found in .env");
@@ -90,7 +92,9 @@ async fn main() -> Result<()> {
         println!("   To use real LLM:");
         println!("   1. Get free API key at https://openrouter.ai/keys");
         println!("   2. Add to .env: OPENROUTER_API_KEY=sk-or-v1-...\n");
-        Arc::new(MockLLMClient { model_name: format!("Mock ({})", model_name) })
+        Arc::new(MockLLMClient {
+            model_name: format!("Mock ({})", model_name),
+        })
     };
 
     // Create orchestrator
@@ -176,7 +180,7 @@ async fn main() -> Result<()> {
     // Phase 1: Architect broadcasts the project plan
     println!("📋 Phase 1: Architect broadcasts project plan");
     println!("   → Sending message to all agents (LLM call for each agent)...\n");
-    
+
     let start = std::time::Instant::now();
     orchestrator
         .broadcast_from(
@@ -192,14 +196,17 @@ async fn main() -> Result<()> {
             },
         )
         .await?;
-    
+
     sleep(Duration::from_secs(3)).await;
-    println!("   ✓ Broadcast complete ({:.1}s)\n", start.elapsed().as_secs_f32());
+    println!(
+        "   ✓ Broadcast complete ({:.1}s)\n",
+        start.elapsed().as_secs_f32()
+    );
 
     // Phase 2: API Specialist asks Auth Specialist about JWT integration
     println!("🔍 Phase 2: API Specialist asks Auth Specialist about JWT middleware");
     println!("   → Direct message (1 LLM call for sender + 1 for receiver)...\n");
-    
+
     let start = std::time::Instant::now();
     orchestrator
         .send_to(
@@ -214,14 +221,17 @@ async fn main() -> Result<()> {
             },
         )
         .await?;
-    
+
     sleep(Duration::from_secs(4)).await;
-    println!("   ✓ Direct message complete ({:.1}s)\n", start.elapsed().as_secs_f32());
+    println!(
+        "   ✓ Direct message complete ({:.1}s)\n",
+        start.elapsed().as_secs_f32()
+    );
 
     // Phase 3: Auth Specialist shares JWT pattern
     println!("💡 Phase 3: Auth Specialist shares JWT implementation pattern");
     println!("   → Broadcasting to all agents...\n");
-    
+
     let start = std::time::Instant::now();
     orchestrator
         .broadcast_from(
@@ -266,21 +276,25 @@ pub async fn auth_middleware<B>(
             },
         )
         .await?;
-    
+
     sleep(Duration::from_secs(3)).await;
-    println!("   ✓ Pattern shared ({:.1}s)\n", start.elapsed().as_secs_f32());
+    println!(
+        "   ✓ Pattern shared ({:.1}s)\n",
+        start.elapsed().as_secs_f32()
+    );
 
     // Phase 4: API Specialist shares Task API design
     println!("📝 Phase 4: API Specialist shares Task API design");
     println!("   → Broadcasting API endpoints...\n");
-    
+
     let start = std::time::Instant::now();
     orchestrator
         .broadcast_from(
             &api_id,
             MessagePayload::PatternShare {
                 title: "Task API Endpoints Design".to_string(),
-                description: "RESTful endpoints for task management with JWT authentication".to_string(),
+                description: "RESTful endpoints for task management with JWT authentication"
+                    .to_string(),
                 code_snippet: r#"
 // Task API Router with Auth Protection
 let task_routes = Router::new()
@@ -299,19 +313,23 @@ async fn create_task(
     state.db.create_task(&task).await?;
     Ok(Json(task))
 }
-"#.to_string(),
+"#
+                .to_string(),
                 applicable_to: vec!["AuthSpecialist".to_string(), "MasterArchitect".to_string()],
             },
         )
         .await?;
-    
+
     sleep(Duration::from_secs(3)).await;
-    println!("   ✓ API design shared ({:.1}s)\n", start.elapsed().as_secs_f32());
+    println!(
+        "   ✓ API design shared ({:.1}s)\n",
+        start.elapsed().as_secs_f32()
+    );
 
     // Phase 5: Architect validates the collaboration
     println!("✅ Phase 5: Architect validates and provides feedback");
     println!("   → Final validation broadcast...\n");
-    
+
     let start = std::time::Instant::now();
     orchestrator
         .broadcast_from(
@@ -328,9 +346,12 @@ async fn create_task(
             },
         )
         .await?;
-    
+
     sleep(Duration::from_secs(3)).await;
-    println!("   ✓ Validation complete ({:.1}s)\n", start.elapsed().as_secs_f32());
+    println!(
+        "   ✓ Validation complete ({:.1}s)\n",
+        start.elapsed().as_secs_f32()
+    );
 
     // Summary
     println!("═══════════════════════════════════════════════════");
@@ -347,8 +368,7 @@ async fn create_task(
     for agent in agents {
         println!(
             "  • {} - Capabilities: {:?}",
-            agent.name,
-            agent.capabilities
+            agent.name, agent.capabilities
         );
     }
 

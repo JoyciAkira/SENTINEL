@@ -8,6 +8,7 @@ export const CMD_BLUEPRINT_LIST = "sentinel.blueprint.list";
 export const CMD_BLUEPRINT_SHOW = "sentinel.blueprint.show";
 export const CMD_BLUEPRINT_APPLY = "sentinel.blueprint.apply";
 export const CMD_BLUEPRINT_QUICKSTART = "sentinel.blueprint.quickstart";
+export const CMD_CONFIGURE_PROVIDERS = "sentinel.configureProviders";
 
 // View IDs
 export const VIEW_CHAT = "sentinel-chat";

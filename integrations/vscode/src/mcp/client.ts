@@ -59,6 +59,15 @@ export class MCPClient extends EventEmitter {
     this.envOverrides = envOverrides;
   }
 
+  /** Append to output channel; no-op if channel is already closed (e.g. during extension host shutdown). */
+  private safeAppendLine(text: string): void {
+    try {
+      this.outputChannel.appendLine(text);
+    } catch {
+      // Channel may be disposed when extension host is terminating
+    }
+  }
+
   get connected(): boolean {
     return this.transport?.connected ?? false;
   }
@@ -87,7 +96,7 @@ export class MCPClient extends EventEmitter {
       this.transport.on("error", (err: Error) => this.handleError(err));
       this.transport.on("close", (code: number) => this.handleClose(code));
       this.transport.on("stderr", (text: string) => {
-        this.outputChannel.appendLine(`[sentinel-mcp stderr] ${text}`);
+        this.safeAppendLine(`[sentinel-mcp stderr] ${text}`);
       });
 
       this.transport.start();
@@ -99,7 +108,7 @@ export class MCPClient extends EventEmitter {
         clientInfo: { name: "sentinel-vscode", version: "2.0.0" },
       })) as McpInitializeResult;
 
-      this.outputChannel.appendLine(
+      this.safeAppendLine(
         `MCP connected: ${result.serverInfo.name} v${result.serverInfo.version}`,
       );
       this.serverInfo = result.serverInfo;
@@ -113,7 +122,7 @@ export class MCPClient extends EventEmitter {
     } catch (err) {
       this._initialized = false;
       const error = err instanceof Error ? err : new Error(String(err));
-      this.outputChannel.appendLine(`MCP connection failed: ${error.message}`);
+      this.safeAppendLine(`MCP connection failed: ${error.message}`);
       this.scheduleReconnect();
       throw error;
     }
@@ -327,13 +336,13 @@ export class MCPClient extends EventEmitter {
   }
 
   private handleError(err: Error): void {
-    this.outputChannel.appendLine(`MCP error: ${err.message}`);
+    this.safeAppendLine(`MCP error: ${err.message}`);
     this._initialized = false;
     this.emit("error", err);
   }
 
   private handleClose(code: number): void {
-    this.outputChannel.appendLine(`MCP process exited with code ${code}`);
+    this.safeAppendLine(`MCP process exited with code ${code}`);
     this._initialized = false;
     this.emit("disconnected");
 
@@ -353,7 +362,7 @@ export class MCPClient extends EventEmitter {
     );
     this.reconnectAttempts++;
 
-    this.outputChannel.appendLine(
+    this.safeAppendLine(
       `Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts})...`,
     );
 

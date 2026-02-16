@@ -1,0 +1,65 @@
+{
+  "version": 1,
+  "turns": [
+    {
+      "id": "cbbea885-7a7d-4d94-b39f-045e33ecb05a",
+      "timestamp": 1771135485917,
+      "user": "Build this application using the \"Ops Dashboard\" blueprint.\nPrimary goal: Turn this spreadsheet workflow into a web app with forms, approval steps, and an admin dashboard.\nAudience: developer\n\nRequired modules:\n- KPI monitoring board\n- Incident workflow\n- Approval queue\n- Reliability and policy center\n\nNon-negotiable guardrails:\n- Read/write separation\n- Policy checks before action\n- SLO-based rollback triggers\n\nOutput policy:\n- outcome-first summary\n- bounded and deterministic implementation plan\n- explicit approvals before sensitive writes\n- minimal, reversible file changes\n",
+      "assistant": "Errore durante l'inferenza dell'agente. Verifica le API key.",
+      "intent_summary": "Build this application using the \"Ops Dashboard\" blueprint. Primary goal: Turn this spreadsheet workflow",
+      "evidence": [
+        "memory_hits=0",
+        "risk_flag=elevated",
+        "governance_pending=none"
+      ]
+    },
+    {
+      "id": "2dab52cd-88e8-4c29-9a24-cafcccff3f39",
+      "timestamp": 1771135501074,
+      "user": "inizia il progetto",
+      "assistant": "Errore durante l'inferenza dell'agente. Verifica le API key.",
+      "intent_summary": "inizia il progetto",
+      "evidence": [
+        "memory_hits=1",
+        "risk_flag=elevated",
+        "governance_pending=none"
+      ]
+    },
+    {
+      "id": "0da1ef75-b46b-43af-be7f-dd5a3832e126",
+      "timestamp": 1771135521484,
+      "user": "Refine the current AppSpec while preserving contracts and deterministic behavior.\nReturn:\n1) Outcome-first sections: What I changed / What needs your approval / What happens next.\n2) A strict JSON block fenced as ```appspec``` with keys:\n   app, dataModel.entities, views, actions, policies, integrations, tests, meta.\nNo prose after the appspec block.\n\nCurrent AppSpec:\n```appspec\n{\n  \"version\": \"1.0\",\n  \"app\": {\n    \"name\": \"Inizia Il Progetto\",\n    \"summary\": \"Draft generated from the current intent and latest response. Primary entity: item.\"\n  },\n  \"dataModel\": {\n    \"entities\": [\n      {\n        \"name\": \"item\",\n        \"fields\": [\n          {\n            \"name\": \"id\",\n            \"type\": \"string\",\n            \"required\": true\n          },\n          {\n            \"name\": \"title\",\n            \"type\": \"string\",\n            \"required\": true\n          },\n          {\n            \"name\": \"status\",\n            \"type\": \"string\",\n            \"required\": true\n          },\n          {\n            \"name\": \"created_at\",\n            \"type\": \"date\",\n            \"required\": true\n          }\n        ]\n      }\n    ]\n  },\n  \"views\": [\n    {\n      \"id\": \"dashboard\",\n      \"type\": \"dashboard\",\n      \"title\": \"Operational Dashboard\"\n    },\n    {\n      \"id\": \"item_list\",\n      \"type\": \"list\",\n      \"title\": \"Item List\",\n      \"entity\": \"item\"\n    },\n    {\n      \"id\": \"item_form\",\n      \"type\": \"form\",\n      \"title\": \"Item Form\",\n      \"entity\": \"item\"\n    }\n  ],\n  \"actions\": [\n    {\n      \"id\": \"create_item\",\n      \"type\": \"create\",\n      \"title\": \"Create item\",\n      \"entity\": \"item\",\n      \"requiresApproval\": true\n    },\n    {\n      \"id\": \"update_item\",\n      \"type\": \"update\",\n      \"title\": \"Update item\",\n      \"entity\": \"item\",\n      \"requiresApproval\": true\n    },\n    {\n      \"id\": \"delete_item\",\n      \"type\": \"delete\",\n      \"title\": \"Delete item\",\n      \"entity\": \"item\",\n      \"requiresApproval\": true\n    },\n    {\n      \"id\": \"read_item\",\n      \"type\": \"read\",\n      \"title\": \"Read item\",\n      \"entity\": \"item\",\n      \"requiresApproval\": false\n    }\n  ],\n  \"policies\": [\n    {\n      \"id\": \"policy_contract\",\n      \"rule\": \"Public contracts are preserved unless explicit migration is provided.\",\n      \"level\": \"hard\"\n    },\n    {\n      \"id\": \"policy_determinism\",\n      \"rule\": \"Execution remains deterministic and bounded by explicit approvals.\",\n      \"level\": \"hard\"\n    },\n    {\n      \"id\": \"policy_visibility\",\n      \"rule\": \"Default responses remain outcome-first; internals are progressive details.\",\n      \"level\": \"soft\"\n    }\n  ],\n  \"integrations\": [],\n  \"tests\": [\n    {\n      \"id\": \"test_guardrail_existing\",\n      \"type\": \"integration\",\n      \"description\": \"Existing behavior remains unchanged for current user flows.\"\n    },\n    {\n      \"id\": \"test_regression_write_gate\",\n      \"type\": \"policy\",\n      \"description\": \"Sensitive file operations require explicit approval.\"\n    },\n    {\n      \"id\": \"test_appspec_smoke\",\n      \"type\": \"e2e\",\n      \"description\": \"Draft AppSpec generates a valid preview without runtime errors.\"\n    }\n  ],\n  \"meta\": {\n    \"source\": \"heuristic_v1\",\n    \"confidence\": 0.54,\n    \"generated_at\": \"2026-02-15T06:05:01.081Z\",\n    \"prompt_excerpt\": \"inizia il progetto\",\n    \"validation\": {\n      \"status\": \"fallback\"\n    }\n  }\n}\n```",
+      "assistant": "Errore durante l'inferenza dell'agente. Verifica le API key.",
+      "intent_summary": "Refine the current AppSpec while preserving contracts and deterministic behavior. Return: 1) Outcome-first sections:",
+      "evidence": [
+        "memory_hits=2",
+        "risk_flag=elevated",
+        "governance_pending=none"
+      ]
+    },
+    {
+      "id": "427fd361-9f1c-45ce-a382-dc3b8eacec28",
+      "timestamp": 1771199952878,
+      "user": "Implementa SOLO il primo goal pending del manifold.\nGoal ID: 0c2a35f8-4eae-4e53-bf96-c21b2be077ea\nGoal descrizione: Configure dependencies and build system: Kernel Foundation: Inizializzazione del core allineato ai vettori d'intento rilevati.\n\nVincoli obbligatori:\n- niente scaffolding iniziale\n- solo file changes mirati\n- test minimi necessari\n- comandi di verifica strettamente necessari\n- mantieni output con sezioni operative e path espliciti",
+      "assistant": "Errore durante l'inferenza dell'agente. Verifica le API key.",
+      "intent_summary": "Implementa SOLO il primo goal pending del manifold. Goal ID: 0c2a35f8-4eae-4e53-bf96-c21b2be077ea Goal descrizione: Configure",
+      "evidence": [
+        "memory_hits=3",
+        "risk_flag=elevated",
+        "governance_pending=none"
+      ]
+    },
+    {
+      "id": "43790353-2ca1-4801-8b63-fac7102e90bc",
+      "timestamp": 1771199998543,
+      "user": "procedi",
+      "assistant": "Errore durante l'inferenza dell'agente. Verifica le API key.",
+      "intent_summary": "procedi",
+      "evidence": [
+        "memory_hits=4",
+        "risk_flag=elevated",
+        "governance_pending=none"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,30 @@
+{
+  "constraints": [
+    "no_scaffolding",
+    "first_pending_goal_only",
+    "strict_goal_execution_mode"
+  ],
+  "invariants": [
+    "deterministic_output",
+    "explicit_paths",
+    "fail_safe_behavior",
+    "contract_preserving",
+    "minimal_blast_radius"
+  ],
+  "objective": "Implementa SOLO il primo goal pending del manifold.\nGoal ID: 0c2a35f8-4eae-4e53-bf96-c21b2be077ea\nGoal descrizione: Configure dependencies and build system: Kernel Foundation: Inizializzazione del core allineato ai vettori d'intento rilevati.\n\nVincoli obbligatori:\n- niente scaffolding iniziale\n- solo file changes mirati\n- test minimi necessari\n- comandi di verifica strettamente necessari\n- mantieni output con sezioni operative e path espliciti",
+  "scope": {
+    "exclude": [
+      "bootstrap_scaffolding"
+    ],
+    "include": [
+      "minimal_tests",
+      "targeted_file_changes"
+    ]
+  },
+  "success_signals": [
+    "safe_write_plan_generated_or_skipped",
+    "verification_commands_present",
+    "explainability_evidence_present"
+  ],
+  "version": 1
+}

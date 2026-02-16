@@ -1573,3 +1573,396 @@
     scroll-behavior: auto !important;
   }
 }
+
+/* ========================================
+   SENTINEL WORLD-CLASS UI - Layout IDE-like
+   ======================================== */
+
+.sentinel-layout {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--vscode-editor-background);
+}
+
+/* Header minimale */
+.sentinel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 40px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--sentinel-border);
+  background: color-mix(in oklab, var(--sentinel-surface) 98%, transparent);
+  flex-shrink: 0;
+}
+
+.sentinel-header-brand {
+  display: flex;
+  align-items: center;
+}
+
+.sentinel-logo {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--sentinel-ink);
+}
+
+.sentinel-header-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 11px;
+  color: var(--sentinel-muted);
+}
+
+.sentinel-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--sentinel-muted);
+}
+
+.sentinel-status-dot.sentinel-up {
+  background: var(--sentinel-success);
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--sentinel-success) 30%, transparent);
+}
+
+.sentinel-status-dot.sentinel-down {
+  background: var(--sentinel-danger);
+}
+
+.sentinel-approval-badge {
+  font-size: 10px;
+  padding: 2px 6px;
+}
+
+/* Body container */
+.sentinel-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Sidebar icon-only: 60px fissa */
+.sentinel-sidebar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 60px;
+  padding: 12px 0;
+  border-right: 1px solid var(--sentinel-border);
+  background: color-mix(in oklab, var(--sentinel-surface) 95%, transparent);
+  flex-shrink: 0;
+  gap: 4px;
+}
+
+.sentinel-sidebar-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--sentinel-muted);
+  cursor: pointer;
+  transition: all 140ms ease;
+}
+
+.sentinel-sidebar-btn:hover {
+  background: color-mix(in oklab, var(--sentinel-accent-soft) 60%, transparent);
+  color: var(--sentinel-ink);
+}
+
+.sentinel-sidebar-btn.active {
+  background: color-mix(in oklab, var(--sentinel-accent-soft) 80%, transparent);
+  border-color: color-mix(in oklab, var(--sentinel-accent) 40%, var(--sentinel-border));
+  color: var(--sentinel-ink);
+}
+
+.sentinel-sidebar-divider {
+  width: 24px;
+  height: 1px;
+  background: var(--sentinel-border);
+  margin: 8px 0;
+}
+
+/* Main content area */
+.sentinel-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Chat View */
+.sentinel-chat-view {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.sentinel-chat-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--sentinel-border);
+  background: color-mix(in oklab, var(--sentinel-surface) 96%, transparent);
+  flex-shrink: 0;
+}
+
+.sentinel-goal-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.sentinel-goal-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--sentinel-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sentinel-goal-placeholder {
+  font-size: 13px;
+  color: var(--sentinel-muted);
+  font-style: italic;
+}
+
+.sentinel-chat-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* Messages container - occupa tutto lo spazio disponibile */
+.sentinel-messages-container {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  padding: 16px;
+}
+
+.sentinel-messages-container > div {
+  height: 100%;
+}
+
+/* Chat input fisso in basso */
+.sentinel-chat-input-wrapper {
+  flex-shrink: 0;
+  padding: 12px 16px 16px;
+  border-top: 1px solid var(--sentinel-border);
+  background: color-mix(in oklab, var(--sentinel-surface) 98%, transparent);
+}
+
+/* Swarm View */
+.sentinel-swarm-view {
+  height: 100%;
+  overflow: hidden;
+  padding: 16px;
+}
+
+/* Settings View */
+.sentinel-settings-view {
+  height: 100%;
+  overflow: hidden;
+}
+
+.sentinel-settings-scroll {
+  height: 100%;
+}
+
+.sentinel-settings-content {
+  padding: 16px;
+  display: grid;
+  gap: 16px;
+  max-width: 800px;
+}
+
+.sentinel-settings-card {
+  border: 1px solid var(--sentinel-border);
+  background: color-mix(in oklab, var(--sentinel-surface-2) 90%, transparent);
+}
+
+.sentinel-settings-card [data-slot="card-header"] {
+  padding: 12px 16px;
+}
+
+.sentinel-settings-card [data-slot="card-title"] {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.sentinel-settings-card [data-slot="card-content"] {
+  padding: 12px 16px 16px;
+}
+
+.sentinel-graph-card {
+  grid-column: 1 / -1;
+}
+
+.sentinel-graph-container {
+  border: 1px solid var(--sentinel-border);
+  border-radius: 8px;
+  overflow: hidden;
+  background: color-mix(in oklab, var(--sentinel-surface) 95%, transparent);
+}
+
+.sentinel-progress-bar {
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: color-mix(in oklab, var(--sentinel-border) 50%, transparent);
+  overflow: hidden;
+}
+
+.sentinel-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--sentinel-accent), color-mix(in oklab, var(--sentinel-accent) 70%, #06b6d4));
+  transition: width 300ms ease;
+}
+
+.sentinel-metrics-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  color: var(--sentinel-muted);
+}
+
+.sentinel-metrics-row span:last-child {
+  font-weight: 500;
+  color: var(--sentinel-ink);
+}
+
+/* Preview Panel - 40% width, collassabile */
+.sentinel-preview-panel {
+  width: 40%;
+  max-width: 500px;
+  min-width: 300px;
+  border-left: 1px solid var(--sentinel-border);
+  background: color-mix(in oklab, var(--sentinel-surface) 94%, transparent);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+
+.sentinel-preview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--sentinel-border);
+  background: color-mix(in oklab, var(--sentinel-surface) 96%, transparent);
+  flex-shrink: 0;
+}
+
+.sentinel-preview-header span {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.sentinel-preview-controls {
+  display: flex;
+  gap: 4px;
+}
+
+.sentinel-preview-content {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.sentinel-preview-iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: white;
+}
+
+/* Modal */
+.sentinel-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: color-mix(in oklab, black 50%, transparent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.sentinel-modal {
+  width: 100%;
+  max-width: 600px;
+  max-height: 80vh;
+  background: var(--sentinel-surface);
+  border: 1px solid var(--sentinel-border);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 20px 60px color-mix(in oklab, black 40%, transparent);
+}
+
+.sentinel-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--sentinel-border);
+}
+
+.sentinel-modal-header h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.sentinel-modal-body {
+  flex: 1;
+  overflow: auto;
+  padding: 20px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 1024px) {
+  .sentinel-preview-panel {
+    width: 50%;
+  }
+}
+
+@media (max-width: 768px) {
+  .sentinel-preview-panel {
+    position: fixed;
+    right: 0;
+    top: 40px;
+    bottom: 0;
+    width: 100%;
+    max-width: none;
+    z-index: 100;
+  }
+  
+  .sentinel-chat-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  
+  .sentinel-goal-info {
+    width: 100%;
+  }
+}

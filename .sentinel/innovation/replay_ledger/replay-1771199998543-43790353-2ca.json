@@ -1,0 +1,18 @@
+{
+  "constitutional_spec_hash": "df615c33dafbbc5228b4d26f3d698ba88949800864bef3071f6157e19cd562f0",
+  "counterfactual_hash": "af191d5223f376b1f69c8dd1d6aa101052f88a56c4e363b9e269abb8aac87c3a",
+  "evidence_hash": "e1b33f2d39120f163a98c2fc382b692f64f95a9a29d8c3962674ca34bb2fed4e",
+  "memory_hit_ids": [
+    "427fd361-9f1c-45ce-a382-dc3b8eacec28",
+    "0da1ef75-b46b-43af-be7f-dd5a3832e126",
+    "2dab52cd-88e8-4c29-9a24-cafcccff3f39",
+    "cbbea885-7a7d-4d94-b39f-045e33ecb05a"
+  ],
+  "policy_simulation_hash": "8b436a5883fe2f3deafd52a8923a7b6985e0d2bea808a60cd582ce3f7e4e8ae1",
+  "response_hash": "10674dde26c5ed292f1dd0d5c6f0d070ae689c18a03d9d61465f3bdc41bc18fb",
+  "strict_goal_execution": false,
+  "timestamp": 1771199998543,
+  "turn_id": "43790353-2ca1-4801-8b63-fac7102e90bc",
+  "user_message": "procedi",
+  "version": 1
+}

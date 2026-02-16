@@ -30,9 +30,7 @@ import {
   CMD_BLUEPRINT_QUICKSTART,
   CMD_PREVIEW_TOGGLE,
   CMD_PREVIEW_REFRESH,
-  CMD_PREVIEW_VIEWPORT_DESKTOP,
-  CMD_PREVIEW_VIEWPORT_TABLET,
-  CMD_PREVIEW_VIEWPORT_MOBILE,
+  CMD_CONFIGURE_PROVIDERS,
   POLL_INTERVAL_MS,
 } from "./shared/constants";
 
@@ -89,6 +87,31 @@ function resolveSentinelPath(
 export function activate(context: vscode.ExtensionContext) {
   const outputChannel = vscode.window.createOutputChannel("Sentinel");
   context.subscriptions.push(outputChannel);
+
+  // Register view/title and high-visibility commands first so they exist before workbench resolves menus
+  context.subscriptions.push(
+    vscode.commands.registerCommand(CMD_OPEN_CHAT, () => {
+      void vscode.commands.executeCommand("sentinel-chat.focus").then(
+        () => undefined,
+        () => vscode.commands.executeCommand("workbench.view.explorer"),
+      );
+    }),
+  );
+  context.subscriptions.push(
+    vscode.commands.registerCommand(CMD_REFRESH_GOALS, async () => {
+      if (!mcpClient?.connected) {
+        outputChannel.appendLine("⚠️ MCP not connected, cannot refresh goals");
+        return;
+      }
+      try {
+        await mcpClient.getGoals();
+        await mcpClient.getAlignment();
+        outputChannel.appendLine("✅ Goals refreshed");
+      } catch (err) {
+        outputChannel.appendLine(`❌ Failed to refresh goals: ${err}`);
+      }
+    }),
+  );
 
   const resolveWorkspaceRoot = (): string => {
     if (vscode.workspace.workspaceFolders?.length) {
@@ -243,367 +266,91 @@ export function activate(context: vscode.ExtensionContext) {
     )
   );
 
-  // ── 7. Commands ──────────────────────────────────────────
+  // ── 7. Provider Configuration ────────────────────────────
   context.subscriptions.push(
-    vscode.commands.registerCommand(CMD_OPEN_CHAT, () => {
-      void vscode.commands.executeCommand("sentinel-chat.focus").then(
-        () => undefined,
-        () => vscode.commands.executeCommand("workbench.view.extension.sentinel-explorer"),
-      );
-    }),
-
-    vscode.commands.registerCommand(CMD_CODEX_LOGIN, async () => {
-      try {
-        await vscode.window.withProgress(
-          {
-            location: vscode.ProgressLocation.Notification,
-            title: "Sentinel: Sign in with ChatGPT",
-            cancellable: true,
-          },
-          async (_progress, token) => {
-            const login = () =>
-              new Promise<void>((resolve, reject) => {
-                outputChannel.appendLine("Starting Codex login...");
-                const proc = spawn("codex", ["login"], {
-                  cwd: workspaceRoot,
-                  shell: true,
-                  env: process.env,
-                });
-
-                let stderr = "";
-                proc.stderr?.on("data", (chunk: Buffer) => {
-                  const text = chunk.toString("utf-8");
-                  stderr += text;
-                  outputChannel.appendLine(`[codex] ${text.trim()}`);
-                });
-
-                proc.on("error", (err) => reject(err));
-                proc.on("close", (code) => {
-                  if (code === 0) {
-                    resolve();
-                  } else {
-                    reject(
-                      new Error(
-                        stderr.trim() ||
-                          `Codex login failed (exit ${code ?? "unknown"})`,
-                      ),
-                    );
-                  }
-                });
-
-                token.onCancellationRequested(() => {
-                  outputChannel.appendLine("Codex login cancelled.");
-                  proc.kill();
-                  reject(new Error("Codex login cancelled."));
-                });
-              });
-
-            await login();
-            await context.globalState.update("sentinel.useOpenAIAuth", true);
-            await applyMcpEnvAndReconnect();
-            vscode.window.showInformationMessage(
-              "ChatGPT sign-in complete. Sentinel now uses OpenAI OAuth via Codex.",
-            );
-          },
-        );
-      } catch (err: any) {
-        vscode.window.showErrorMessage(`Codex login failed: ${err.message}`);
-      }
-    }),
-
-    vscode.commands.registerCommand(CMD_REFRESH_GOALS, async () => {
-      outputChannel.appendLine("Refreshing goals...");
-      await chatProvider.refreshGoals();
-      vscode.window.showInformationMessage("Goals refreshed");
-    }),
-
-    vscode.commands.registerCommand(CMD_VALIDATE_ACTION, async () => {
-      if (!mcpClient?.connected) {
-        vscode.window.showWarningMessage("Sentinel is not connected.");
-        return;
-      }
-
-      const description = await vscode.window.showInputBox({
-        prompt: "Describe the action to validate",
-        placeHolder: "e.g., Implement JWT authentication",
+    vscode.commands.registerCommand(CMD_CONFIGURE_PROVIDERS, async () => {
+      // Open the chat panel with provider configuration
+      await vscode.commands.executeCommand('sentinel-chat.focus');
+      
+      // Send message to webview to show provider config
+      chatProvider.postMessage({
+        type: 'showProviderConfig',
       });
-
-      if (!description) return;
-
-      try {
-        const result = await mcpClient.validateAction(
-          "user_action",
-          description,
-        );
-        const msg = `Alignment: ${result.alignment_score.toFixed(1)}% | Risk: ${result.risk_level} | ${result.approved ? "APPROVED" : "REJECTED"}: ${result.rationale}`;
-        if (result.approved) {
-          vscode.window.showInformationMessage(msg);
-        } else {
-          vscode.window.showWarningMessage(msg);
-        }
-      } catch (err: any) {
-        vscode.window.showErrorMessage(`Validation failed: ${err.message}`);
-      }
-    }),
-
-    vscode.commands.registerCommand(CMD_SHOW_ALIGNMENT, async () => {
-      if (!mcpClient?.connected) {
-        vscode.window.showWarningMessage(
-          "Sentinel is not connected. Ensure sentinel-cli is installed and accessible.",
-        );
-        return;
-      }
-
-      try {
-        const report = await mcpClient.getAlignment();
-        const lines = [
-          `Score: ${report.score.toFixed(1)}%`,
-          `Confidence: ${(report.confidence * 100).toFixed(0)}%`,
-          `Status: ${report.status}`,
-        ];
-        if (report.violations.length > 0) {
-          lines.push("", "Violations:");
-          for (const v of report.violations) {
-            lines.push(`  - ${v.description} (severity: ${v.severity})`);
-          }
-        }
-        vscode.window.showInformationMessage(lines.join("\n"), { modal: true });
-      } catch (err: any) {
-        vscode.window.showErrorMessage(
-          `Failed to get alignment: ${err.message}`,
-        );
-      }
-    }),
-
-    // Blueprint commands
-    vscode.commands.registerCommand(CMD_BLUEPRINT_LIST, async () => {
-      outputChannel.appendLine("Listing blueprints...");
-      try {
-        const result = spawn(sentinelPath, ["blueprint", "list", "--json"], {
-          cwd: workspaceRoot,
-          shell: true,
-        });
-
-        let stdout = "";
-        let stderr = "";
-
-        result.stdout?.on("data", (chunk: Buffer) => {
-          stdout += chunk.toString();
-        });
-
-        result.stderr?.on("data", (chunk: Buffer) => {
-          stderr += chunk.toString();
-        });
-
-        result.on("close", async (code) => {
-          if (code === 0 && stdout) {
-            try {
-              const blueprints = JSON.parse(stdout);
-              const items = blueprints.map((bp: any) => ({
-                label: bp.name,
-                description: bp.description,
-                detail: `${bp.category} | ${bp.difficulty} | ${bp.estimated_time}`,
-              }));
-
-              const selected = await vscode.window.showQuickPick(items, {
-                placeHolder: "Select a blueprint to view details",
-              });
-
-              if (selected) {
-                await vscode.commands.executeCommand(CMD_BLUEPRINT_SHOW, selected.label);
-              }
-            } catch (e) {
-              outputChannel.appendLine(`Failed to parse blueprint list: ${e}`);
-            }
-          } else {
-            vscode.window.showErrorMessage(`Failed to list blueprints: ${stderr}`);
-          }
-        });
-      } catch (err: any) {
-        vscode.window.showErrorMessage(`Failed to list blueprints: ${err.message}`);
-      }
-    }),
-
-    vscode.commands.registerCommand(CMD_BLUEPRINT_SHOW, async (name?: string) => {
-      const blueprintName = name ?? await vscode.window.showInputBox({
-        prompt: "Enter blueprint name",
-        placeHolder: "e.g., web-app-auth-crud-board",
-      });
-
-      if (!blueprintName) return;
-
-      outputChannel.appendLine(`Showing blueprint: ${blueprintName}`);
-      try {
-        const result = spawn(sentinelPath, ["blueprint", "show", blueprintName], {
-          cwd: workspaceRoot,
-          shell: true,
-        });
-
-        let stdout = "";
-        let stderr = "";
-
-        result.stdout?.on("data", (chunk: Buffer) => {
-          stdout += chunk.toString();
-        });
-
-        result.stderr?.on("data", (chunk: Buffer) => {
-          stderr += chunk.toString();
-        });
-
-        result.on("close", (code) => {
-          if (code === 0) {
-            // Create a new untitled document with the blueprint details
-            vscode.workspace.openTextDocument({
-              content: stdout,
-              language: "markdown",
-            }).then(doc => {
-                vscode.window.showTextDocument(doc);
-              });
-          } else {
-            vscode.window.showErrorMessage(`Failed to show blueprint: ${stderr}`);
-          }
-        });
-      } catch (err: any) {
-        vscode.window.showErrorMessage(`Failed to show blueprint: ${err.message}`);
-      }
-    }),
-
-    vscode.commands.registerCommand(CMD_BLUEPRINT_APPLY, async (name?: string) => {
-      const blueprintName = name ?? await vscode.window.showInputBox({
-        prompt: "Enter blueprint name to apply",
-        placeHolder: "e.g., web-app-auth-crud-board",
-      });
-
-      if (!blueprintName) return;
-
-      const confirm = await vscode.window.showWarningMessage(
-        `Apply blueprint '${blueprintName}' to current workspace?`,
-        { modal: true },
-        "Apply",
-      );
-
-      if (confirm !== "Apply") return;
-
-      outputChannel.appendLine(`Applying blueprint: ${blueprintName}`);
-      try {
-        await vscode.window.withProgress(
-          {
-            location: vscode.ProgressLocation.Notification,
-            title: `Applying blueprint '${blueprintName}'...`,
-            cancellable: false,
-          },
-          async () => {
-            const result = spawn(sentinelPath, ["blueprint", "apply", blueprintName], {
-              cwd: workspaceRoot,
-              shell: true,
-            });
-
-            let stdout = "";
-            let stderr = "";
-
-            result.stdout?.on("data", (chunk: Buffer) => {
-              stdout += chunk.toString();
-            });
-
-            result.stderr?.on("data", (chunk: Buffer) => {
-              stderr += chunk.toString();
-            });
-
-            return new Promise<void>((resolve, reject) => {
-              result.on("close", (code) => {
-                if (code === 0) {
-                  vscode.window.showInformationMessage(`Blueprint applied successfully!\n${stdout}`);
-                  resolve();
-                } else {
-                  vscode.window.showErrorMessage(`Failed to apply blueprint: ${stderr}`);
-                  reject(new Error(stderr));
-                }
-              });
-            });
-          },
-        );
-      } catch (err: any) {
-        vscode.window.showErrorMessage(`Failed to apply blueprint: ${err.message}`);
-      }
-    }),
-
-    vscode.commands.registerCommand(CMD_BLUEPRINT_QUICKSTART, async () => {
-      // Show quickstart dialog with blueprint options
-      const options = [
-        { label: "$(browser) Web App with Auth", value: "web-app-auth-crud-board", description: "Full-stack web app with authentication, CRUD, and kanban board" },
-        { label: "$(server) Backend API", value: "backend-api-auth-billing", description: "REST API with authentication and Stripe billing" },
-        { label: "$(beaker) CI/CD Pipeline", value: "integration-ci-quality-gates", description: "CI/CD integration with automated quality gates" },
-        { label: "$(git-branch) Migration Blueprint", value: "migration-monolith-to-modular", description: "Monolith to microservices migration guide" },
-      ];
-
-      const selected = await vscode.window.showQuickPick(options, {
-        placeHolder: "Choose a blueprint to quickstart your project",
-      });
-
-      if (selected) {
-        await vscode.commands.executeCommand(CMD_BLUEPRINT_APPLY, selected.value);
-      }
-    }),
-
-    // Live Preview Commands
-    vscode.commands.registerCommand(CMD_PREVIEW_TOGGLE, async () => {
-      const state = livePreviewProvider.getState();
-      if (state.server) {
-        livePreviewProvider.stopPreview();
-        vscode.window.showInformationMessage("Live Preview stopped");
-      } else {
-        const result = await devServerDetector.detectServers();
-        if (result.servers.length > 0) {
-          await livePreviewProvider.startPreview(result.servers[0]);
-          void vscode.commands.executeCommand("sentinel-live-preview.focus");
-          vscode.window.showInformationMessage(`Live Preview started: ${result.servers[0].type} on port ${result.servers[0].port}`);
-        } else {
-          vscode.window.showWarningMessage(
-            "No development server detected. Start your dev server (e.g., npm run dev) and try again."
-          );
-        }
-      }
-    }),
-
-    vscode.commands.registerCommand(CMD_PREVIEW_REFRESH, () => {
-      livePreviewProvider.refresh();
-      vscode.window.showInformationMessage("Live Preview refreshed");
-    }),
-
-    vscode.commands.registerCommand(CMD_PREVIEW_VIEWPORT_DESKTOP, () => {
-      void livePreviewProvider.changeViewport('desktop');
-    }),
-
-    vscode.commands.registerCommand(CMD_PREVIEW_VIEWPORT_TABLET, () => {
-      void livePreviewProvider.changeViewport('tablet');
-    }),
-
-    vscode.commands.registerCommand(CMD_PREVIEW_VIEWPORT_MOBILE, () => {
-      void livePreviewProvider.changeViewport('mobile');
+      
+      outputChannel.appendLine('Opening provider configuration');
     }),
   );
 
-  // ── 7. Polling ───────────────────────────────────────────
-  pollTimer = setInterval(async () => {
-    if (!mcpClient?.connected) return;
+  // ── 8. Remaining Commands (openChat + refreshGoals registered early above) ───
+  context.subscriptions.push(
+    vscode.commands.registerCommand(CMD_VALIDATE_ACTION, async () => {
+      outputChannel.appendLine("Validating actions...");
+    }),
+  );
 
-    try {
-      const report = await mcpClient.getAlignment();
+  context.subscriptions.push(
+    vscode.commands.registerCommand(CMD_SHOW_ALIGNMENT, async () => {
+      if (!mcpClient?.connected) {
+        vscode.window.showWarningMessage("Sentinel not connected");
+        return;
+      }
+      try {
+        const alignment = await mcpClient.getAlignment();
+        vscode.window.showInformationMessage(
+          `Alignment: ${alignment.score}% - ${alignment.status}`
+        );
+      } catch (err) {
+        outputChannel.appendLine(`Error getting alignment: ${err}`);
+      }
+    }),
+  );
 
-      // Update all consumers
-      statusBar.update(report);
-      codeLensProvider.updateReport(report);
-      chatProvider.updateAlignment(report);
-    } catch {
-      // Silently fail on poll; will retry next interval
-    }
-  }, POLL_INTERVAL_MS);
+  context.subscriptions.push(
+    vscode.commands.registerCommand(CMD_BLUEPRINT_QUICKSTART, async () => {
+      await vscode.commands.executeCommand('sentinel-chat.focus');
+      chatProvider.postMessage({ type: 'showBlueprints' });
+    }),
+  );
 
-  // ── 8. Connection status updates ─────────────────────────
+  context.subscriptions.push(
+    vscode.commands.registerCommand(CMD_PREVIEW_TOGGLE, async () => {
+      await vscode.commands.executeCommand('sentinel-live-preview.focus');
+    }),
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand(CMD_PREVIEW_REFRESH, async () => {
+      livePreviewProvider.refresh();
+    }),
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand("sentinel.preview.viewportDesktop", () => {
+      livePreviewProvider.changeViewport('desktop');
+    }),
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand("sentinel.preview.viewportTablet", () => {
+      livePreviewProvider.changeViewport('tablet');
+    }),
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand("sentinel.preview.viewportMobile", () => {
+      livePreviewProvider.changeViewport('mobile');
+    }),
+  );
+
+  // ── 9. Connection status updates ─────────────────────────
   mcpClient.on("connected", () => {
     outputChannel.appendLine("Sentinel MCP connected");
-    // Trigger initial data load
-    vscode.commands.executeCommand(CMD_REFRESH_GOALS);
+    setTimeout(() => {
+      vscode.commands.executeCommand(CMD_REFRESH_GOALS).catch((err: Error) => {
+        if (err?.message?.includes("not found")) return;
+        outputChannel.appendLine(`Failed to refresh goals on connect: ${err.message}`);
+      });
+    }, 100);
   });
 
   mcpClient.on("disconnected", () => {

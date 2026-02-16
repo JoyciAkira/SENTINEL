@@ -18,6 +18,7 @@ import {
   getBlueprintById,
   listBlueprintsForChat,
 } from "./blueprints";
+import ProviderConfigService from "../services/ProviderConfigService";
 
 type AugmentRuntimeMode = "disabled" | "internal_only" | "byo_customer";
 
@@ -573,6 +574,144 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
       case "codexLogin":
         vscode.commands.executeCommand(CMD_CODEX_LOGIN);
         break;
+
+      // Provider Configuration Messages
+      case "getProviders":
+        await this.handleGetProviders();
+        break;
+
+      case "saveProviderKey":
+        await this.handleSaveProviderKey(msg.provider, msg.apiKey);
+        break;
+
+      case "deleteProviderKey":
+        await this.handleDeleteProviderKey(msg.provider);
+        break;
+
+      case "exportEnvScript":
+        await this.handleExportEnvScript();
+        break;
+
+      case "testProviderConnection":
+        await this.handleTestProviderConnection(msg.provider);
+        break;
+    }
+  }
+
+  private async handleGetProviders(): Promise<void> {
+    const providerService = ProviderConfigService.getInstance(this.context);
+    const providers = await providerService.getAllProviders();
+    this.postMessage({
+      type: "providersList",
+      providers,
+    });
+  }
+
+  private async handleSaveProviderKey(provider: string, apiKey: string): Promise<void> {
+    try {
+      const providerService = ProviderConfigService.getInstance(this.context);
+      
+      // Validate key format
+      const isValid = providerService.validateApiKey(provider, apiKey);
+      if (!isValid) {
+        this.postMessage({
+          type: "error",
+          error: `Invalid API key format for ${provider}`,
+        });
+        return;
+      }
+
+      // Test connection
+      const testResult = await providerService.testApiKey(provider, apiKey);
+      if (!testResult.success) {
+        this.postMessage({
+          type: "error",
+          error: testResult.message,
+        });
+        return;
+      }
+
+      // Store securely
+      await providerService.storeApiKey(provider, apiKey);
+      
+      this.postMessage({
+        type: "providerSaved",
+        provider,
+        message: testResult.message,
+      });
+
+      this.outputChannel.appendLine(`Provider ${provider} configured successfully`);
+    } catch (err: any) {
+      this.postMessage({
+        type: "error",
+        error: err?.message ?? String(err),
+      });
+    }
+  }
+
+  private async handleDeleteProviderKey(provider: string): Promise<void> {
+    try {
+      const providerService = ProviderConfigService.getInstance(this.context);
+      await providerService.deleteApiKey(provider);
+      this.postMessage({
+        type: "providerDeleted",
+        provider,
+      });
+      this.outputChannel.appendLine(`Provider ${provider} removed`);
+    } catch (err: any) {
+      this.postMessage({
+        type: "error",
+        error: err?.message ?? String(err),
+      });
+    }
+  }
+
+  private async handleExportEnvScript(): Promise<void> {
+    try {
+      const providerService = ProviderConfigService.getInstance(this.context);
+      const script = await providerService.exportEnvScript();
+      
+      // Copy to clipboard
+      await vscode.env.clipboard.writeText(script);
+      
+      this.postMessage({
+        type: "envScriptExported",
+        message: "Environment script copied to clipboard",
+      });
+    } catch (err: any) {
+      this.postMessage({
+        type: "error",
+        error: err?.message ?? String(err),
+      });
+    }
+  }
+
+  private async handleTestProviderConnection(provider: string): Promise<void> {
+    try {
+      const providerService = ProviderConfigService.getInstance(this.context);
+      const apiKey = await providerService.getApiKey(provider);
+      
+      if (!apiKey) {
+        this.postMessage({
+          type: "error",
+          error: `No API key configured for ${provider}`,
+        });
+        return;
+      }
+
+      const result = await providerService.testApiKey(provider, apiKey);
+      
+      this.postMessage({
+        type: "providerTestResult",
+        provider,
+        success: result.success,
+        message: result.message,
+      });
+    } catch (err: any) {
+      this.postMessage({
+        type: "error",
+        error: err?.message ?? String(err),
+      });
     }
   }
 

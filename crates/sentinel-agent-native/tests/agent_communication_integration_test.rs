@@ -10,8 +10,8 @@ use sentinel_core::outcome_compiler::agent_communication::{
     AgentCapability, AgentId, AgentMessage, MessagePayload, UrgencyLevel,
 };
 use std::collections::HashMap;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
 use tokio::sync::Mutex;
 use tokio::time::{sleep, Duration};
 
@@ -32,13 +32,11 @@ impl TrackingMockLLM {
         );
         responses.insert(
             "auth".to_string(),
-            "I will share a pattern about JWT authentication with middleware."
-                .to_string(),
+            "I will share a pattern about JWT authentication with middleware.".to_string(),
         );
         responses.insert(
             "api".to_string(),
-            "I will design the RESTful API endpoints and request help if needed."
-                .to_string(),
+            "I will design the RESTful API endpoints and request help if needed.".to_string(),
         );
 
         Self {
@@ -89,11 +87,19 @@ async fn test_agent_registration_and_listing() -> Result<()> {
 
     // Register multiple agents
     let (handle1, _agent1) = orchestrator
-        .register_agent("Agent1", vec![AgentCapability::AuthExpert], "System prompt 1")
+        .register_agent(
+            "Agent1",
+            vec![AgentCapability::AuthExpert],
+            "System prompt 1",
+        )
         .await?;
 
     let (handle2, _agent2) = orchestrator
-        .register_agent("Agent2", vec![AgentCapability::ApiExpert], "System prompt 2")
+        .register_agent(
+            "Agent2",
+            vec![AgentCapability::ApiExpert],
+            "System prompt 2",
+        )
         .await?;
 
     // List agents
@@ -102,11 +108,9 @@ async fn test_agent_registration_and_listing() -> Result<()> {
     assert_eq!(agents.len(), 2);
     assert!(agents.iter().any(|a| a.name == "Agent1"));
     assert!(agents.iter().any(|a| a.name == "Agent2"));
-    assert!(
-        agents
-            .iter()
-            .any(|a| a.capabilities.contains(&AgentCapability::AuthExpert))
-    );
+    assert!(agents
+        .iter()
+        .any(|a| a.capabilities.contains(&AgentCapability::AuthExpert)));
 
     // Verify handles have correct IDs
     assert_eq!(handle1.info.name, "Agent1");
@@ -123,11 +127,19 @@ async fn test_direct_message_routing() -> Result<()> {
 
     // Register two agents
     let (handle1, mut agent1) = orchestrator
-        .register_agent("Agent1", vec![AgentCapability::AuthExpert], "You are Agent1.")
+        .register_agent(
+            "Agent1",
+            vec![AgentCapability::AuthExpert],
+            "You are Agent1.",
+        )
         .await?;
 
     let (handle2, mut agent2) = orchestrator
-        .register_agent("Agent2", vec![AgentCapability::ApiExpert], "You are Agent2.")
+        .register_agent(
+            "Agent2",
+            vec![AgentCapability::ApiExpert],
+            "You are Agent2.",
+        )
         .await?;
 
     // Spawn orchestrator loop
@@ -159,7 +171,9 @@ async fn test_direct_message_routing() -> Result<()> {
         urgency: UrgencyLevel::High,
     };
 
-    orchestrator.send_to(&handle2.id, &handle1.id, payload).await?;
+    orchestrator
+        .send_to(&handle2.id, &handle1.id, payload)
+        .await?;
 
     // Give time for routing
     sleep(Duration::from_millis(500)).await;
@@ -176,15 +190,27 @@ async fn test_broadcast_messaging() -> Result<()> {
 
     // Register three agents
     let (handle1, _agent1) = orchestrator
-        .register_agent("Agent1", vec![AgentCapability::AuthExpert], "You are Agent1.")
+        .register_agent(
+            "Agent1",
+            vec![AgentCapability::AuthExpert],
+            "You are Agent1.",
+        )
         .await?;
 
     let (_handle2, _agent2) = orchestrator
-        .register_agent("Agent2", vec![AgentCapability::ApiExpert], "You are Agent2.")
+        .register_agent(
+            "Agent2",
+            vec![AgentCapability::ApiExpert],
+            "You are Agent2.",
+        )
         .await?;
 
     let (_handle3, _agent3) = orchestrator
-        .register_agent("Agent3", vec![AgentCapability::FrontendExpert], "You are Agent3.")
+        .register_agent(
+            "Agent3",
+            vec![AgentCapability::FrontendExpert],
+            "You are Agent3.",
+        )
         .await?;
 
     // Spawn orchestrator loop
@@ -292,7 +318,10 @@ fn test_message_payload_variants() {
     // Verify all variants can be created
     assert!(matches!(pattern, MessagePayload::PatternShare { .. }));
     assert!(matches!(help, MessagePayload::HelpRequest { .. }));
-    assert!(matches!(validation, MessagePayload::ValidationResult { .. }));
+    assert!(matches!(
+        validation,
+        MessagePayload::ValidationResult { .. }
+    ));
 }
 
 /// Test agent capabilities matching

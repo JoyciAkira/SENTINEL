@@ -1,0 +1,17 @@
+{
+  "constitutional_spec_hash": "3b1b6241ebd4340b8e7cb4bdd38855bb251ea921ecb06435f6bb99f7a198afd5",
+  "counterfactual_hash": "af191d5223f376b1f69c8dd1d6aa101052f88a56c4e363b9e269abb8aac87c3a",
+  "evidence_hash": "74619e063db2e2515e785782e272ae11399ff24d54a10ebee4c7b2f387dc93a5",
+  "memory_hit_ids": [
+    "cbbea885-7a7d-4d94-b39f-045e33ecb05a",
+    "0da1ef75-b46b-43af-be7f-dd5a3832e126",
+    "2dab52cd-88e8-4c29-9a24-cafcccff3f39"
+  ],
+  "policy_simulation_hash": "8b436a5883fe2f3deafd52a8923a7b6985e0d2bea808a60cd582ce3f7e4e8ae1",
+  "response_hash": "10674dde26c5ed292f1dd0d5c6f0d070ae689c18a03d9d61465f3bdc41bc18fb",
+  "strict_goal_execution": true,
+  "timestamp": 1771199952878,
+  "turn_id": "427fd361-9f1c-45ce-a382-dc3b8eacec28",
+  "user_message": "Implementa SOLO il primo goal pending del manifold.\nGoal ID: 0c2a35f8-4eae-4e53-bf96-c21b2be077ea\nGoal descrizione: Configure dependencies and build system: Kernel Foundation: Inizializzazione del core allineato ai vettori d'intento rilevati.\n\nVincoli obbligatori:\n- niente scaffolding iniziale\n- solo file changes mirati\n- test minimi necessari\n- comandi di verifica strettamente necessari\n- mantieni output con sezioni operative e path espliciti",
+  "version": 1
+}

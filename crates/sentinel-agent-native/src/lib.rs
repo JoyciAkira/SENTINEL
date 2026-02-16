@@ -47,6 +47,7 @@ pub mod orchestrator;
 pub mod planning;
 pub mod providers;
 pub mod reasoning;
+pub mod swarm;
 
 use anyhow::Result;
 use sentinel_core::{

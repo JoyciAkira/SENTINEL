@@ -1,0 +1,71 @@
+{
+  "_comment": "SENTINEL SWARM - Multi-Provider Configuration",
+  "_comment": "Supports: OpenAI, Anthropic, Google, OpenRouter, Ollama, Groq, and any OpenAI-compatible API",
+  
+  "default": "openrouter",
+  "fallbacks": ["openai", "anthropic"],
+  
+  "providers": {
+    "openrouter": {
+      "type": "openrouter",
+      "api_key_env": "OPENROUTER_API_KEY",
+      "model": "deepseek/deepseek-r1-0528:free",
+      "temperature": 0.3,
+      "max_tokens": 2048
+    },
+    
+    "openai": {
+      "type": "openai",
+      "api_key_env": "OPENAI_API_KEY",
+      "model": "gpt-4o-mini",
+      "temperature": 0.3,
+      "max_tokens": 2048
+    },
+    
+    "anthropic": {
+      "type": "anthropic", 
+      "api_key_env": "ANTHROPIC_API_KEY",
+      "model": "claude-3-5-sonnet-20240620",
+      "temperature": 0.3,
+      "max_tokens": 2048
+    },
+    
+    "gemini": {
+      "type": "gemini",
+      "api_key_env": "GEMINI_API_KEY",
+      "model": "gemini-1.5-pro",
+      "temperature": 0.3,
+      "max_tokens": 2048
+    },
+    
+    "ollama": {
+      "type": "openai_compatible",
+      "name": "Ollama (Local)",
+      "base_url": "http://localhost:11434/v1",
+      "model": "llama3.2:latest",
+      "temperature": 0.3,
+      "max_tokens": 2048
+    },
+    
+    "groq": {
+      "type": "openai_compatible",
+      "name": "Groq",
+      "api_key_env": "GROQ_API_KEY", 
+      "base_url": "https://api.groq.com/openai/v1",
+      "model": "llama-3.3-70b-versatile",
+      "temperature": 0.3,
+      "max_tokens": 2048
+    },
+    
+    "custom_local": {
+      "type": "openai_compatible",
+      "name": "My Local LLM",
+      "base_url": "http://localhost:8000/v1",
+      "model": "my-model",
+      "api_key": "optional-api-key",
+      "headers": {
+        "X-Custom-Header": "value"
+      }
+    }
+  }
+}
