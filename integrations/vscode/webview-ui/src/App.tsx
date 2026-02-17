@@ -235,6 +235,23 @@ export default function App() {
     vscodeApi.postMessage({ type: "webviewReady" });
   }, [vscodeApi]);
 
+  useEffect(() => {
+    const handler = (event: MessageEvent) => {
+      const msg = event.data;
+      if (!msg || typeof msg.type !== "string") return;
+
+      if (msg.type === "showProviderConfig") {
+        setActiveFeature("settings");
+      }
+      if (msg.type === "showBlueprints") {
+        setActiveFeature("chat");
+      }
+    };
+
+    window.addEventListener("message", handler);
+    return () => window.removeEventListener("message", handler);
+  }, []);
+
   const alignmentScore = alignment?.score ?? 0;
 
   const pendingFileApprovals = useMemo(

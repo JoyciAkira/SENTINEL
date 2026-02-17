@@ -12,6 +12,7 @@ interface Provider {
   keyEnvVar: string;
   defaultModel: string;
   isConfigured: boolean;
+  isEnabled: boolean;
 }
 
 interface ProviderConfigState {
@@ -74,6 +75,21 @@ export const ProviderConfigPanel: React.FC = () => {
         setState(prev => ({
           ...prev,
           providers: message.providers,
+          isLoading: false,
+        }));
+      } else if (message.type === 'providerToggled') {
+        setState(prev => ({
+          ...prev,
+          message: `${message.enabled ? '✅ Enabled' : '⏸️ Disabled'} ${message.provider}`,
+          messageType: 'info',
+          isLoading: false,
+        }));
+        vscode.postMessage({ type: 'getProviders' });
+      } else if (message.type === 'providerTestResult') {
+        setState(prev => ({
+          ...prev,
+          message: message.message ?? `Provider test ${message.success ? 'passed' : 'failed'}`,
+          messageType: message.success ? 'success' : 'error',
           isLoading: false,
         }));
       } else if (message.type === 'providerSaved') {
@@ -146,6 +162,7 @@ export const ProviderConfigPanel: React.FC = () => {
   }, []);
 
   const testConnection = useCallback((providerId: string) => {
+    setState(prev => ({ ...prev, isLoading: true }));
     vscode.postMessage({
       type: 'testProviderConnection',
       provider: providerId,
@@ -155,6 +172,15 @@ export const ProviderConfigPanel: React.FC = () => {
       message: `🧪 Testing ${providerId} connection...`,
       messageType: 'info',
     }));
+  }, []);
+
+  const toggleProvider = useCallback((providerId: string, enabled: boolean) => {
+    setState(prev => ({ ...prev, isLoading: true }));
+    vscode.postMessage({
+      type: 'toggleProviderEnabled',
+      provider: providerId,
+      enabled,
+    });
   }, []);
 
   const configuredCount = state.providers.filter(p => p.isConfigured).length;
@@ -215,11 +241,24 @@ export const ProviderConfigPanel: React.FC = () => {
                   {provider.isConfigured && (
                     <span className="configured-badge">✓</span>
                   )}
+                  {!provider.isEnabled && (
+                    <span className="disabled-badge">disabled</span>
+                  )}
                 </div>
                 <div className="provider-description">{provider.description}</div>
                 <div className="provider-model">Model: {provider.defaultModel}</div>
               </div>
               <div className="provider-actions">
+                <button
+                  className={`toggle-btn ${provider.isEnabled ? 'enabled' : ''}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleProvider(provider.id, !provider.isEnabled);
+                  }}
+                  title={provider.isEnabled ? 'Disable provider' : 'Enable provider'}
+                >
+                  {provider.isEnabled ? 'ON' : 'OFF'}
+                </button>
                 {provider.isConfigured ? (
                   <>
                     <button
@@ -261,7 +300,7 @@ export const ProviderConfigPanel: React.FC = () => {
       </div>
 
       {/* Configuration Form */}
-      {state.selectedProvider && (
+      {state.selectedProvider && state.selectedProvider !== 'openai_auth' && (
         <div className="config-form">
           <h3>Configure {state.providers.find(p => p.id === state.selectedProvider)?.name}</h3>
           

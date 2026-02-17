@@ -16,6 +16,7 @@ import {
 } from "./webview-providers/SentinelChatViewProvider";
 import { sentinelService } from "./services/SentinelService";
 import { LivePreviewProvider, devServerDetector, DevServer } from "./services";
+import ProviderConfigService from "./services/ProviderConfigService";
 import {
   CONFIG_SENTINEL_PATH,
   CONFIG_DEFAULT_PATH,
@@ -154,19 +155,69 @@ export function activate(context: vscode.ExtensionContext) {
     else outputChannel.appendLine("❌ SDK Service Failed");
   });
 
-  const buildMcpEnv = () => {
+  const buildMcpEnv = async () => {
     const useOpenAIAuth = context.globalState.get<boolean>(
       "sentinel.useOpenAIAuth",
       false,
     );
+    const providerService = ProviderConfigService.getInstance(context);
+    const openaiAuthEnabled = await providerService.isProviderEnabled(
+      "openai_auth",
+      useOpenAIAuth,
+    );
+    const providers = await providerService.getAllProviders();
+    const enabledConfigured = providers.filter((p) => p.isConfigured && p.isEnabled);
     const augment = context.globalState.get<AugmentRuntimeSettings>(
       "sentinel.augmentSettings",
       { enabled: false, mode: "disabled", enforceByo: true },
     );
     const env: NodeJS.ProcessEnv = {};
-    if (useOpenAIAuth) {
+    if (openaiAuthEnabled) {
       env.SENTINEL_OPENAI_AUTH = "true";
       env.SENTINEL_LLM_PROVIDER = "openai_auth";
+      env.SENTINEL_DISABLE_OPENAI_AUTH = "false";
+    } else {
+      env.SENTINEL_OPENAI_AUTH = "false";
+      env.SENTINEL_DISABLE_OPENAI_AUTH = "true";
+    }
+    for (const provider of enabledConfigured) {
+      if (provider.id === "openai_auth") continue;
+      const key = await providerService.getApiKey(provider.id);
+      if (!key) continue;
+      switch (provider.id) {
+        case "openrouter":
+          env.OPENROUTER_API_KEY = key;
+          break;
+        case "openai":
+          env.OPENAI_API_KEY = key;
+          break;
+        case "anthropic":
+          env.ANTHROPIC_API_KEY = key;
+          break;
+        case "google":
+          env.GEMINI_API_KEY = key;
+          break;
+        case "groq":
+          env.GROQ_API_KEY = key;
+          break;
+        case "ollama":
+          env.SENTINEL_LLM_BASE_URL = key;
+          env.SENTINEL_LLM_MODEL = provider.defaultModel;
+          break;
+      }
+    }
+    const firstEnabled = enabledConfigured.find((p) => p.id !== "openai_auth");
+    if (!openaiAuthEnabled && firstEnabled) {
+      const map: Record<string, string> = {
+        openrouter: "openrouter",
+        openai: "openai",
+        anthropic: "anthropic",
+        google: "gemini",
+        groq: "openai_compatible",
+        ollama: "openai_compatible",
+      };
+      const mapped = map[firstEnabled.id];
+      if (mapped) env.SENTINEL_LLM_PROVIDER = mapped;
     }
     env.SENTINEL_AUGMENT_ENABLED = augment.enabled ? "true" : "false";
     env.SENTINEL_AUGMENT_MODE = augment.mode;
@@ -177,7 +228,7 @@ export function activate(context: vscode.ExtensionContext) {
   };
 
   const applyMcpEnvAndReconnect = async () => {
-    const env = buildMcpEnv();
+    const env = await buildMcpEnv();
     mcpClient?.setEnvOverrides(env);
     mcpClient?.disconnect();
     await mcpClient?.start();
@@ -188,11 +239,14 @@ export function activate(context: vscode.ExtensionContext) {
     sentinelPath,
     workspaceRoot,
     outputChannel,
-    buildMcpEnv(),
+    {},
   );
 
   // Start MCP connection
-  mcpClient.start().catch((err) => {
+  void buildMcpEnv().then((env) => {
+    mcpClient?.setEnvOverrides(env);
+    return mcpClient?.start();
+  }).catch((err) => {
     outputChannel.appendLine(`MCP initial connection error: ${err.message}`);
   });
 
@@ -269,15 +323,22 @@ export function activate(context: vscode.ExtensionContext) {
   // ── 7. Provider Configuration ────────────────────────────
   context.subscriptions.push(
     vscode.commands.registerCommand(CMD_CONFIGURE_PROVIDERS, async () => {
-      // Open the chat panel with provider configuration
-      await vscode.commands.executeCommand('sentinel-chat.focus');
-      
-      // Send message to webview to show provider config
+      // Open the chat panel with provider configuration.
+      // Fallback to the extension view container if focus command is not yet available.
+      try {
+        await vscode.commands.executeCommand("sentinel-chat.focus");
+      } catch {
+        await vscode.commands.executeCommand("workbench.view.extension.sentinel-explorer");
+        await vscode.commands.executeCommand("sentinel-chat.focus");
+      }
+
+      // Send message to webview to show provider config.
+      // If view is still resolving, provider queues and flushes on resolve.
       chatProvider.postMessage({
-        type: 'showProviderConfig',
+        type: "showProviderConfig",
       });
-      
-      outputChannel.appendLine('Opening provider configuration');
+
+      outputChannel.appendLine("Opening provider configuration");
     }),
   );
 

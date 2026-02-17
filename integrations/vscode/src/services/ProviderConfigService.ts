@@ -4,6 +4,8 @@
 //! for 100% secure storage with encryption at rest
 
 import * as vscode from 'vscode';
+import * as fs from 'fs';
+import * as path from 'path';
 
 export const PROVIDER_KEYS = {
   OPENROUTER: 'openrouter_api_key',
@@ -22,6 +24,7 @@ export interface ProviderConfig {
   baseUrl?: string;
   defaultModel: string;
   isConfigured: boolean;
+  isEnabled: boolean;
 }
 
 export class ProviderConfigService {
@@ -90,14 +93,32 @@ export class ProviderConfigService {
    * Get all provider configurations
    */
   async getAllProviders(): Promise<ProviderConfig[]> {
+    const openrouterConfigured = await this.isProviderConfigured('openrouter');
+    const openaiConfigured = await this.isProviderConfigured('openai');
+    const anthropicConfigured = await this.isProviderConfigured('anthropic');
+    const googleConfigured = await this.isProviderConfigured('google');
+    const groqConfigured = await this.isProviderConfigured('groq');
+    const ollamaConfigured = await this.isProviderConfigured('ollama');
+    const openaiAuthConfigured = this.hasCodexAuth();
+
     const providers: ProviderConfig[] = [
+      {
+        id: 'openai_auth',
+        name: 'OpenAI Auth (ChatGPT Login)',
+        description: 'Use ChatGPT/Codex local auth token (optional)',
+        keyEnvVar: 'SENTINEL_OPENAI_AUTH',
+        defaultModel: 'gpt-4o-mini',
+        isConfigured: openaiAuthConfigured,
+        isEnabled: await this.isProviderEnabled('openai_auth', false),
+      },
       {
         id: 'openrouter',
         name: 'OpenRouter',
         description: '40+ models (DeepSeek, Claude, GPT-4) - Recommended',
         keyEnvVar: 'OPENROUTER_API_KEY',
         defaultModel: 'deepseek/deepseek-r1-0528:free',
-        isConfigured: await this.isProviderConfigured('openrouter'),
+        isConfigured: openrouterConfigured,
+        isEnabled: await this.isProviderEnabled('openrouter', openrouterConfigured),
       },
       {
         id: 'openai',
@@ -105,7 +126,8 @@ export class ProviderConfigService {
         description: 'GPT-4, GPT-3.5, o1',
         keyEnvVar: 'OPENAI_API_KEY',
         defaultModel: 'gpt-4o-mini',
-        isConfigured: await this.isProviderConfigured('openai'),
+        isConfigured: openaiConfigured,
+        isEnabled: await this.isProviderEnabled('openai', openaiConfigured),
       },
       {
         id: 'anthropic',
@@ -113,15 +135,17 @@ export class ProviderConfigService {
         description: 'Claude 3.5 Sonnet - Excellent reasoning',
         keyEnvVar: 'ANTHROPIC_API_KEY',
         defaultModel: 'claude-3-5-sonnet-20241022',
-        isConfigured: await this.isProviderConfigured('anthropic'),
+        isConfigured: anthropicConfigured,
+        isEnabled: await this.isProviderEnabled('anthropic', anthropicConfigured),
       },
       {
         id: 'google',
         name: 'Google (Gemini)',
         description: 'Gemini 1.5 Pro, Flash - Good for code',
-        keyEnvVar: 'GOOGLE_API_KEY',
+        keyEnvVar: 'GEMINI_API_KEY',
         defaultModel: 'gemini-1.5-flash',
-        isConfigured: await this.isProviderConfigured('google'),
+        isConfigured: googleConfigured,
+        isEnabled: await this.isProviderEnabled('google', googleConfigured),
       },
       {
         id: 'groq',
@@ -129,7 +153,8 @@ export class ProviderConfigService {
         description: 'Ultra-fast inference (Llama 3.1, Mixtral)',
         keyEnvVar: 'GROQ_API_KEY',
         defaultModel: 'llama-3.1-70b-versatile',
-        isConfigured: await this.isProviderConfigured('groq'),
+        isConfigured: groqConfigured,
+        isEnabled: await this.isProviderEnabled('groq', groqConfigured),
       },
       {
         id: 'ollama',
@@ -137,7 +162,8 @@ export class ProviderConfigService {
         description: 'Run models locally - Free & Private',
         keyEnvVar: 'OLLAMA_HOST',
         defaultModel: 'llama3.2',
-        isConfigured: await this.isProviderConfigured('ollama'),
+        isConfigured: ollamaConfigured,
+        isEnabled: await this.isProviderEnabled('ollama', ollamaConfigured),
       },
     ];
 
@@ -155,6 +181,8 @@ export class ProviderConfigService {
     let script = '#!/bin/bash\n# SENTINEL Provider Environment Variables\n# Auto-generated - DO NOT COMMIT\n\n';
     
     for (const provider of configured) {
+      if (!provider.isEnabled) continue;
+      if (provider.id === 'openai_auth') continue;
       const key = await this.getApiKey(provider.id);
       if (key) {
         script += `export ${provider.keyEnvVar}="${key}"\n`;
@@ -170,8 +198,16 @@ export class ProviderConfigService {
    */
   async getPrimaryProvider(): Promise<ProviderConfig | null> {
     const providers = await this.getAllProviders();
-    const configured = providers.find(p => p.isConfigured);
+    const configured = providers.find(p => p.isConfigured && p.isEnabled);
     return configured || null;
+  }
+
+  async setProviderEnabled(providerId: string, enabled: boolean): Promise<void> {
+    await this.context.workspaceState.update(`provider_${providerId}_enabled`, enabled);
+  }
+
+  async isProviderEnabled(providerId: string, defaultValue = false): Promise<boolean> {
+    return this.context.workspaceState.get<boolean>(`provider_${providerId}_enabled`, defaultValue);
   }
 
   /**
@@ -195,6 +231,17 @@ export class ProviderConfigService {
 
   private getSecretKeyName(providerId: string): string {
     return `sentinel_provider_${providerId}_api_key`;
+  }
+
+  private hasCodexAuth(): boolean {
+    const codexHome = process.env.CODEX_HOME;
+    if (codexHome) {
+      const codexPath = path.join(codexHome, 'auth.json');
+      if (fs.existsSync(codexPath)) return true;
+    }
+    const home = process.env.HOME || process.env.USERPROFILE;
+    if (!home) return false;
+    return fs.existsSync(path.join(home, '.codex', 'auth.json'));
   }
 
   /**

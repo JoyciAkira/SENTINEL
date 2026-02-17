@@ -369,6 +369,12 @@ impl ProviderRouter {
     fn build_provider_from_env(name: &str) -> Result<Option<ProviderEntry>> {
         match name {
             "openai_auth" => {
+                let disabled = std::env::var("SENTINEL_DISABLE_OPENAI_AUTH")
+                    .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
+                    .unwrap_or(false);
+                if disabled {
+                    return Ok(None);
+                }
                 let allow = std::env::var("SENTINEL_OPENAI_AUTH")
                     .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
                     .unwrap_or(false)

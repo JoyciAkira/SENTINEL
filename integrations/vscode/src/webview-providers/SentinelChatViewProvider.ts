@@ -153,6 +153,7 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
   private warnedMissingRuntimeTools = false;
   private augmentSettings: AugmentRuntimeSettings = DEFAULT_AUGMENT_SETTINGS;
   private pendingWritePlans: Map<string, PendingWritePlanEntry[]> = new Map();
+  private pendingUiMessages: unknown[] = [];
   private lastAppSpecDraft: AppSpecPayload | null = null;
   private lastUiKpiSignature: string | null = null;
 
@@ -188,6 +189,7 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
       webviewView.webview,
       this.extensionUri,
     );
+    this.flushPendingUiMessages();
 
     // Handle messages from webview
     webviewView.webview.onDidReceiveMessage((msg) => {
@@ -236,7 +238,19 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
   }
 
   postMessage(msg: unknown): void {
-    this.view?.webview.postMessage(msg);
+    if (!this.view) {
+      this.pendingUiMessages.push(msg);
+      return;
+    }
+    void this.view.webview.postMessage(msg);
+  }
+
+  private flushPendingUiMessages(): void {
+    if (!this.view || this.pendingUiMessages.length === 0) return;
+    const queue = this.pendingUiMessages.splice(0, this.pendingUiMessages.length);
+    for (const message of queue) {
+      void this.view.webview.postMessage(message);
+    }
   }
 
   private emitTimeline(
@@ -595,6 +609,9 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
       case "testProviderConnection":
         await this.handleTestProviderConnection(msg.provider);
         break;
+      case "toggleProviderEnabled":
+        await this.handleToggleProviderEnabled(msg.provider, Boolean(msg.enabled));
+        break;
 
       // Orchestration Messages
       case "startOrchestration":
@@ -720,6 +737,25 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
         success: result.success,
         message: result.message,
       });
+    } catch (err: any) {
+      this.postMessage({
+        type: "error",
+        error: err?.message ?? String(err),
+      });
+    }
+  }
+
+  private async handleToggleProviderEnabled(provider: string, enabled: boolean): Promise<void> {
+    try {
+      const providerService = ProviderConfigService.getInstance(this.context);
+      await providerService.setProviderEnabled(provider, enabled);
+      this.postMessage({
+        type: "providerToggled",
+        provider,
+        enabled,
+      });
+      await this.onAugmentSettingsChanged(this.augmentSettings);
+      await this.handleGetProviders();
     } catch (err: any) {
       this.postMessage({
         type: "error",
