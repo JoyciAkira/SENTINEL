@@ -186,9 +186,17 @@ impl ProviderRouter {
 
         let content = std::fs::read_to_string(&path)
             .with_context(|| format!("Failed to read LLM config at {:?}", path))?;
-        let config = serde_json::from_str::<ProviderRouterConfig>(&content)
-            .with_context(|| format!("Invalid LLM config JSON at {:?}", path))?;
-        Ok(Some(config))
+        match serde_json::from_str::<ProviderRouterConfig>(&content) {
+            Ok(config) => Ok(Some(config)),
+            Err(error) => {
+                tracing::warn!(
+                    "Invalid LLM config JSON at {:?}: {}. Falling back to env-based provider configuration.",
+                    path,
+                    error
+                );
+                Ok(None)
+            }
+        }
     }
 
     fn build_provider(name: &str, config: &ProviderConfig) -> Result<Option<ProviderEntry>> {

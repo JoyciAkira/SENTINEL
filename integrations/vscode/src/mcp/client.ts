@@ -14,6 +14,7 @@ import {
 import { RECONNECT_BASE_MS, RECONNECT_MAX_MS } from "../shared/constants";
 import type {
   AlignmentReport,
+  GoalManifold,
   ValidationResult,
   SecurityScanResult,
   CognitiveMap,
@@ -161,6 +162,18 @@ export class MCPClient extends EventEmitter {
 
   async getAlignment(): Promise<AlignmentReport> {
     return this.callTool("get_alignment", {}) as Promise<AlignmentReport>;
+  }
+
+  async getGoals(): Promise<GoalManifold | Record<string, unknown>> {
+    // Backward-compatible probe: different backend versions expose goals differently.
+    const tools = await this.listToolNames();
+    if (tools.has("get_manifold")) {
+      return this.callTool("get_manifold", {}) as Promise<GoalManifold>;
+    }
+    if (tools.has("get_goal_graph")) {
+      return this.callTool("get_goal_graph", {}) as Promise<Record<string, unknown>>;
+    }
+    return {};
   }
 
   async validateAction(

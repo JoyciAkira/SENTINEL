@@ -1,7 +1,4 @@
 {
-  "_comment": "SENTINEL SWARM - Multi-Provider Configuration",
-  "_comment": "Supports: OpenAI, Anthropic, Google, OpenRouter, Ollama, Groq, and any OpenAI-compatible API",
-  
   "default": "openrouter",
   "fallbacks": ["openai", "anthropic"],
   
