@@ -74,10 +74,10 @@ export default function ChatInput({
   };
 
   return (
-    <div className={cn("relative group animate-in slide-in-from-bottom-2 duration-500 delay-150 fill-mode-both", clineMode && "sentinel-input--cline")}>
+    <div className={cn("relative group animate-in slide-in-from-bottom-2 duration-300 delay-100 fill-mode-both", clineMode && "sentinel-input--cline")}>
       <div className={cn(
-        "relative flex flex-col rounded-xl border bg-card/50 shadow-sm transition-all overflow-hidden",
-        "focus-within:border-primary/30 focus-within:ring-2 focus-within:ring-primary/10",
+        "relative flex flex-col rounded-xl border bg-card/60 shadow-sm transition-all overflow-hidden",
+        "focus-within:border-primary/35 focus-within:ring-2 focus-within:ring-primary/12",
         !connected && "opacity-50 cursor-not-allowed"
       )}>
         <textarea
@@ -89,7 +89,7 @@ export default function ChatInput({
           disabled={!connected}
           rows={1}
           className={cn(
-            "w-full bg-transparent border-none focus:ring-0 px-4 pt-3 pb-12 resize-none min-h-[56px] placeholder:text-muted-foreground outline-none",
+            "w-full bg-transparent border-none focus:ring-0 px-4 pt-3 pb-12 resize-none min-h-[58px] placeholder:text-muted-foreground/90 outline-none leading-5",
             compact ? "text-[12px]" : "text-sm",
           )}
         />

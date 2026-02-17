@@ -16,7 +16,6 @@ import {
   Terminal,
   Eye,
   EyeOff,
-  Cpu,
   Network,
   Target,
   CheckCircle2,
@@ -230,6 +229,7 @@ export default function App() {
   const [showPreview, setShowPreview] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [orchestrationRunning, setOrchestrationRunning] = useState(false);
+  const [showFocusDetails, setShowFocusDetails] = useState(false);
 
   useEffect(() => {
     vscodeApi.postMessage({ type: "webviewReady" });
@@ -288,7 +288,7 @@ export default function App() {
             <span className="brand-text">SENTINEL</span>
           </div>
           
-          {goals.length > 0 && (
+          {goals.length > 0 && showFocusDetails && (
             <div className="goal-pill">
               <Target className="size-3" />
               <span className="truncate max-w-[200px]">{goals[goals.length - 1].description}</span>
@@ -296,31 +296,29 @@ export default function App() {
           )}
         </div>
 
-        <div className="topbar-center">
-          <div className="orchestration-controls">
+        <div className="topbar-right">
+          <div className="orchestration-controls orchestration-controls--compact">
             <Button
-              size="sm"
-              variant={orchestrationRunning ? "destructive" : "default"}
+              size="xs"
+              variant={orchestrationRunning ? "destructive" : "outline"}
               onClick={toggleOrchestration}
               disabled={!connected}
-              className="gap-2"
+              className="gap-1.5"
             >
               {orchestrationRunning ? (
-                <><Pause className="size-4" /> Pause</>
+                <><Pause className="size-3" /> Pause</>
               ) : (
-                <><Play className="size-4" /> Start</>
+                <><Play className="size-3" /> Start</>
               )}
             </Button>
-            
+
             {orchestrationRunning && (
-              <Button size="sm" variant="outline" onClick={stopOrchestration} className="gap-2">
-                <Square className="size-4" /> Stop
+              <Button size="xs" variant="outline" onClick={stopOrchestration} className="gap-1.5">
+                <Square className="size-3" /> Stop
               </Button>
             )}
           </div>
-        </div>
 
-        <div className="topbar-right">
           <div className="status-indicators">
             <div className={cn("status-dot", connected ? "connected" : "disconnected")} />
             <span className="status-text">{connected ? "Connected" : "Offline"}</span>
@@ -344,81 +342,64 @@ export default function App() {
       </header>
 
       <div className="sentinel-body">
-        {/* Left Sidebar - Feature Toggles */}
-        <aside className="feature-sidebar">
-          <div className="feature-group">
-            <span className="feature-label">Core</span>
-            
-            <button
-              className={cn("feature-toggle", activeFeature === "chat" && "active")}
-              onClick={() => setActiveFeature("chat")}
-            >
-              <MessageSquare className="size-4" />
-              <span>Chat</span>
-              {messages.length > 0 && <span className="badge">{messages.length}</span>}
-            </button>
+        {/* Left Sidebar - Icon Only */}
+        <aside className="feature-sidebar feature-sidebar--icon-only">
+          <button
+            className={cn("feature-toggle feature-toggle--icon-only", activeFeature === "chat" && "active")}
+            onClick={() => setActiveFeature("chat")}
+            title="Chat"
+            data-tooltip="Chat"
+          >
+            <MessageSquare className="size-4" />
+            {messages.length > 0 && <span className="badge">{messages.length}</span>}
+          </button>
 
-            <button
-              className={cn("feature-toggle", activeFeature === "split" && "active")}
-              onClick={() => setActiveFeature("split")}
-            >
-              <GitBranch className="size-4" />
-              <span>Split Agent</span>
-              <Zap className="size-3 ml-auto text-yellow-500" />
-            </button>
-          </div>
+          <button
+            className={cn("feature-toggle feature-toggle--icon-only", activeFeature === "split" && "active")}
+            onClick={() => setActiveFeature("split")}
+            title="Split Agent"
+            data-tooltip="Split Agent"
+          >
+            <GitBranch className="size-4" />
+          </button>
 
-          <div className="feature-group">
-            <span className="feature-label">Agents</span>
-            
-            <button
-              className={cn("feature-toggle", activeFeature === "swarm" && "active")}
-              onClick={() => setActiveFeature("swarm")}
-            >
-              <Bot className="size-4" />
-              <span>Swarm</span>
-            </button>
+          <button
+            className={cn("feature-toggle feature-toggle--icon-only", activeFeature === "swarm" && "active")}
+            onClick={() => setActiveFeature("swarm")}
+            title="Swarm"
+            data-tooltip="Swarm"
+          >
+            <Bot className="size-4" />
+          </button>
 
-            <button
-              className={cn("feature-toggle", activeFeature === "network" && "active")}
-              onClick={() => setActiveFeature("network")}
-            >
-              <Network className="size-4" />
-              <span>Network</span>
-            </button>
-          </div>
+          <button
+            className={cn("feature-toggle feature-toggle--icon-only", activeFeature === "network" && "active")}
+            onClick={() => setActiveFeature("network")}
+            title="Network"
+            data-tooltip="Network"
+          >
+            <Network className="size-4" />
+          </button>
 
-          <div className="feature-group">
-            <span className="feature-label">System</span>
-            
-            <button
-              className={cn("feature-toggle", activeFeature === "settings" && "active")}
-              onClick={() => setActiveFeature("settings")}
-            >
-              <Settings className="size-4" />
-              <span>Settings</span>
-            </button>
+          <div className="feature-divider" />
 
-            <button
-              className={cn("feature-toggle", showPreview && "active")}
-              onClick={() => setShowPreview(!showPreview)}
-            >
-              {showPreview ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-              <span>Preview</span>
-            </button>
-          </div>
+          <button
+            className={cn("feature-toggle feature-toggle--icon-only", activeFeature === "settings" && "active")}
+            onClick={() => setActiveFeature("settings")}
+            title="Settings"
+            data-tooltip="Settings"
+          >
+            <Settings className="size-4" />
+          </button>
 
-          {/* Mini Stats */}
-          <div className="sidebar-stats">
-            <div className="stat-item">
-              <Cpu className="size-3" />
-              <span>Alignment: {alignmentScore.toFixed(0)}%</span>
-            </div>
-            <div className="stat-item">
-              <Target className="size-3" />
-              <span>Goals: {goals.filter(g => g.status === "completed").length}/{goals.length}</span>
-            </div>
-          </div>
+          <button
+            className={cn("feature-toggle feature-toggle--icon-only", showPreview && "active")}
+            onClick={() => setShowPreview(!showPreview)}
+            title={showPreview ? "Hide Preview" : "Show Preview"}
+            data-tooltip={showPreview ? "Hide Preview" : "Show Preview"}
+          >
+            {showPreview ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+          </button>
         </aside>
 
         {/* Main Content Area */}
@@ -426,8 +407,38 @@ export default function App() {
           {/* Chat View */}
           {activeFeature === "chat" && (
             <div className="chat-view">
+              <div className="chat-focus-header">
+                <div className="chat-focus-header__title">
+                  <span>{goals.length > 0 ? "Current objective" : "Start with an outcome"}</span>
+                  {goals.length > 0 ? (
+                    <strong className="truncate">{goals[goals.length - 1].description}</strong>
+                  ) : (
+                    <strong>Describe what you want to build</strong>
+                  )}
+                </div>
+                <div className="chat-focus-header__actions">
+                  <Button size="xs" variant="outline" onClick={() => setShowFocusDetails((prev) => !prev)}>
+                    {showFocusDetails ? "Hide details" : "Show details"}
+                  </Button>
+                </div>
+              </div>
+              {showFocusDetails && (
+                <div className="chat-focus-meta">
+                  <span>{connected ? "Connected" : "Offline"}</span>
+                  <span>Alignment {alignmentScore.toFixed(0)}%</span>
+                  <span>Goals {goals.length}</span>
+                  <span>Pending approvals {pendingFileApprovals}</span>
+                </div>
+              )}
               <div className="chat-messages">
-                {messages.length === 0 && <QuickPrompts />}
+                {messages.length === 0 && (
+                  <QuickPrompts
+                    goalsCount={goals.length}
+                    pendingApprovals={pendingFileApprovals}
+                    alignmentScore={alignmentScore}
+                    hasConversation={messages.length > 0}
+                  />
+                )}
                 <MessageList compact={false} clineMode={true} simpleMode={true} showInternals={false} askWhy={false} />
               </div>
               <div className="chat-input-area">

@@ -55,8 +55,8 @@ export default function MessageList({
   }
 
   return (
-    <ScrollArea className="h-full w-full">
-        <div className={compact ? "flex flex-col gap-3 p-3" : "flex flex-col gap-6 p-6"}>
+    <ScrollArea className="h-full w-full sentinel-message-scroll">
+        <div className={compact ? "flex flex-col gap-3 p-3" : "flex flex-col gap-5 p-4"}>
         {messages.map((msg, index) => (
           <MessageBubble
             key={msg.id}
