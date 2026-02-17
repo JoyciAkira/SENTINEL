@@ -37,6 +37,7 @@ import { SplitAgentPanel } from "./components/Forge/SplitAgentPanel";
 import { TopologyGraph } from "./components/Network/TopologyGraph";
 import { AdvancedSettings } from "./components/Settings/AdvancedSettings";
 import { LivePreviewPanel } from "./components/Preview/LivePreviewPanel";
+import { ErrorBoundary } from "./components/shared/ErrorBoundary";
 
 // Main App Component
 export default function App() {
@@ -292,7 +293,9 @@ export default function App() {
           {/* Split Agent View */}
           {activeFeature === "split" && (
             <div className="split-view">
-              <SplitAgentPanel />
+              <ErrorBoundary label="Forge">
+                <SplitAgentPanel />
+              </ErrorBoundary>
             </div>
           )}
 
@@ -312,10 +315,14 @@ export default function App() {
                   <TabsTrigger value="topology">Topology</TabsTrigger>
                 </TabsList>
                 <TabsContent value="graph" className="h-[calc(100%-60px)] m-0">
-                  <CommunicationGraph height={600} />
+                  <ErrorBoundary label="Communication Graph">
+                    <CommunicationGraph height={600} />
+                  </ErrorBoundary>
                 </TabsContent>
                 <TabsContent value="topology" className="h-[calc(100%-60px)] m-0">
-                  <TopologyGraph height={540} />
+                  <ErrorBoundary label="Topology Graph">
+                    <TopologyGraph height={540} />
+                  </ErrorBoundary>
                 </TabsContent>
               </Tabs>
             </div>
@@ -342,7 +349,9 @@ export default function App() {
                   </div>
                 </TabsContent>
                 <TabsContent value="advanced" className="h-[calc(100%-60px)] overflow-auto">
-                  <AdvancedSettings />
+                  <ErrorBoundary label="Advanced Settings">
+                    <AdvancedSettings />
+                  </ErrorBoundary>
                 </TabsContent>
               </Tabs>
             </div>
@@ -352,7 +361,9 @@ export default function App() {
         {/* Preview Panel — real dev server preview with viewport controls */}
         {showPreview && (
           <aside className="preview-panel">
-            <LivePreviewPanel />
+            <ErrorBoundary label="Live Preview">
+              <LivePreviewPanel />
+            </ErrorBoundary>
           </aside>
         )}
       </div>

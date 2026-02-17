@@ -764,16 +764,21 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
     }
   }
 
-  private getWorkspaceRoot(): string {
-    return vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? process.cwd();
+  private getWorkspaceRoot(): string | null {
+    return vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? null;
   }
 
   private resolveWorkspacePath(relativePath: string): string {
-    const root = path.resolve(this.getWorkspaceRoot());
+    const workspaceRoot = this.getWorkspaceRoot();
+    if (!workspaceRoot) {
+      throw new Error("No workspace open: file write operations require an open workspace folder.");
+    }
+    const root = path.resolve(workspaceRoot);
     const normalizedRelative = relativePath.replace(/^\/+/, "");
     const resolved = path.resolve(root, normalizedRelative);
-    if (resolved !== root && !resolved.startsWith(`${root}${path.sep}`)) {
-      throw new Error(`Unsafe write path blocked: ${relativePath}`);
+    // Strict containment check: resolved path must be inside workspace root
+    if (!resolved.startsWith(`${root}${path.sep}`) && resolved !== root) {
+      throw new Error(`Path traversal blocked: '${relativePath}' resolves outside workspace.`);
     }
     return resolved;
   }
@@ -1192,21 +1197,22 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
     const primaryEntity = entities[0].name;
 
     const viewsRaw = Array.isArray(candidate.views) ? candidate.views : [];
-    const views: AppSpecPayload["views"] = viewsRaw
+    const views: AppSpecPayload["views"] = (viewsRaw
       .map((entry, idx) => {
         if (!this.isRecord(entry)) return null;
         const id = typeof entry.id === "string" ? this.toSlug(entry.id, `view_${idx + 1}`) : `view_${idx + 1}`;
         const rawType = typeof entry.type === "string" ? entry.type : "list";
-        const type = rawType === "dashboard" || rawType === "list" || rawType === "detail" || rawType === "form"
-          ? rawType
-          : "list";
+        const type: "dashboard" | "list" | "detail" | "form" =
+          rawType === "dashboard" || rawType === "list" || rawType === "detail" || rawType === "form"
+            ? rawType
+            : "list";
         const title = typeof entry.title === "string"
           ? this.clip(entry.title.trim(), 80)
           : this.toTitleCase(`${type} ${primaryEntity}`);
-        const entity = typeof entry.entity === "string" ? this.toSlug(entry.entity, primaryEntity) : undefined;
+        const entity: string | undefined = typeof entry.entity === "string" ? this.toSlug(entry.entity, primaryEntity) : undefined;
         return { id, type, title, entity };
       })
-      .filter((view): view is { id: string; type: "dashboard" | "list" | "detail" | "form"; title: string; entity?: string } => Boolean(view));
+      .filter((view) => view !== null) as AppSpecPayload["views"]);
 
     if (views.length === 0) {
       issues.push("Views missing; injected default list/form views.");
@@ -1217,22 +1223,23 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
     }
 
     const actionsRaw = Array.isArray(candidate.actions) ? candidate.actions : [];
-    const actions: AppSpecPayload["actions"] = actionsRaw
+    const actions: AppSpecPayload["actions"] = (actionsRaw
       .map((entry, idx) => {
         if (!this.isRecord(entry)) return null;
         const id = typeof entry.id === "string" ? this.toSlug(entry.id, `action_${idx + 1}`) : `action_${idx + 1}`;
         const rawType = typeof entry.type === "string" ? entry.type : "custom";
-        const type = rawType === "create" || rawType === "update" || rawType === "delete" || rawType === "read" || rawType === "custom"
-          ? rawType
-          : "custom";
+        const type: "create" | "update" | "delete" | "read" | "custom" =
+          rawType === "create" || rawType === "update" || rawType === "delete" || rawType === "read" || rawType === "custom"
+            ? rawType
+            : "custom";
         const title = typeof entry.title === "string"
           ? this.clip(entry.title.trim(), 80)
           : this.toTitleCase(`${type} ${primaryEntity}`);
-        const entity = typeof entry.entity === "string" ? this.toSlug(entry.entity, primaryEntity) : primaryEntity;
+        const entity: string | undefined = typeof entry.entity === "string" ? this.toSlug(entry.entity, primaryEntity) : primaryEntity;
         const requiresApproval = typeof entry.requiresApproval === "boolean" ? entry.requiresApproval : type !== "read";
         return { id, type, title, entity, requiresApproval };
       })
-      .filter((action): action is { id: string; type: "create" | "update" | "delete" | "read" | "custom"; title: string; entity?: string; requiresApproval?: boolean } => Boolean(action));
+      .filter((action) => action !== null) as AppSpecPayload["actions"]);
 
     if (actions.length === 0) {
       issues.push("Actions missing; injected CRUD defaults.");
@@ -1470,7 +1477,8 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
         { path: entry.path, content: entry.content },
         messageId,
       )) as any;
-      const isSafe = scan?.is_safe !== false;
+      // Security: require explicit is_safe === true; null/undefined/missing → block.
+      const isSafe = scan?.is_safe === true;
       if (!isSafe) {
         const threats = Array.isArray(scan?.threats)
           ? scan.threats
@@ -2601,7 +2609,8 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
     const hasGovernance = supportedTools.has("governance_status");
     const hasWorldModel = supportedTools.has("get_world_model");
     const hasQualityStatus = supportedTools.has("get_quality_status");
-    const hasQualityReport = supportedTools.has("quality_report");
+    // Note: quality_report requires a specific report_id from a completed harness run.
+    // Live status is handled by get_quality_status above.
     if (!this.warnedMissingRuntimeTools && (!hasReliability || !hasGovernance)) {
       this.warnedMissingRuntimeTools = true;
       const missing = [
@@ -2662,46 +2671,8 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
       this.outputChannel.appendLine(`Failed to refresh governance: ${err.message}`);
     }
 
-    try {
-      if (hasQualityReport) {
-        const reportId = arguments && arguments.report_id;
-        if (!reportId) {
-          this.postMessage({
-            type: "qualityUpdate",
-            quality: { error: "Missing report_id parameter" },
-          });
-          return;
-        }
-
-        const quality = await this.client.callTool("quality_report", { report_id }) as any;
-        if (quality && !quality.error) {
-          // Parse the report content
-          let reportData = null;
-          try {
-            if (quality.content && Array.isArray(quality.content) && quality.content[0]) {
-              reportData = JSON.parse(quality.content[0].text);
-            }
-          } catch (parseErr) {
-            // If parsing fails, use as-is
-            reportData = quality;
-          }
-
-          this.postMessage({
-            type: "qualityUpdate",
-            quality: reportData || quality,
-          });
-        }
-      }
-    } catch (err: any) {
-      this.outputChannel.appendLine(`Failed to get quality report: ${err.message}`);
-    }
-  }
-
-  /**
-   * Legacy method: refresh quality status using get_quality_status
-   * Kept for backward compatibility
-   */
-  private async refreshQualityStatusLegacy() {
+    // Use get_quality_status for live status (quality_report requires a specific report_id
+    // that is only available after a harness run — see handleRunQualityHarness).
     try {
       if (hasQualityStatus) {
         const quality = (await this.client.callTool("get_quality_status", {})) as any;
@@ -2714,6 +2685,27 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
       }
     } catch (err: any) {
       this.outputChannel.appendLine(`Failed to refresh quality status: ${err.message}`);
+    }
+  }
+
+  /**
+   * Refresh quality status via get_quality_status tool.
+   * Called after Augment settings changes; checks tool availability independently.
+   */
+  private async refreshQualityStatusLegacy(): Promise<void> {
+    if (!this.client.connected) return;
+    try {
+      const hasQualityStatus = await this.client.supportsTool("get_quality_status");
+      if (!hasQualityStatus) return;
+      const quality = (await this.client.callTool("get_quality_status", {})) as any;
+      if (quality && !quality.error) {
+        this.postMessage({
+          type: "qualityUpdate",
+          quality,
+        });
+      }
+    } catch (err: any) {
+      this.outputChannel.appendLine(`Failed to refresh quality status (legacy): ${err.message}`);
     }
   }
 
@@ -2956,6 +2948,12 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
   }
 
   // Orchestration Handlers
+
+  /**
+   * Start Split Agent orchestration.
+   * Uses orchestrate_task MCP tool if available; reports each phase through postMessage.
+   * Falls back to a graceful error if the tool is not exposed by the backend.
+   */
   private async handleStartOrchestration(): Promise<void> {
     if (!this.client.connected) {
       this.postMessage({
@@ -2966,22 +2964,99 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
       return;
     }
 
-    this.outputChannel.appendLine("🚀 Starting Split Agent Orchestration...");
-    
-    // Notify frontend that orchestration has started
+    this.outputChannel.appendLine("🚀 Starting Split Agent Orchestration via orchestrate_task...");
+    this.emitTimeline("tool", "Orchestration started", "orchestrate_task MCP", undefined);
+
+    // Check tool availability before calling
+    const hasOrchestrate = await this.client.supportsTool("orchestrate_task");
+    if (!hasOrchestrate) {
+      this.postMessage({
+        type: "orchestrationStatus",
+        status: "error",
+        message: "Tool orchestrate_task not available. Upgrade sentinel-cli to enable Split Agent orchestration.",
+      });
+      this.emitTimeline("error", "Orchestration unavailable", "orchestrate_task missing", undefined);
+      return;
+    }
+
+    // Phase: Scaffold
     this.postMessage({
       type: "orchestrationStatus",
       status: "running",
-      message: "Orchestration started",
       phase: "scaffold",
+      progress: 0,
+      message: "Preparing orchestration plan...",
     });
 
-    // Emit timeline event
-    this.emitTimeline("tool", "Orchestration started", "Split Agent Orchestration", undefined);
+    try {
+      const goals = this.client ? await this.client.callTool("get_goal_graph", {}).catch(() => null) as any : null;
+      const nodes = Array.isArray(goals?.nodes) ? goals.nodes : [];
+      const pendingGoals = nodes
+        .filter((n: any) => n?.id !== "root" && String(n?.data?.status ?? "").toLowerCase() === "pending")
+        .slice(0, 4);
+      
+      const task = pendingGoals.length > 0
+        ? pendingGoals.map((n: any) => String(n?.data?.label ?? "")).filter(Boolean).join(", ")
+        : "Execute pending goals from the current manifold";
 
-    // TODO: Implement actual orchestration logic with split agent
-    // For now, simulate the phases
-    await this.simulateOrchestrationPhases();
+      this.postMessage({
+        type: "orchestrationStatus",
+        status: "running",
+        phase: "scaffold",
+        progress: 50,
+        message: `Orchestrating: ${this.clip(task, 80)}`,
+      });
+
+      // Phase: Execute — call real MCP tool
+      this.postMessage({
+        type: "orchestrationStatus",
+        status: "running",
+        phase: "execute",
+        progress: 10,
+        message: "Dispatching to worker agents...",
+      });
+
+      const result = await this.callToolTracked("orchestrate_task", {
+        task,
+        max_parallel: 2,
+        subtask_count: Math.max(2, Math.min(pendingGoals.length, 4)),
+      }, undefined) as any;
+
+      // Phase: Verify
+      this.postMessage({
+        type: "orchestrationStatus",
+        status: "running",
+        phase: "verify",
+        progress: 80,
+        message: "Verifying results...",
+      });
+
+      const formatted = this.formatOrchestrationResult(result);
+      this.outputChannel.appendLine(`Orchestration result: ${formatted}`);
+
+      this.postMessage({
+        type: "orchestrationStatus",
+        status: "completed",
+        phase: "verify",
+        progress: 100,
+        message: "Orchestration completed",
+        result: formatted,
+      });
+
+      this.emitTimeline("result", "Orchestration completed", this.clip(task, 80), undefined);
+
+      // Refresh goals after orchestration
+      void this.refreshGoalSnapshot();
+    } catch (err: any) {
+      const error = err?.message ?? String(err);
+      this.outputChannel.appendLine(`Orchestration failed: ${error}`);
+      this.postMessage({
+        type: "orchestrationStatus",
+        status: "error",
+        message: `Orchestration failed: ${error}`,
+      });
+      this.emitTimeline("error", "Orchestration failed", error, undefined);
+    }
   }
 
   private async handlePauseOrchestration(): Promise<void> {
@@ -3008,55 +3083,4 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
     this.emitTimeline("tool", "Orchestration stopped", "User requested stop", undefined);
   }
 
-  private async simulateOrchestrationPhases(): Promise<void> {
-    // Phase 1: Scaffold
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    this.postMessage({
-      type: "orchestrationStatus",
-      status: "running",
-      phase: "scaffold",
-      progress: 50,
-      message: "Scaffolding modules...",
-    });
-
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    this.postMessage({
-      type: "orchestrationStatus",
-      status: "running",
-      phase: "execute",
-      progress: 0,
-      message: "Executing with worker agents...",
-    });
-
-    // Phase 2: Execute
-    await new Promise(resolve => setTimeout(resolve, 3000));
-    this.postMessage({
-      type: "orchestrationStatus",
-      status: "running",
-      phase: "execute",
-      progress: 50,
-      message: "Worker agents processing...",
-    });
-
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    this.postMessage({
-      type: "orchestrationStatus",
-      status: "running",
-      phase: "verify",
-      progress: 0,
-      message: "Running verification...",
-    });
-
-    // Phase 3: Verify
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    this.postMessage({
-      type: "orchestrationStatus",
-      status: "completed",
-      phase: "verify",
-      progress: 100,
-      message: "Orchestration completed successfully",
-    });
-
-    this.emitTimeline("result", "Orchestration completed", "All phases finished", undefined);
-  }
 }

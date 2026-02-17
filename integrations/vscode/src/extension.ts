@@ -312,6 +312,14 @@ export function activate(context: vscode.ExtensionContext) {
 
   // ── 6. Live Preview ──────────────────────────────────────
   const livePreviewProvider = new LivePreviewProvider(context);
+
+  // Bridge: forward detected dev server URL to the chat webview so that
+  // the LivePreviewPanel component receives it via postMessage({ type: "livePreviewUrl" }).
+  livePreviewProvider.setOnServerDetected((url: string) => {
+    outputChannel.appendLine(`Live preview server detected: ${url}`);
+    chatProvider.postMessage({ type: "livePreviewUrl", url });
+  });
+
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(
       LivePreviewProvider.viewType,
@@ -407,7 +415,8 @@ export function activate(context: vscode.ExtensionContext) {
   mcpClient.on("connected", () => {
     outputChannel.appendLine("Sentinel MCP connected");
     setTimeout(() => {
-      vscode.commands.executeCommand(CMD_REFRESH_GOALS).catch((err: Error) => {
+      // executeCommand returns Thenable, not Promise — wrap to get .catch()
+      void Promise.resolve(vscode.commands.executeCommand(CMD_REFRESH_GOALS)).catch((err: Error) => {
         if (err?.message?.includes("not found")) return;
         outputChannel.appendLine(`Failed to refresh goals on connect: ${err.message}`);
       });

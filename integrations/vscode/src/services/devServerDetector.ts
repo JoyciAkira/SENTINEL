@@ -138,8 +138,9 @@ export class DevServerDetector {
   ): Promise<boolean> {
     try {
       const content = await readFileAsync(filePath, 'utf-8');
-      const pkg = JSON.parse(content);
-      const scripts = pkg.scripts || {};
+      // `JSON.parse` returns `any`; cast scripts explicitly to avoid `unknown` in .some callback.
+      const pkg = JSON.parse(content) as { scripts?: Record<string, string> };
+      const scripts = (pkg.scripts || {}) as Record<string, string>;
 
       const scriptPatterns: Record<DevServerType, string[]> = {
         vite: ['dev', 'vite'],

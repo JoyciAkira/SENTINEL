@@ -23,6 +23,10 @@ export class LivePreviewProvider implements vscode.WebviewViewProvider {
   /** Must match the view id in package.json "views.sentinel-explorer" */
   public static readonly viewType = "sentinel-live-preview";
   
+  /** Optional callback invoked whenever a dev server is detected and preview starts.
+   *  Used to forward the live preview URL to the chat webview. */
+  private onServerDetectedCallback: ((url: string) => void) | null = null;
+
   private webviewView: vscode.WebviewView | undefined;
   private state: PreviewPanelState = {
     server: null,
@@ -112,6 +116,15 @@ export class LivePreviewProvider implements vscode.WebviewViewProvider {
   }
 
   /**
+   * Register a callback invoked when a dev server is detected.
+   * The callback receives the full preview URL (e.g. "http://localhost:5173/").
+   * Used by extension.ts to bridge the URL to the chat webview.
+   */
+  setOnServerDetected(cb: (url: string) => void): void {
+    this.onServerDetectedCallback = cb;
+  }
+
+  /**
    * Start preview with specific server
    */
   async startPreview(server: DevServer): Promise<void> {
@@ -121,11 +134,16 @@ export class LivePreviewProvider implements vscode.WebviewViewProvider {
       lastError: null 
     });
 
+    const previewUrl = `http://localhost:${server.port}${server.path}`;
+
+    // Notify any external listener (e.g. chat webview LivePreviewPanel)
+    this.onServerDetectedCallback?.(previewUrl);
+
     // Send init message to webview
     await this.postMessage({
       type: 'init',
       payload: {
-        url: `http://localhost:${server.port}${server.path}`,
+        url: previewUrl,
         viewport: this.state.viewport,
         title: this.getServerDisplayName(server)
       }

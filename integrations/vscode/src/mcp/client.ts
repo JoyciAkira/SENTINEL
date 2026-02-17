@@ -153,6 +153,9 @@ export class MCPClient extends EventEmitter {
     this.cancelReconnect();
     this._initialized = false;
     this.serverInfo = null;
+    // Reset backoff counter so the next reconnect starts from base delay,
+    // not from the cap accumulated during previous crash cycles.
+    this.reconnectAttempts = 0;
     this.transport?.stop();
     this.transport = null;
     this.emit("disconnected");
