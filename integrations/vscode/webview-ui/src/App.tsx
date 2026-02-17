@@ -12,15 +12,12 @@ import {
   Pause,
   Square,
   Zap,
-  LayoutGrid,
   Terminal,
   Eye,
   EyeOff,
   Network,
   Target,
-  CheckCircle2,
   AlertCircle,
-  X,
   Maximize2,
   Minimize2,
 } from "lucide-react";
@@ -28,7 +25,6 @@ import {
 import { cn } from "@/lib/utils";
 import { Button } from "./components/ui/button";
 import { Badge } from "./components/ui/badge";
-import { ScrollArea } from "./components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./components/ui/tabs";
 
 import MessageList from "./components/Chat/MessageList";
@@ -37,181 +33,10 @@ import QuickPrompts from "./components/Chat/QuickPrompts";
 import { CommunicationGraph } from "./components/CommunicationGraph";
 import { SwarmPanel } from "./components/Swarm/SwarmPanel";
 import { ProviderConfigPanel } from "./components/ProviderConfig";
-
-// Split Agent Orchestration Panel
-const SplitAgentPanel: React.FC = () => {
-  const [activePhase, setActivePhase] = useState<"scaffold" | "execute" | "verify">("scaffold");
-  const [scaffoldProgress, setScaffoldProgress] = useState(0);
-  const [modules, setModules] = useState<Array<{id: string; name: string; status: string; agent?: string}>>([]);
-
-  return (
-    <div className="split-agent-panel">
-      <div className="split-agent-header">
-        <div className="split-agent-title">
-          <Target className="size-5 text-primary" />
-          <div>
-            <h3>Split Agent Orchestration</h3>
-            <p>End-to-end autonomous code generation</p>
-          </div>
-        </div>
-        <Badge variant={activePhase === "execute" ? "default" : "outline"}>
-          {activePhase === "scaffold" ? "Scaffolding" : activePhase === "execute" ? "Executing" : "Verifying"}
-        </Badge>
-      </div>
-
-      {/* Phase Indicator */}
-      <div className="phase-indicator">
-        <div className={cn("phase-step", activePhase === "scaffold" && "active", activePhase !== "scaffold" && "completed")}>
-          <div className="phase-icon">1</div>
-          <span>Scaffold</span>
-        </div>
-        <div className={cn("phase-connector", activePhase !== "scaffold" && "completed")} />
-        <div className={cn("phase-step", activePhase === "execute" && "active", activePhase === "verify" && "completed")}>
-          <div className="phase-icon">2</div>
-          <span>Execute</span>
-        </div>
-        <div className={cn("phase-connector", activePhase === "verify" && "completed")} />
-        <div className={cn("phase-step", activePhase === "verify" && "active")}>
-          <div className="phase-icon">3</div>
-          <span>Verify</span>
-        </div>
-      </div>
-
-      {/* Phase 1: Scaffolding */}
-      {activePhase === "scaffold" && (
-        <div className="scaffold-phase">
-          <div className="scaffold-description">
-            <h4>🎯 Intent Interpreter Agent</h4>
-            <p>Analyzing your outcome and creating atomic module scaffolding with non-negotiable boundaries...</p>
-          </div>
-          
-          <div className="scaffold-progress">
-            <div className="progress-label">
-              <span>Analyzing requirements</span>
-              <span>{scaffoldProgress}%</span>
-            </div>
-            <div className="progress-bar">
-              <div className="progress-fill" style={{ width: `${scaffoldProgress}%` }} />
-            </div>
-          </div>
-
-          <div className="modules-preview">
-            <h4>Generated Modules</h4>
-            {modules.length === 0 ? (
-              <div className="modules-placeholder">
-                <LayoutGrid className="size-8 text-muted" />
-                <p>Modules will appear here after scaffolding completes</p>
-              </div>
-            ) : (
-              <div className="modules-list">
-                {modules.map((mod) => (
-                  <div key={mod.id} className={cn("module-card", mod.status)}>
-                    <div className="module-header">
-                      <span className="module-name">{mod.name}</span>
-                      <Badge variant="outline" size="sm">{mod.status}</Badge>
-                    </div>
-                    {mod.agent && (
-                      <div className="module-agent">
-                        <Bot className="size-3" />
-                        <span>{mod.agent}</span>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Phase 2: Execution */}
-      {activePhase === "execute" && (
-        <div className="execute-phase">
-          <div className="execute-description">
-            <h4>🔧 Worker Agents</h4>
-            <p>Agents working within confined modules with specific guardrails...</p>
-          </div>
-
-          <div className="active-agents">
-            <div className="agent-work-card">
-              <div className="agent-header">
-                <Bot className="size-4 text-blue-500" />
-                <span className="agent-name">AuthArchitect</span>
-                <Badge size="sm">Working</Badge>
-              </div>
-              <div className="agent-task">Implementing JWT authentication in auth/module.ts</div>
-              <div className="agent-guardrails">
-                <span className="guardrail">⚡ Must use oauth2</span>
-                <span className="guardrail">🔒 Secure by default</span>
-              </div>
-            </div>
-
-            <div className="agent-work-card">
-              <div className="agent-header">
-                <Bot className="size-4 text-green-500" />
-                <span className="agent-name">APICoder</span>
-                <Badge size="sm" variant="secondary">Planning</Badge>
-              </div>
-              <div className="agent-task">Designing REST endpoints structure</div>
-              <div className="agent-guardrails">
-                <span className="guardrail">📐 RESTful patterns</span>
-                <span className="guardrail">📝 OpenAPI spec</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="orchestration-log">
-            <h4>Orchestration Log</h4>
-            <div className="log-entries">
-              <div className="log-entry">
-                <span className="log-time">14:32:05</span>
-                <span className="log-agent">AuthArchitect</span>
-                <span className="log-action">→ Completed auth/module.ts</span>
-              </div>
-              <div className="log-entry">
-                <span className="log-time">14:32:08</span>
-                <span className="log-agent">Orchestrator</span>
-                <span className="log-action">→ Handoff to APICoder</span>
-              </div>
-              <div className="log-entry">
-                <span className="log-time">14:32:10</span>
-                <span className="log-agent">APICoder</span>
-                <span className="log-action">→ Starting api/routes.ts</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Phase 3: Verification */}
-      {activePhase === "verify" && (
-        <div className="verify-phase">
-          <div className="verify-description">
-            <h4>✅ Verification Agent</h4>
-            <p>Running end-to-end tests and quality checks...</p>
-          </div>
-
-          <div className="verification-checks">
-            <div className="check-item completed">
-              <CheckCircle2 className="size-4 text-green-500" />
-              <span>Type checking passed</span>
-            </div>
-            <div className="check-item completed">
-              <CheckCircle2 className="size-4 text-green-500" />
-              <span>Unit tests passed (12/12)</span>
-            </div>
-            <div className="check-item in-progress">
-              <div className="animate-spin">
-                <Zap className="size-4 text-yellow-500" />
-              </div>
-              <span>Integration tests running...</span>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
+import { SplitAgentPanel } from "./components/Forge/SplitAgentPanel";
+import { TopologyGraph } from "./components/Network/TopologyGraph";
+import { AdvancedSettings } from "./components/Settings/AdvancedSettings";
+import { LivePreviewPanel } from "./components/Preview/LivePreviewPanel";
 
 // Main App Component
 export default function App() {
@@ -489,11 +314,8 @@ export default function App() {
                 <TabsContent value="graph" className="h-[calc(100%-60px)] m-0">
                   <CommunicationGraph height={600} />
                 </TabsContent>
-                <TabsContent value="topology" className="h-[calc(100%-60px)] m-0 p-4">
-                  <div className="topology-placeholder">
-                    <Network className="size-16 text-muted" />
-                    <p>Agent topology visualization</p>
-                  </div>
+                <TabsContent value="topology" className="h-[calc(100%-60px)] m-0">
+                  <TopologyGraph height={540} />
                 </TabsContent>
               </Tabs>
             </div>
@@ -519,32 +341,18 @@ export default function App() {
                     </div>
                   </div>
                 </TabsContent>
-                <TabsContent value="advanced" className="h-[calc(100%-60px)] p-4">
-                  <div className="advanced-settings">
-                    <p>Advanced configuration options</p>
-                  </div>
+                <TabsContent value="advanced" className="h-[calc(100%-60px)] overflow-auto">
+                  <AdvancedSettings />
                 </TabsContent>
               </Tabs>
             </div>
           )}
         </main>
 
-        {/* Preview Panel */}
+        {/* Preview Panel — real dev server preview with viewport controls */}
         {showPreview && (
           <aside className="preview-panel">
-            <div className="preview-header">
-              <span>Live Preview</span>
-              <Button size="icon" variant="ghost" onClick={() => setShowPreview(false)}>
-                <X className="size-4" />
-              </Button>
-            </div>
-            <div className="preview-content">
-              <iframe
-                src="about:blank"
-                className="preview-iframe"
-                title="Live Preview"
-              />
-            </div>
+            <LivePreviewPanel />
           </aside>
         )}
       </div>

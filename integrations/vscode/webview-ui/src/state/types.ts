@@ -381,6 +381,20 @@ export interface QualityDashboardState {
     total_evaluations: number;
 }
 
+export interface OrchestrationPhase {
+    phase: 'scaffold' | 'execute' | 'verify';
+    startedAt: number;
+    completedAt?: number;
+    log: OrchestrationLogEntry[];
+}
+
+export interface OrchestrationLogEntry {
+    ts: number;
+    level: 'info' | 'warn' | 'error' | 'success';
+    agent: string;
+    action: string;
+}
+
 export interface AppState {
     connected: boolean;
     messages: ChatMessage[];
