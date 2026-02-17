@@ -53,3 +53,4 @@ hf-hub = "0.4"
 [dev-dependencies]
 proptest.workspace = true
 tokio-test = "0.4"
+tempfile = "3"

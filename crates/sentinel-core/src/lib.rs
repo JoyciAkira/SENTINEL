@@ -75,6 +75,7 @@
 
 pub mod alignment;
 pub mod architect;
+pub mod split_agent;
 pub mod cognitive_state;
 pub mod error;
 pub mod evidence;
