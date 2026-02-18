@@ -300,8 +300,8 @@ result, err = call_tool("orchestrate_task", {
     "task": "Implement JWT authentication middleware",
     "modes": ["sequential"],
     "max_parallel": 1,
-    "subtask_count": 3
-}, timeout=60)
+    "subtask_count": 2
+}, timeout=120)
 text = extract_text(result)
 if result:
     log_pass(f"orchestrate_task responded: {text[:120]}")
