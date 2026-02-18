@@ -519,6 +519,30 @@ async fn handle_request(req: McpRequest, id: Value) -> McpResponse {
                         }
                     },
                     {
+                        "name": "agent_run",
+                        "description": "Esegue il loop end-to-end Architect→Worker→Verify→Repair per un intent in linguaggio naturale. Genera codice reale, lo verifica sul filesystem e si ripara automaticamente. Richiede Gemini CLI nel PATH.",
+                        "inputSchema": {
+                            "type": "object",
+                            "properties": {
+                                "intent": {
+                                    "type": "string",
+                                    "description": "Intent in linguaggio naturale (es. 'Crea una REST API in Rust con auth JWT')"
+                                },
+                                "output": {
+                                    "type": "string",
+                                    "description": "Directory di output dove generare il codice (default: sentinel-output)"
+                                },
+                                "max_retries": {
+                                    "type": "integer",
+                                    "description": "Numero massimo di tentativi di repair per modulo (default: 3)",
+                                    "minimum": 1,
+                                    "maximum": 10
+                                }
+                            },
+                            "required": ["intent"]
+                        }
+                    },
+                    {
                         "name": "agent_communication_send",
                         "description": "Send message between agents in the split-agent network",
                         "inputSchema": {
@@ -3338,6 +3362,106 @@ Ti propongo un piano concreto in 3 step: \
             });
 
             Some(serde_json::json!({ "content": [{ "type": "text", "text": result.to_string() }] }))
+        }
+
+        "agent_run" => {
+            // Invoca EndToEndAgent (Architect→Worker→Verify→Repair) via MCP.
+            // Richiede Gemini CLI nel PATH. Operazione long-running: può durare minuti.
+            let intent = arguments
+                .and_then(|a| a.get("intent"))
+                .and_then(|v| v.as_str())
+                .map(|s| s.trim().to_string())
+                .unwrap_or_default();
+
+            if intent.is_empty() {
+                return Some(serde_json::json!({
+                    "isError": true,
+                    "content": [{ "type": "text", "text": "intent è obbligatorio per agent_run." }]
+                }));
+            }
+
+            // Verifica disponibilità Gemini CLI prima di avviare
+            if !sentinel_agent_native::providers::gemini_cli::is_gemini_cli_available() {
+                return Some(serde_json::json!({
+                    "isError": true,
+                    "content": [{ "type": "text", "text": "Gemini CLI non trovato nel PATH. Installa con: npm install -g @google/gemini-cli && gemini auth" }]
+                }));
+            }
+
+            let output_dir = arguments
+                .and_then(|a| a.get("output"))
+                .and_then(|v| v.as_str())
+                .map(PathBuf::from)
+                .unwrap_or_else(|| {
+                    workspace_root().join("sentinel-output")
+                });
+
+            let max_retries = arguments
+                .and_then(|a| a.get("max_retries"))
+                .and_then(|v| v.as_u64())
+                .map(|v| v.clamp(1, 10) as usize)
+                .unwrap_or(3);
+
+            let workspace = if output_dir.is_absolute() {
+                output_dir.clone()
+            } else {
+                workspace_root().join(&output_dir)
+            };
+
+            let config = sentinel_agent_native::E2EConfig {
+                workspace: workspace.clone(),
+                max_repair_attempts: max_retries,
+                verbose: false, // MCP: no stdout noise
+                gemini_model: None,
+            };
+
+            let agent = sentinel_agent_native::EndToEndAgent::new(config);
+            match agent.run(&intent).await {
+                Ok(report) => {
+                    let module_details: Vec<serde_json::Value> = report
+                        .module_details
+                        .iter()
+                        .map(|d| {
+                            serde_json::json!({
+                                "title": d.title,
+                                "passed": d.passed,
+                                "attempts": d.attempts,
+                                "generated_files": d.generated_files.iter()
+                                    .map(|f| f.display().to_string())
+                                    .collect::<Vec<_>>(),
+                                "predicate_results": d.predicate_results.iter()
+                                    .map(|(pred, ok)| serde_json::json!({ "predicate": pred, "passed": ok }))
+                                    .collect::<Vec<_>>()
+                            })
+                        })
+                        .collect();
+
+                    let result = serde_json::json!({
+                        "ok": report.success,
+                        "intent": report.intent,
+                        "total_modules": report.total_modules,
+                        "passed_modules": report.passed_modules,
+                        "failed_modules": report.failed_modules,
+                        "duration_secs": report.duration_secs,
+                        "workspace": report.workspace.display().to_string(),
+                        "module_details": module_details,
+                        "summary": if report.success {
+                            format!("✅ Goal raggiunto: {}/{} moduli passati in {:.1}s",
+                                report.passed_modules, report.total_modules, report.duration_secs)
+                        } else {
+                            format!("⚠️ Goal parziale: {}/{} moduli passati in {:.1}s",
+                                report.passed_modules, report.total_modules, report.duration_secs)
+                        }
+                    });
+                    Some(serde_json::json!({
+                        "content": [{ "type": "text", "text": result.to_string() }]
+                    }))
+                }
+                Err(e) => Some(serde_json::json!({
+                    "isError": true,
+                    "content": [{ "type": "text", "text": format!("agent_run fallito: {}", e) }]
+                })),
+            }
         }
 
         _ => Some(

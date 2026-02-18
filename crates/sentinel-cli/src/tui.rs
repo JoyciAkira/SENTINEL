@@ -24,6 +24,24 @@ pub struct AgentStatus {
     pub activity: String,
 }
 
+/// Metadati reali di un singolo goal, estratti dal GoalManifold.
+/// Usati dal Tab 1 (Goal Tree) per mostrare dati verificabili, non hardcoded.
+pub struct GoalMeta {
+    pub id: String,
+    pub status: String,
+    pub progress_pct: f64,
+    pub success_criteria: Vec<String>,
+}
+
+/// Nota di handover reale dal manifold.handover_log.
+/// Campi mappati da sentinel_core::types::HandoverNote (agent_id, content, timestamp).
+pub struct HandoverNote {
+    pub timestamp: String,
+    pub agent_id: String,
+    pub content: String,
+    pub warnings: Vec<String>,
+}
+
 pub struct TuiApp {
     pub title: String,
     pub alignment_score: f64,
@@ -31,6 +49,8 @@ pub struct TuiApp {
     pub should_quit: bool,
     pub goal_list_state: ListState,
     pub goals: Vec<String>,
+    /// Metadati reali per ogni goal (parallelo a `goals`)
+    pub goal_meta: Vec<GoalMeta>,
     pub dependency_count: usize,
     pub agents: Vec<AgentStatus>,
     pub conflicts: Vec<String>,
@@ -41,6 +61,12 @@ pub struct TuiApp {
     pub reliability: sentinel_core::ReliabilitySnapshot,
     pub reliability_thresholds: reliability::ReliabilityThresholds,
     pub reliability_eval: reliability::ReliabilityEvaluation,
+    /// Sensibilità reale dal manifold (non hardcoded 0.50)
+    pub sensitivity: f64,
+    /// Override registrati nel manifold
+    pub override_count: usize,
+    /// Handover log reale dal manifold
+    pub handover_log: Vec<HandoverNote>,
 }
 
 impl TuiApp {
@@ -55,6 +81,7 @@ impl TuiApp {
             should_quit: false,
             goal_list_state,
             goals: Vec::new(),
+            goal_meta: Vec::new(),
             dependency_count: 0,
             agents: Vec::new(),
             conflicts: Vec::new(),
@@ -65,23 +92,75 @@ impl TuiApp {
             reliability: sentinel_core::ReliabilitySnapshot::from_counts(0, 0, 0, 0, 0, 0, 0),
             reliability_thresholds: reliability::ReliabilityThresholds::default(),
             reliability_eval: reliability::ReliabilityEvaluation::default(),
+            sensitivity: 0.5,
+            override_count: 0,
+            handover_log: Vec::new(),
         }
     }
 
     pub fn on_tick(&mut self) {
-        // Polling reale dal file sentinel.json
+        // Polling reale dal file sentinel.json ogni 250ms
         if self.manifold_path.exists() {
             if let Ok(content) = std::fs::read_to_string(&self.manifold_path) {
                 if let Ok(manifold) = serde_json::from_str::<sentinel_core::GoalManifold>(&content)
                 {
-                    // Sincronizzazione Goal tramite i metodi del DAG (goals() restituisce già un iteratore)
-                    self.goals = manifold
-                        .goal_dag
-                        .goals()
-                        .map(|g| g.description.clone())
+                    // ── Goal descriptions + metadati reali ──────────────────
+                    let goals_vec: Vec<_> = manifold.goal_dag.goals().collect();
+                    self.goals = goals_vec.iter().map(|g| g.description.clone()).collect();
+
+                    // Popola goal_meta con dati reali: id, status, progress, criteri
+                    self.goal_meta = goals_vec
+                        .iter()
+                        .map(|g| {
+                            let status = format!("{:?}", g.status).to_lowercase();
+                            // progress_pct: completed=1.0, in_progress=0.5, altri=0.0
+                            let progress_pct = match g.status {
+                                sentinel_core::GoalStatus::Completed => 1.0,
+                                sentinel_core::GoalStatus::InProgress => 0.5,
+                                _ => 0.0,
+                            };
+                            // success_criteria: descrizione dei predicati
+                            let success_criteria: Vec<String> = g
+                                .success_criteria
+                                .iter()
+                                .map(|p| format!("{:?}", p))
+                                .collect();
+                            GoalMeta {
+                                id: g.id.to_string(),
+                                status,
+                                progress_pct,
+                                success_criteria: if success_criteria.is_empty() {
+                                    vec!["No criteria defined".to_string()]
+                                } else {
+                                    success_criteria
+                                },
+                            }
+                        })
                         .collect();
 
-                    // Calcolo Barriera e Densità
+                    // ── Sensibilità reale dal manifold ──────────────────────
+                    self.sensitivity = manifold.sensitivity;
+
+                    // ── Override count reale ────────────────────────────────
+                    self.override_count = manifold.overrides.len();
+
+                    // ── Handover log reale ──────────────────────────────────
+                    // Campi reali: agent_id, content, technical_warnings, timestamp
+                    self.handover_log = manifold
+                        .handover_log
+                        .iter()
+                        .map(|note| {
+                            let ts = note.timestamp.format("%H:%M").to_string();
+                            HandoverNote {
+                                timestamp: ts,
+                                agent_id: note.agent_id.to_string(),
+                                content: note.content.clone(),
+                                warnings: note.technical_warnings.clone(),
+                            }
+                        })
+                        .collect();
+
+                    // ── Calcolo Barriera e Densità ──────────────────────────
                     let decision = sentinel_core::guardrail::GuardrailEngine::evaluate(&manifold);
                     self.is_barrier_locked = !decision.allowed;
                     self.alignment_score = decision.score_at_check;
@@ -106,7 +185,7 @@ impl TuiApp {
                         / 3.0;
                     self.estimated_tokens = report.total_tokens_estimated;
 
-                    // Rilevamento Conflitti Reali
+                    // ── Rilevamento Conflitti Reali ─────────────────────────
                     self.conflicts.clear();
                     let mut files_seen = std::collections::HashMap::new();
                     for (file, agent_id) in &manifold.file_locks {
@@ -312,12 +391,30 @@ fn ui(f: &mut Frame, app: &TuiApp) {
                 .constraints([Constraint::Percentage(40), Constraint::Percentage(60)].as_ref())
                 .split(main_chunk);
 
-            // List of goals
-            let items: Vec<ListItem> = app
-                .goals
-                .iter()
-                .map(|g| ListItem::new(g.as_str()))
-                .collect();
+            // List of goals — dati reali dal DAG
+            let items: Vec<ListItem> = if app.goals.is_empty() {
+                vec![ListItem::new("No goals — run `sentinel init <description>`")
+                    .style(Style::default().fg(Color::DarkGray))]
+            } else {
+                app.goals
+                    .iter()
+                    .enumerate()
+                    .map(|(i, g)| {
+                        let meta = &app.goal_meta;
+                        let status_prefix = if let Some(m) = meta.get(i) {
+                            match m.status.as_str() {
+                                "completed" => "✓ ",
+                                "in_progress" => "▶ ",
+                                "failed" => "✗ ",
+                                _ => "○ ",
+                            }
+                        } else {
+                            "○ "
+                        };
+                        ListItem::new(format!("{}{}", status_prefix, g))
+                    })
+                    .collect()
+            };
             let list = List::new(items)
                 .block(Block::default().borders(Borders::ALL).title("Goal DAG"))
                 .highlight_style(
@@ -328,22 +425,36 @@ fn ui(f: &mut Frame, app: &TuiApp) {
                 .highlight_symbol(">> ");
             f.render_stateful_widget(list, goal_chunks[0], &mut app.goal_list_state.clone());
 
-            // Details
+            // Details — dati reali dal goal selezionato
             let selected_index = app.goal_list_state.selected().unwrap_or(0);
-            let goal_name = if app.goals.is_empty() {
-                "No goals"
+            let details = if app.goals.is_empty() {
+                "No goals loaded.\n\nRun:\n  sentinel init \"<your project description>\"\n\nThen press 'r' to refresh.".to_string()
             } else {
-                &app.goals[selected_index]
+                let goal_name = &app.goals[selected_index];
+                let meta = app.goal_meta.get(selected_index);
+                let status = meta.map(|m| m.status.as_str()).unwrap_or("pending");
+                let progress = meta.map(|m| m.progress_pct).unwrap_or(0.0);
+                let criteria = meta
+                    .map(|m| m.success_criteria.join("\n  - "))
+                    .unwrap_or_else(|| "No criteria defined".to_string());
+                let id_short = meta
+                    .map(|m| m.id[..8.min(m.id.len())].to_string())
+                    .unwrap_or_else(|| "unknown".to_string());
+
+                format!(
+                    "GOAL: {}\n\nID: {}\nSTATUS: {}\nPROGRESS: {:.0}%\n\nSUCCESS CRITERIA:\n  - {}",
+                    goal_name,
+                    id_short,
+                    status.to_uppercase(),
+                    progress * 100.0,
+                    criteria,
+                )
             };
-            let details = format!(
-                "GOAL: {}\n\nSTATUS: Active\nPROGRESS: 45%\n\nSUCCESS CRITERIA:\n- Validated by Layer 2\n- Code Coverage > 80%\n- Invariants Satisfied",
-                goal_name
-            );
             let detail_block = Paragraph::new(details)
                 .block(
                     Block::default()
                         .borders(Borders::ALL)
-                        .title("Context Details"),
+                        .title("Goal Details (real data)"),
                 )
                 .wrap(ratatui::widgets::Wrap { trim: true });
             f.render_widget(detail_block, goal_chunks[1]);
@@ -381,27 +492,63 @@ fn ui(f: &mut Frame, app: &TuiApp) {
             f.render_widget(main_block, main_chunk);
         }
         5 => {
-            let inner_text = "ALIGNMENT CALIBRATION:\n\n- Sentinel Sensitivity: 0.50 [BALANCED]\n- Precision Rate: 98.2%\n- False Positive Rate: 1.8%\n\nHuman Overrides Registered: 0\n\n(Use 'sentinel calibrate <VALUE>' to adjust rigidity)";
+            // Tab 5: dati reali da manifold.sensitivity e manifold.overrides
+            let sensitivity_label = match app.sensitivity {
+                s if s < 0.3 => "PERMISSIVE",
+                s if s < 0.6 => "BALANCED",
+                s if s < 0.8 => "STRICT",
+                _ => "MAXIMUM",
+            };
+            let sensitivity_color = match app.sensitivity {
+                s if s < 0.3 => Color::Green,
+                s if s < 0.6 => Color::Cyan,
+                s if s < 0.8 => Color::Yellow,
+                _ => Color::Red,
+            };
+            let inner_text = format!(
+                "ALIGNMENT CALIBRATION (live from sentinel.json)\n\n\
+                - Sentinel Sensitivity: {:.2} [{}]\n\
+                - Alignment Score: {:.1}%\n\
+                - Barrier Status: {}\n\n\
+                Human Overrides Registered: {}\n\n\
+                Adjust with:\n  sentinel calibrate <0.0-1.0>\n\n\
+                Scale:\n\
+                  0.0-0.3 = PERMISSIVE (more flexible)\n\
+                  0.3-0.6 = BALANCED\n\
+                  0.6-0.8 = STRICT\n\
+                  0.8-1.0 = MAXIMUM (most rigid)",
+                app.sensitivity,
+                sensitivity_label,
+                app.alignment_score * 100.0,
+                if app.is_barrier_locked { "LOCKED 🛑" } else { "OPEN ✅" },
+                app.override_count,
+            );
             let main_block = Paragraph::new(inner_text)
                 .block(
                     Block::default()
                         .borders(Borders::ALL)
-                        .title("Sensitivity & Confidence Control"),
+                        .title("Sensitivity & Confidence Control (real data)"),
                 )
-                .style(Style::default().fg(Color::White));
+                .style(Style::default().fg(sensitivity_color))
+                .wrap(ratatui::widgets::Wrap { trim: true });
             f.render_widget(main_block, main_chunk);
         }
         6 => {
             let social_chunks = Layout::default()
                 .direction(Direction::Vertical)
-                .constraints([Constraint::Percentage(60), Constraint::Percentage(40)].as_ref())
+                .constraints([Constraint::Percentage(55), Constraint::Percentage(45)].as_ref())
                 .split(main_chunk);
 
-            // Agent Herd Table
+            // Agent Herd Table (dati reali da manifold.agents se presenti)
             let rows = app
                 .agents
                 .iter()
                 .map(|a| Row::new(vec![a.name.clone(), a.goal.clone(), a.activity.clone()]));
+            let agent_title = if app.agents.is_empty() {
+                "Social Manifold: No active agents"
+            } else {
+                "Social Manifold: Active Agent Herd"
+            };
             let table = Table::new(
                 rows,
                 [
@@ -420,17 +567,47 @@ fn ui(f: &mut Frame, app: &TuiApp) {
             .block(
                 Block::default()
                     .borders(Borders::ALL)
-                    .title("Social Manifold: Active Agent Herd"),
+                    .title(agent_title),
             );
             f.render_widget(table, social_chunks[0]);
 
-            // Handover Notes
-            let handover_text = "COGNITIVE TRAIL (Handover Notes):\n\n[10:15] Cline -> Cursor: 'Implemented base types, check field alignment in types.rs'\n[11:30] Cursor -> Kilo: 'Refined LSP diagnostics, performance verified'\n[NOW] Kilo -> Team: 'Invariants secured. Ready for Layer 8 integration'";
+            // Handover log reale da manifold.handover_log
+            let handover_text = if app.handover_log.is_empty() {
+                "COGNITIVE TRAIL (Handover Notes):\n\nNo handover notes yet.\n\nHandover notes are added automatically when agents\ntransfer context between sessions.\n\nUse: sentinel status --json to see full manifold state.".to_string()
+            } else {
+                let entries: Vec<String> = app
+                    .handover_log
+                    .iter()
+                    .rev() // più recenti prima
+                    .take(10) // max 10 entries visibili
+                    .map(|note| {
+                        let warn_suffix = if note.warnings.is_empty() {
+                            String::new()
+                        } else {
+                            format!(" ⚠ {}", note.warnings.join("; "))
+                        };
+                        format!(
+                            "[{}] agent:{} — {}{}",
+                            note.timestamp,
+                            &note.agent_id[..8.min(note.agent_id.len())],
+                            note.content,
+                            warn_suffix,
+                        )
+                    })
+                    .collect();
+                format!(
+                    "COGNITIVE TRAIL (Handover Notes — real data):\n\n{}",
+                    entries.join("\n")
+                )
+            };
             let handover_block = Paragraph::new(handover_text)
                 .block(
                     Block::default()
                         .borders(Borders::ALL)
-                        .title("Cognitive Handover Log"),
+                        .title(format!(
+                            "Cognitive Handover Log ({} entries)",
+                            app.handover_log.len()
+                        )),
                 )
                 .wrap(ratatui::widgets::Wrap { trim: true });
             f.render_widget(handover_block, social_chunks[1]);
