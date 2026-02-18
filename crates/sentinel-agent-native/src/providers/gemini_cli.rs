@@ -23,6 +23,15 @@ use sentinel_core::Uuid;
 const CLI_TIMEOUT_SECS: u64 = 180;
 const GEMINI_BIN: &str = "gemini";
 
+/// Modelli di fallback in ordine di priorità quando il modello primario è esaurito (HTTP 429).
+/// Tutti disponibili con Google AI Pro OAuth senza API key aggiuntiva.
+const FALLBACK_MODELS: &[&str] = &[
+    "gemini-2.0-flash",
+    "gemini-2.0-flash-lite",
+    "gemini-1.5-flash",
+    "gemini-1.5-flash-8b",
+];
+
 /// Risposta JSON del Gemini CLI v0.28+
 #[derive(Debug, Deserialize)]
 struct GeminiCliResponse {
@@ -101,15 +110,76 @@ impl GeminiCliClient {
     }
 
     /// Invoca il Gemini CLI con il prompt dato e ritorna la risposta grezza.
+    ///
+    /// Se il modello primario risponde con HTTP 429 (capacity exhausted),
+    /// prova automaticamente i modelli di fallback in `FALLBACK_MODELS`.
     async fn call(&self, prompt: &str) -> Result<(String, u32)> {
+        // Costruisce la lista di modelli da provare: primario + fallback
+        let models_to_try: Vec<Option<String>> = {
+            let mut list = vec![self.model.clone()];
+            // Aggiunge fallback solo se il modello primario non è già uno di essi
+            for &fb in FALLBACK_MODELS {
+                if self.model.as_deref() != Some(fb) {
+                    list.push(Some(fb.to_string()));
+                }
+            }
+            list
+        };
+
+        let mut last_error = String::new();
+
+        for model_opt in &models_to_try {
+            match self.call_with_model(prompt, model_opt.as_deref()).await {
+                Ok(result) => return Ok(result),
+                Err(e) => {
+                    let err_str = e.to_string();
+                    // Rileva errori di capacity/rate-limit per decidere se fare fallback
+                    let is_capacity_error = err_str.contains("429")
+                        || err_str.contains("RESOURCE_EXHAUSTED")
+                        || err_str.contains("MODEL_CAPACITY_EXHAUSTED")
+                        || err_str.contains("rateLimitExceeded")
+                        || err_str.contains("No capacity available");
+
+                    if is_capacity_error {
+                        let model_name = model_opt.as_deref().unwrap_or("default");
+                        tracing::warn!(
+                            "Model {} capacity exhausted (429), trying next fallback...",
+                            model_name
+                        );
+                        last_error = format!("Model {} exhausted: {}", model_name, err_str);
+                        // Breve pausa prima del prossimo tentativo
+                        tokio::time::sleep(Duration::from_millis(500)).await;
+                        continue;
+                    }
+
+                    // Errore non-429: non fare fallback, propaga immediatamente
+                    return Err(e);
+                }
+            }
+        }
+
+        bail!(
+            "All Gemini models exhausted (429). Last error: {}. \
+            Models tried: {}",
+            last_error,
+            models_to_try
+                .iter()
+                .map(|m| m.as_deref().unwrap_or("default"))
+                .collect::<Vec<_>>()
+                .join(", ")
+        )
+    }
+
+    /// Invoca il Gemini CLI con un modello specifico (None = default CLI).
+    async fn call_with_model(&self, prompt: &str, model: Option<&str>) -> Result<(String, u32)> {
         let start = Instant::now();
 
         let mut cmd = Command::new(&self.binary);
         // Usa --output-format (flag corretto per v0.28+), non -o
         cmd.arg("-p").arg(prompt).arg("--output-format").arg("json");
 
-        if let Some(model) = &self.model {
-            cmd.arg("-m").arg(model);
+        if let Some(m) = model {
+            cmd.arg("-m").arg(m);
         }
 
         let output = timeout(
@@ -122,7 +192,11 @@ impl GeminiCliClient {
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            bail!("gemini CLI exited with error: {}", stderr.trim());
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            // Combina stderr e stdout per catturare il messaggio di errore completo
+            // (Gemini CLI v0.28 scrive l'errore JSON su stdout anche in caso di 429)
+            let combined = format!("{}\n{}", stderr.trim(), stdout.trim());
+            bail!("gemini CLI exited with error: {}", combined.trim());
         }
 
         // L'output contiene righe di log prima del JSON (es. "Loaded cached credentials.")
@@ -131,6 +205,19 @@ impl GeminiCliClient {
         let json_str = extract_json_object(&raw_stdout);
 
         if let Ok(parsed) = serde_json::from_str::<GeminiCliResponse>(&json_str) {
+            // Controlla se la risposta JSON contiene un errore 429 embedded
+            // (Gemini CLI v0.28 può uscire con exit 0 ma con errore nel JSON)
+            if let Some(err_obj) = parsed.stats.get("error") {
+                let code = err_obj.get("code").and_then(|c| c.as_u64()).unwrap_or(0);
+                if code == 429 {
+                    let msg = err_obj
+                        .get("message")
+                        .and_then(|m| m.as_str())
+                        .unwrap_or("capacity exhausted");
+                    bail!("429 RESOURCE_EXHAUSTED: {}", msg);
+                }
+            }
+
             // Estrae il conteggio token dagli stats
             let tokens = parsed
                 .stats
@@ -142,8 +229,10 @@ impl GeminiCliClient {
                 .and_then(|t| t.as_u64())
                 .unwrap_or(0) as u32;
 
+            let model_used = model.unwrap_or("default");
             tracing::debug!(
-                "gemini CLI response: {} chars, {} tokens, {}ms",
+                "gemini CLI [{}] response: {} chars, {} tokens, {}ms",
+                model_used,
                 parsed.response.len(),
                 tokens,
                 start.elapsed().as_millis()
@@ -152,18 +241,32 @@ impl GeminiCliClient {
             return Ok((parsed.response, tokens));
         }
 
+        // Controlla se il testo grezzo contiene un errore 429
+        if raw_stdout.contains("429") || raw_stdout.contains("RESOURCE_EXHAUSTED") {
+            bail!("429 RESOURCE_EXHAUSTED detected in stdout: {}", raw_stdout.trim());
+        }
+
         // Fallback: se il JSON non è parsabile, usa stdout come testo plain
         // (rimuovendo le righe di log che precedono il contenuto utile)
         let plain = raw_stdout
             .lines()
-            .filter(|l| !l.starts_with("Loaded ") && !l.starts_with("Loading ") && !l.starts_with("Server ") && !l.starts_with("Error during") && !l.starts_with("Hook registry"))
+            .filter(|l| {
+                !l.starts_with("Loaded ")
+                    && !l.starts_with("Loading ")
+                    && !l.starts_with("Server ")
+                    && !l.starts_with("Error during")
+                    && !l.starts_with("Hook registry")
+            })
             .collect::<Vec<_>>()
             .join("\n")
             .trim()
             .to_string();
 
         if plain.is_empty() {
-            bail!("gemini CLI returned empty response. stdout: {}", raw_stdout.trim());
+            bail!(
+                "gemini CLI returned empty response. stdout: {}",
+                raw_stdout.trim()
+            );
         }
 
         Ok((plain, 0))
