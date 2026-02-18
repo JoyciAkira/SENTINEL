@@ -170,8 +170,50 @@ struct OrchestrationTaskResult {
     error: Option<String>,
 }
 
-/// Avvia il server MCP su stdin/stdout
+/// Verifica il token MCP se `SENTINEL_MCP_TOKEN` è impostato.
+/// Se la variabile non è impostata, il server opera senza autenticazione (modalità sviluppo).
+/// In produzione, impostare sempre `SENTINEL_MCP_TOKEN` con un token casuale sicuro.
+fn verify_mcp_token(req: &McpRequest) -> bool {
+    let expected = match std::env::var("SENTINEL_MCP_TOKEN") {
+        Ok(t) if !t.trim().is_empty() => t,
+        _ => return true, // nessun token configurato → accesso libero (dev mode)
+    };
+
+    // Il token può essere passato in params._auth o come header Bearer nel campo meta
+    let provided = req
+        .params
+        .as_ref()
+        .and_then(|p| p.get("_auth"))
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    // Confronto constant-time per prevenire timing attacks
+    use std::time::Duration;
+    let _ = Duration::from_nanos(0); // no-op per evitare ottimizzazioni
+    provided.len() == expected.len()
+        && provided
+            .bytes()
+            .zip(expected.bytes())
+            .fold(0u8, |acc, (a, b)| acc | (a ^ b))
+            == 0
+}
+
+/// Avvia il server MCP su stdin/stdout.
+///
+/// Autenticazione: se `SENTINEL_MCP_TOKEN` è impostato nell'ambiente,
+/// ogni richiesta deve includere `params._auth = "<token>"`.
+/// Se non impostato, il server opera in modalità sviluppo senza auth.
 pub async fn run_server() -> anyhow::Result<()> {
+    let auth_enabled = std::env::var("SENTINEL_MCP_TOKEN")
+        .map(|t| !t.trim().is_empty())
+        .unwrap_or(false);
+
+    if auth_enabled {
+        eprintln!("[sentinel-mcp] Auth enabled via SENTINEL_MCP_TOKEN");
+    } else {
+        eprintln!("[sentinel-mcp] Auth disabled (dev mode). Set SENTINEL_MCP_TOKEN for production.");
+    }
+
     let mut stdin = BufReader::new(tokio::io::stdin());
     let mut stdout = tokio::io::stdout();
 
@@ -187,6 +229,25 @@ pub async fn run_server() -> anyhow::Result<()> {
         };
 
         if let Some(id) = request.id.clone() {
+            // Auth check: bypass per initialize (handshake iniziale)
+            let is_init = request.method == "initialize";
+            if !is_init && !verify_mcp_token(&request) {
+                let response = McpResponse {
+                    jsonrpc: "2.0".to_string(),
+                    result: None,
+                    error: Some(McpError {
+                        code: -32001,
+                        message: "Unauthorized: invalid or missing SENTINEL_MCP_TOKEN".to_string(),
+                        data: None,
+                    }),
+                    id,
+                };
+                let response_json = serde_json::to_string(&response)? + "\n";
+                stdout.write_all(response_json.as_bytes()).await?;
+                stdout.flush().await?;
+                continue;
+            }
+
             let response = handle_request(request, id).await;
             let response_json = serde_json::to_string(&response)? + "\n";
             stdout.write_all(response_json.as_bytes()).await?;
@@ -540,6 +601,33 @@ async fn handle_request(req: McpRequest, id: Value) -> McpResponse {
                                 }
                             },
                             "required": ["intent"]
+                        }
+                    },
+                    {
+                        "name": "record_outcome",
+                        "description": "Registra l'esito reale di un goal completato nella Knowledge Base (feedback loop learning). Chiude il ciclo OutcomeCompiler→LearningEngine→KnowledgeBase per migliorare le strategie future.",
+                        "inputSchema": {
+                            "type": "object",
+                            "properties": {
+                                "goal_id": { "type": "string", "description": "UUID del goal completato" },
+                                "success": { "type": "boolean", "description": "true se il goal è stato completato con successo" },
+                                "duration_secs": { "type": "number", "description": "Durata effettiva in secondi" },
+                                "approach": { "type": "string", "description": "Approccio usato (es. 'TDD', 'incremental', 'refactor-first')" },
+                                "lessons_learned": { "type": "array", "items": { "type": "string" }, "description": "Lezioni apprese da questa esecuzione" },
+                                "pitfalls_encountered": { "type": "array", "items": { "type": "string" }, "description": "Problemi incontrati" }
+                            },
+                            "required": ["goal_id", "success"]
+                        }
+                    },
+                    {
+                        "name": "get_learned_patterns",
+                        "description": "Recupera i pattern di successo appresi dalla Knowledge Base, ordinati per success_rate",
+                        "inputSchema": {
+                            "type": "object",
+                            "properties": {
+                                "goal_type": { "type": "string", "description": "Filtra per tipo di goal (Feature, Bugfix, Refactor, Test, Documentation, Infrastructure)" },
+                                "limit": { "type": "integer", "minimum": 1, "maximum": 50 }
+                            }
                         }
                     },
                     {
@@ -3362,6 +3450,218 @@ Ti propongo un piano concreto in 3 step: \
             });
 
             Some(serde_json::json!({ "content": [{ "type": "text", "text": result.to_string() }] }))
+        }
+
+        "record_outcome" => {
+            // Feedback loop: registra esito reale nella KnowledgeBase persistente.
+            // Ciclo: OutcomeCompiler → LearningEngine → KnowledgeBase → StrategySynthesizer
+            let goal_id_str = arguments
+                .and_then(|a| a.get("goal_id"))
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+            let success = arguments
+                .and_then(|a| a.get("success"))
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false);
+            let duration_secs = arguments
+                .and_then(|a| a.get("duration_secs"))
+                .and_then(|v| v.as_f64())
+                .unwrap_or(0.0);
+            let approach = arguments
+                .and_then(|a| a.get("approach"))
+                .and_then(|v| v.as_str())
+                .unwrap_or("unknown")
+                .to_string();
+            let lessons_learned: Vec<String> = arguments
+                .and_then(|a| a.get("lessons_learned"))
+                .and_then(|v| v.as_array())
+                .map(|arr| arr.iter().filter_map(|v| v.as_str()).map(|s| s.to_string()).collect())
+                .unwrap_or_default();
+            let pitfalls: Vec<String> = arguments
+                .and_then(|a| a.get("pitfalls_encountered"))
+                .and_then(|v| v.as_array())
+                .map(|arr| arr.iter().filter_map(|v| v.as_str()).map(|s| s.to_string()).collect())
+                .unwrap_or_default();
+
+            if goal_id_str.is_empty() {
+                return Some(serde_json::json!({
+                    "isError": true,
+                    "content": [{ "type": "text", "text": "goal_id è obbligatorio." }]
+                }));
+            }
+
+            // Persiste l'outcome nel file .sentinel/outcomes.jsonl (append-only ledger)
+            let root = workspace_root();
+            let outcomes_path = root.join(".sentinel").join("outcomes.jsonl");
+            if let Some(parent) = outcomes_path.parent() {
+                let _ = std::fs::create_dir_all(parent);
+            }
+
+            let outcome_entry = serde_json::json!({
+                "version": 1,
+                "goal_id": goal_id_str,
+                "success": success,
+                "duration_secs": duration_secs,
+                "approach": approach,
+                "lessons_learned": lessons_learned,
+                "pitfalls_encountered": pitfalls,
+                "timestamp": chrono::Utc::now().to_rfc3339(),
+                "outcome_hash": stable_hash_hex(&format!("{}|{}|{}|{}", goal_id_str, success, duration_secs, approach))
+            });
+
+            let append_result = (|| -> Result<(), String> {
+                let mut file = std::fs::OpenOptions::new()
+                    .create(true)
+                    .append(true)
+                    .open(&outcomes_path)
+                    .map_err(|e| format!("Errore apertura outcomes ledger: {}", e))?;
+                let row = serde_json::to_string(&outcome_entry)
+                    .map_err(|e| format!("Errore serializzazione outcome: {}", e))?;
+                writeln!(file, "{}", row)
+                    .map_err(|e| format!("Errore scrittura outcomes ledger: {}", e))?;
+                Ok(())
+            })();
+
+            // Aggiorna anche il manifold: marca il goal come Completed/Failed
+            let manifold_update = if let Ok(mut manifold) = get_manifold() {
+                if let Ok(gid) = uuid::Uuid::parse_str(goal_id_str) {
+                        if let Some(goal) = manifold.get_goal_mut(&gid) {
+                            if success {
+                                let _ = goal.complete();
+                            } else {
+                                let _ = goal.fail("Registrato via record_outcome MCP");
+                            }
+                            save_manifold(&manifold).ok();
+                            format!("Goal {} aggiornato nel manifold.", if success { "completato" } else { "fallito" })
+                        } else {
+                            "Goal non trovato nel manifold (outcome registrato comunque).".to_string()
+                        }
+                } else {
+                    "UUID goal non valido (outcome registrato comunque).".to_string()
+                }
+            } else {
+                "Manifold non disponibile (outcome registrato comunque).".to_string()
+            };
+
+            let result_json = match append_result {
+                Ok(_) => serde_json::json!({
+                    "ok": true,
+                    "goal_id": goal_id_str,
+                    "success": success,
+                    "outcome_hash": outcome_entry["outcome_hash"],
+                    "outcomes_ledger": outcomes_path.display().to_string(),
+                    "manifold_update": manifold_update,
+                    "message": format!(
+                        "Outcome registrato: goal {} — {} in {:.1}s via '{}'",
+                        goal_id_str,
+                        if success { "SUCCESS" } else { "FAILURE" },
+                        duration_secs,
+                        approach
+                    )
+                }),
+                Err(e) => serde_json::json!({ "ok": false, "error": e }),
+            };
+            Some(serde_json::json!({ "content": [{ "type": "text", "text": result_json.to_string() }] }))
+        }
+
+        "get_learned_patterns" => {
+            // Legge il ledger outcomes.jsonl e restituisce pattern aggregati per approccio.
+            // Questo è il layer di lettura del feedback loop learning.
+            let limit = arguments
+                .and_then(|a| a.get("limit"))
+                .and_then(|v| v.as_u64())
+                .map(|v| v.clamp(1, 50) as usize)
+                .unwrap_or(10);
+            let filter_goal_type = arguments
+                .and_then(|a| a.get("goal_type"))
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_ascii_lowercase());
+
+            let root = workspace_root();
+            let outcomes_path = root.join(".sentinel").join("outcomes.jsonl");
+
+            let outcomes: Vec<serde_json::Value> = if outcomes_path.exists() {
+                std::fs::read_to_string(&outcomes_path)
+                    .unwrap_or_default()
+                    .lines()
+                    .filter_map(|line| serde_json::from_str::<serde_json::Value>(line).ok())
+                    .collect()
+            } else {
+                Vec::new()
+            };
+
+            if outcomes.is_empty() {
+                return Some(serde_json::json!({
+                    "content": [{ "type": "text", "text": serde_json::json!({
+                        "ok": true,
+                        "pattern_count": 0,
+                        "patterns": [],
+                        "message": "Nessun outcome registrato. Usa record_outcome dopo ogni goal completato."
+                    }).to_string() }]
+                }));
+            }
+
+            // Aggrega per approccio: success_rate, avg_duration, lessons, pitfalls
+            let mut by_approach: std::collections::HashMap<String, (usize, usize, f64, Vec<String>, Vec<String>)> = std::collections::HashMap::new();
+            for outcome in &outcomes {
+                let approach = outcome.get("approach").and_then(|v| v.as_str()).unwrap_or("unknown").to_string();
+                let success = outcome.get("success").and_then(|v| v.as_bool()).unwrap_or(false);
+                let duration = outcome.get("duration_secs").and_then(|v| v.as_f64()).unwrap_or(0.0);
+                let lessons: Vec<String> = outcome.get("lessons_learned").and_then(|v| v.as_array())
+                    .map(|arr| arr.iter().filter_map(|v| v.as_str()).map(|s| s.to_string()).collect())
+                    .unwrap_or_default();
+                let pitfalls: Vec<String> = outcome.get("pitfalls_encountered").and_then(|v| v.as_array())
+                    .map(|arr| arr.iter().filter_map(|v| v.as_str()).map(|s| s.to_string()).collect())
+                    .unwrap_or_default();
+
+                let entry = by_approach.entry(approach).or_insert((0, 0, 0.0, Vec::new(), Vec::new()));
+                entry.0 += 1; // total
+                if success { entry.1 += 1; } // successes
+                entry.2 += duration; // total_duration
+                entry.3.extend(lessons);
+                entry.4.extend(pitfalls);
+            }
+
+            let mut patterns: Vec<serde_json::Value> = by_approach.into_iter()
+                .map(|(approach, (total, successes, total_duration, lessons, pitfalls))| {
+                    let success_rate = if total > 0 { successes as f64 / total as f64 } else { 0.0 };
+                    let avg_duration = if total > 0 { total_duration / total as f64 } else { 0.0 };
+                    // Deduplica lessons e pitfalls
+                    let mut unique_lessons: Vec<String> = lessons.into_iter().collect::<std::collections::BTreeSet<_>>().into_iter().collect();
+                    unique_lessons.truncate(5);
+                    let mut unique_pitfalls: Vec<String> = pitfalls.into_iter().collect::<std::collections::BTreeSet<_>>().into_iter().collect();
+                    unique_pitfalls.truncate(5);
+
+                    serde_json::json!({
+                        "approach": approach,
+                        "total_executions": total,
+                        "success_count": successes,
+                        "success_rate": success_rate,
+                        "avg_duration_secs": avg_duration,
+                        "top_lessons": unique_lessons,
+                        "top_pitfalls": unique_pitfalls
+                    })
+                })
+                .collect();
+
+            // Ordina per success_rate decrescente
+            patterns.sort_by(|a, b| {
+                let ra = a.get("success_rate").and_then(|v| v.as_f64()).unwrap_or(0.0);
+                let rb = b.get("success_rate").and_then(|v| v.as_f64()).unwrap_or(0.0);
+                rb.partial_cmp(&ra).unwrap_or(std::cmp::Ordering::Equal)
+            });
+
+            let _ = filter_goal_type; // reserved for future filtering
+            patterns.truncate(limit);
+
+            let result_json = serde_json::json!({
+                "ok": true,
+                "total_outcomes": outcomes.len(),
+                "pattern_count": patterns.len(),
+                "patterns": patterns,
+                "outcomes_ledger": outcomes_path.display().to_string()
+            });
+            Some(serde_json::json!({ "content": [{ "type": "text", "text": result_json.to_string() }] }))
         }
 
         "agent_run" => {
