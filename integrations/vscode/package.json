@@ -18,7 +18,24 @@
     "Chat"
   ],
   "activationEvents": [
-    "*"
+    "onCommand:sentinel.blueprint.apply",
+    "onCommand:sentinel.blueprint.list",
+    "onCommand:sentinel.blueprint.quickstart",
+    "onCommand:sentinel.blueprint.show",
+    "onCommand:sentinel.codexLogin",
+    "onCommand:sentinel.configureProviders",
+    "onCommand:sentinel.openChat",
+    "onCommand:sentinel.preview.refresh",
+    "onCommand:sentinel.preview.toggle",
+    "onCommand:sentinel.preview.viewportDesktop",
+    "onCommand:sentinel.preview.viewportMobile",
+    "onCommand:sentinel.preview.viewportTablet",
+    "onCommand:sentinel.refreshGoals",
+    "onCommand:sentinel.showAlignment",
+    "onCommand:sentinel.validateAction",
+    "onStartupFinished",
+    "onView:sentinel-chat",
+    "onView:sentinel-live-preview"
   ],
   "main": "./out/extension.js",
   "scripts": {

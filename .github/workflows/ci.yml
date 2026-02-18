@@ -206,3 +206,49 @@ jobs:
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # 7. Release VSCode Extension .vsix (solo su tag v*)
+  # ─────────────────────────────────────────────────────────────────────────
+  release-vsix:
+    name: Release VSCode Extension (.vsix)
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [webview, sdk-typescript, security]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+
+      - name: Install vsce
+        run: npm install -g @vscode/vsce
+
+      - name: Install extension dependencies
+        run: cd integrations/vscode && npm ci --silent
+
+      - name: Build extension (TypeScript + Webview)
+        run: cd integrations/vscode && npm run build
+
+      - name: Package .vsix
+        run: |
+          cd integrations/vscode
+          vsce package --no-dependencies --out ../../sentinel-extension.vsix
+          echo "VSIX_SIZE=$(du -sh ../../sentinel-extension.vsix | cut -f1)" >> $GITHUB_ENV
+
+      - name: Upload .vsix artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sentinel-extension-vsix
+          path: sentinel-extension.vsix
+
+      - name: Attach .vsix to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: sentinel-extension.vsix
+          generate_release_notes: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
