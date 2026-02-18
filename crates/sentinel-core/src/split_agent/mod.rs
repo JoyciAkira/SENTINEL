@@ -15,6 +15,10 @@ use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use uuid::Uuid;
+
+pub mod contract_proof;
+pub mod repair;
+
 // ---------------------------------------------------------------------------
 // Core types
 // ---------------------------------------------------------------------------
@@ -111,14 +115,25 @@ impl WorkerModule {
     /// Compute a stable Blake3 hash of the module's negotiable contract.
     /// Workers can use this to prove they received an unmodified module.
     pub fn contract_hash(&self) -> String {
+        // Hash covers: id, title, output_contract count, guardrails count,
+        // destination_state (critical: workers cannot change what "done" means)
         let material = format!(
-            "{}|{}|{}|{}",
+            "{}|{}|{}|{}|{}",
             self.id,
             self.title,
             self.output_contract.len(),
-            self.local_guardrails.len()
+            self.local_guardrails.len(),
+            self.worker_context.destination_state
         );
         blake3::hash(material.as_bytes()).to_hex().to_string()
+    }
+
+    /// Verify that a ContractProof was produced for this exact module contract.
+    /// Returns true only if the proof covers the same contract_hash.
+    pub fn verify_proof(&self, proof: &crate::split_agent::contract_proof::ContractProof) -> bool {
+        proof.module_id == self.id
+            && proof.contract_hash == self.contract_hash()
+            && proof.all_satisfied
     }
 }
 
