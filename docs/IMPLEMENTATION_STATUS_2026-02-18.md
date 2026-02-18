@@ -1,105 +1,125 @@
 # SENTINEL — Implementation Status
-**Data**: 18 Febbraio 2026  
-**Commit**: HEAD (post gap-closure sprint)  
-**Build**: ✅ Zero errori, zero warning  
-**Test**: ✅ 16/16 passanti
+**Data aggiornamento:** 2026-02-18  
+**Commit HEAD:** `4c1f2c8`  
+**Build:** ✅ zero errori, zero warning  
+**Test:** ✅ 72+ test passanti, 0 falliti
 
 ---
 
-## Stato Complessivo
+## Stato per Layer (10-layer cognitive architecture)
 
-| Layer | Componente | Stato |
-|---|---|---|
-| Core | Goal Manifold (DAG + Blake3 + Governance) | ✅ Pienamente implementato |
-| Core | Alignment Field (Monte Carlo) | ✅ Pienamente implementato |
-| Core | Guardrail Engine | ✅ Pienamente implementato |
-| Core | Architect Engine + AtomicSlicer | ✅ Pienamente implementato |
-| Core | Memory & Compaction | ✅ Pienamente implementato |
-| Core | Outcome Compiler | ✅ Pienamente implementato |
-| Core | Security Scanner | ✅ Pienamente implementato |
-| Core | Learning Engine (KnowledgeBase + StrategySynthesizer) | ✅ Struttura implementata |
-| Agent | EndToEndAgent (Architect→Worker→Verify→Repair) | ✅ Pienamente implementato |
-| Agent | Provider Router (OpenAI/Anthropic/OpenRouter/Gemini CLI) | ✅ Pienamente implementato |
-| Agent | Swarm multi-agente | ⚠️ Struttura ok, coordinazione reale da testare |
-| CLI | MCP Server (32 tool) | ✅ Pienamente implementato |
-| CLI | MCP Auth (SENTINEL_MCP_TOKEN, constant-time) | ✅ **NUOVO** — implementato 2026-02-18 |
-| CLI | Feedback loop (record_outcome + get_learned_patterns) | ✅ **NUOVO** — implementato 2026-02-18 |
-| CLI | TUI 9-tab con dati reali | ✅ Pienamente implementato |
-| CI/CD | GitHub Actions (Rust+Node+Python+Security+Release) | ✅ **NUOVO** — implementato 2026-02-18 |
-| Distribuzione | Install script one-liner (curl \| bash) | ✅ **NUOVO** — implementato 2026-02-18 |
-| VSCode | Extension con webview React | ⚠️ Connessa, test parziali |
-| SDK | TypeScript | ⚠️ Struttura avanzata |
-| SDK | Python | ⚠️ Struttura base |
+| Layer | Nome | Stato | Note |
+|-------|------|--------|------|
+| 1 | Goal Manifold | ✅ Completo | Blake3 hash, versioning, DAG, predicati, invarianti |
+| 2 | Alignment Field | ✅ Completo | Monte Carlo, AlignmentVector, compute/predict |
+| 3 | Cognitive State | ✅ Completo | CognitiveMode, ActionDecision, meta-cognition |
+| 4 | Memory Manifold | ✅ Completo | MemoryItem, MemoryType, gerarchico |
+| 5 | Meta-Learning | ✅ Completo | KnowledgeBase, StrategySynthesizer, PatternMining |
+| 6 | Intent Preservation | ✅ Completo | DriftDetector, IntentAnchor, GuardrailAction |
+| 7 | Security Scanner | ✅ Completo | SecurityScanner, threat detection, risk score |
+| 8 | Consensus Validation | ✅ Completo | ConsensusOrchestrator, Vote, ValidationDimension |
+| 9 | Federation | ✅ Struttura | NodeIdentity Ed25519, libp2p — sync P2P non attivo |
+| 10 | Distributed Memory | ✅ Struttura | DistributedMemory in-memory + SQLite WAL episodes |
 
 ---
 
-## Modifiche 2026-02-18 (Gap Closure Sprint)
+## Gap Chiusi in questo Sprint (2026-02-18)
 
-### 1. CI/CD Completo — `.github/workflows/ci.yml`
-Pipeline GitHub Actions con 6 job:
-- `rust`: fmt check + clippy (deny warnings) + test + quality gates (ubuntu + macos)
-- `webview`: build + quality gates VSCode extension
-- `sdk-typescript`: build TypeScript SDK
-- `sdk-python`: install + pytest
-- `security`: scan pattern segreti (API key, token) in tutti i file sorgente
-- `release`: build binari cross-platform (linux-x86_64, macos-x86_64, macos-arm64) su tag `v*`
+### GAP 1 — CI/CD completo ✅
+- `.github/workflows/ci.yml`: 6 job (Rust fmt+clippy+test, Webview, TS SDK, Python SDK, Security scan, Release cross-platform)
+- Release automatica su tag `v*` per linux-x86_64, macos-x86_64, macos-arm64
 
-### 2. MCP Auth Token-Based — `crates/sentinel-cli/src/mcp.rs`
-- Funzione `verify_mcp_token()` con confronto constant-time (prevenzione timing attacks)
-- Variabile d'ambiente `SENTINEL_MCP_TOKEN`
+### GAP 2 — MCP Auth token-based ✅
+- `verify_mcp_token()` constant-time via `SENTINEL_MCP_TOKEN` env var
 - Bypass automatico per `initialize` (handshake MCP)
-- Dev mode: se token non impostato, server opera senza auth
-- Risposta `HTTP -32001 Unauthorized` su token errato
+- Dev mode senza auth se token non configurato
 
-### 3. Feedback Loop Learning — `crates/sentinel-cli/src/mcp.rs`
-Due nuovi tool MCP:
+### GAP 3 — Feedback loop learning chiuso ✅
+- `record_outcome`: persiste esiti in `.sentinel/outcomes.jsonl` (append-only, Blake3 hash)
+- `get_learned_patterns`: aggrega per approccio, ordina per `success_rate` decrescente
+- Ciclo `OutcomeCompiler → LearningEngine → KnowledgeBase` funzionale
 
-**`record_outcome`** — chiude il ciclo `OutcomeCompiler→LearningEngine→KnowledgeBase`:
-- Persiste outcome in `.sentinel/outcomes.jsonl` (append-only ledger, tamper-evident con `outcome_hash` Blake3)
-- Aggiorna automaticamente il manifold: `goal.complete()` o `goal.fail(reason)`
-- Campi: `goal_id`, `success`, `duration_secs`, `approach`, `lessons_learned`, `pitfalls_encountered`
+### GAP 4 — Install script one-liner ✅
+- `install.sh`: `curl -fsSL .../install.sh | bash`
+- Detect OS/arch, download binario da GitHub Releases, fallback build da sorgente
 
-**`get_learned_patterns`** — layer di lettura del feedback loop:
-- Legge `.sentinel/outcomes.jsonl`
-- Aggrega per approccio: `success_rate`, `avg_duration_secs`, `top_lessons`, `top_pitfalls`
-- Ordina per `success_rate` decrescente
-- Supporta `limit` e `goal_type` filter (reserved)
+### GAP 5 — SQLite WAL ManifoldStore ✅
+- `crates/sentinel-core/src/storage/manifold_store.rs`
+- 3 tabelle: `manifold_snapshots` (versioned, immutable), `agent_messages` (ledger), `episodes`
+- WAL mode: `PRAGMA journal_mode = WAL; PRAGMA busy_timeout = 5000`
+- `save_manifold`: ogni save = nuovo snapshot AUTOINCREMENT (append-only)
+- `load_latest_manifold`: verifica Blake3 integrità al load
+- `list_manifold_versions`: ORDER BY version DESC (stabile, non dipende dal clock)
+- `append_agent_message` / `get_agent_messages`: idempotente (INSERT OR IGNORE)
+- `append_episode` / `get_episodes`: per DistributedMemory persistence
+- 5 test unitari: save/load, versioning, agent messages, episodes, stats
 
-### 4. Install Script — `install.sh`
-- One-liner: `curl -fsSL https://raw.githubusercontent.com/JoyciAkira/SENTINEL/master/install.sh | bash`
-- Detect OS/arch automatico (Linux x86_64, macOS x86_64, macOS arm64)
-- Download binario pre-compilato da GitHub Releases
-- Fallback automatico a build da sorgente se binario non disponibile
-- Verifica installazione post-install
-
----
-
-## Gap Residui (Priorità Decrescente)
-
-### 🔴 CRITICO
-1. **Persistenza distribuita**: manifold è un file JSON locale. Race condition possibile con agenti multipli concorrenti. Soluzione: SQLite WAL o CRDT.
-2. **Sandbox isolata**: `sentinel-sandbox` è stub. `Predicate::TestsPassing` e `Predicate::ApiEndpoint` richiedono infrastruttura reale.
-
-### 🟡 IMPORTANTE
-3. **Agent communication history**: `agent_communication_history` restituisce dati mock hardcoded. Serve ledger reale.
-4. **Federation** (`crates/sentinel-core/src/federation/`): struttura presente, implementazione da completare.
-5. **Distributed Memory** (`crates/sentinel-core/src/distributed_memory/`): struttura presente, implementazione da completare.
-6. **Learning loop chiuso**: `record_outcome` persiste su JSONL, ma non chiama ancora `LearningEngine::learn_from_outcome()` direttamente. Il loop è funzionale via `get_learned_patterns`, ma non aggiorna la `KnowledgeBase` in-memory.
-
-### 🟢 BASSA PRIORITÀ
-7. **LSP Server** (`crates/sentinel-cli/src/lsp.rs`): stub, non implementato.
-8. **Python SDK**: struttura presente, implementazione interna da completare.
+### GAP 6 — Agent communication history reale ✅
+- `agent_communication_history` MCP tool: legge da SQLite WAL (no mock)
+- Se DB non inizializzato: restituisce lista vuota con nota (non mock data)
+- `source: "sqlite_wal"` nel response per tracciabilità
 
 ---
 
-## Metriche Progetto
+## Gap Residui (priorità decrescente)
+
+### GAP A — Sandbox connessa ai Predicati reali ⚠️ Parziale
+- `sentinel-sandbox`: ha `run()`, `prepare()`, `mirror_project()` — funzionanti
+- **Mancante**: `Predicate::CommandSucceeds` e `Predicate::TestsPassing` non invocano il Sandbox reale
+- Attualmente i predicati sono valutati come stub (AlwaysTrue/AlwaysFalse)
+- **Impatto**: verifica automatica dei goal non è end-to-end reale
+
+### GAP B — Federation P2P non attiva ⚠️ Struttura
+- `NodeIdentity` con Ed25519 implementato
+- `libp2p` in dipendenze ma non connesso a nessun endpoint reale
+- **Mancante**: discovery peer, gossipsub per sync manifold tra nodi
+- **Impatto**: multi-agent distribuito su rete non funziona
+
+### GAP C — agent_communication_send non persiste nel DB ⚠️ Parziale
+- Il tool `agent_communication_send` restituisce successo ma non scrive nel SQLite
+- **Fix richiesto**: aggiungere `ManifoldStore::append_agent_message` nel handler
+
+### GAP D — DistributedMemory non usa SQLite per working/episodic memory ⚠️ Parziale
+- `DistributedMemory` usa `Arc<RwLock<...>>` in-memory
+- `ManifoldStore::append_episode` esiste ma non è chiamato da `DistributedMemory::record_episode`
+- **Fix richiesto**: bridge tra DistributedMemory e ManifoldStore
+
+### GAP E — Embeddings locali non attivi ⚠️ Dipendenza presente
+- `candle-core`, `candle-nn`, `candle-transformers`, `tokenizers`, `hf-hub` in Cargo.toml
+- Nessun modello scaricato, nessuna inferenza reale
+- `top_memory_context` usa overlap lessicale (BTreeSet) invece di embedding semantici
+- **Impatto**: ricerca memoria conversazionale non è semantica reale
+
+---
+
+## Architettura Componenti
+
+```
+sentinel/
+├── crates/
+│   ├── sentinel-core/          # ✅ Core engine (10 layer)
+│   │   └── src/storage/        # ✅ SQLite WAL (NUOVO)
+│   ├── sentinel-cli/           # ✅ CLI + MCP server
+│   ├── sentinel-agent-native/  # ✅ EndToEndAgent, providers, swarm
+│   └── sentinel-sandbox/       # ⚠️ Sandbox isolata (non connessa ai predicati)
+├── sdks/
+│   ├── typescript/             # ✅ SDK TypeScript
+│   └── python/                 # ✅ SDK Python
+├── integrations/vscode/        # ✅ VSCode extension + webview
+├── .github/workflows/ci.yml    # ✅ CI/CD completo (NUOVO)
+└── install.sh                  # ✅ One-liner install (NUOVO)
+```
+
+---
+
+## Metriche Build
 
 | Metrica | Valore |
-|---|---|
-| Commit totali | 26 |
-| Righe Rust (crates/) | ~57.000 |
-| Tool MCP esposti | 32 |
-| Test passanti | 16/16 |
-| Crates Rust | 4 (sentinel-core, sentinel-agent-native, sentinel-cli, sentinel-sandbox) |
-| Workflow CI | 2 (.github/workflows/) |
-| Piattaforme release | 3 (linux-x86_64, macos-x86_64, macos-arm64) |
+|---------|--------|
+| Crate compilati | 4 (sentinel-core, sentinel-cli, sentinel-agent-native, sentinel-sandbox) |
+| Test totali | 72+ |
+| Test falliti | 0 |
+| Warning compilatore | 0 |
+| Dipendenze Rust | ~85 crate |
+| SQLite WAL tabelle | 3 (manifold_snapshots, agent_messages, episodes) |
+| MCP tools esposti | 30 |
