@@ -17,6 +17,7 @@ struct Cli {
     manifold: PathBuf,
 }
 
+mod generate;
 mod lsp;
 mod mcp;
 mod reliability;
@@ -86,6 +87,22 @@ enum Commands {
         /// Il comando da eseguire (es. "cargo build")
         #[arg(last = true)]
         command: Vec<String>,
+    },
+
+    /// Genera codice autonomamente per tutti i goal incompleti (Sentinel autonomous agent)
+    Generate {
+        /// ID specifico del goal (default: tutti gli incompleti)
+        #[arg(short, long)]
+        goal_id: Option<String>,
+        /// Directory di output (default: directory corrente)
+        #[arg(short, long)]
+        output: Option<PathBuf>,
+        /// Usa LLM per analisi requisiti avanzata (default: true se API key presente)
+        #[arg(long, default_value = "true")]
+        llm: bool,
+        /// Dry run: mostra cosa verrebbe generato senza scrivere file
+        #[arg(long)]
+        dry_run: bool,
     },
 
     /// Avvia la sincronizzazione con la rete Sentinel globale (Layer 9)
@@ -532,6 +549,24 @@ async fn main() -> anyhow::Result<()> {
                 ));
             }
         }
+        Commands::Generate {
+            goal_id,
+            output,
+            llm,
+            dry_run,
+        } => {
+            let output_dir = output.unwrap_or_else(|| std::env::current_dir().unwrap());
+            let opts = generate::GenerateOptions {
+                goal_id,
+                output: output_dir,
+                llm,
+                dry_run,
+            };
+            let report = generate::run(&cli.manifold, opts).await?;
+            if !report.errors.is_empty() {
+                std::process::exit(1);
+            }
+        }
         Commands::Verify { sandbox } => {
             if sandbox {
                 let cwd = std::env::current_dir()?;
@@ -696,11 +731,23 @@ async fn main() -> anyhow::Result<()> {
             handle_blueprint(action)?;
         }
         Commands::Federate { relay } => {
-            let relay_info = relay.unwrap_or_else(|| "no-relay".to_string());
+            use sentinel_core::federation::network::NetworkManager;
+            println!("🌐 SENTINEL P2P Federation — avvio nodo Kademlia/gossipsub...");
+            let relay_addr = relay.and_then(|r| {
+                r.parse().ok().or_else(|| {
+                    eprintln!("⚠️  Indirizzo relay non valido, ignorato.");
+                    None
+                })
+            });
+            let mut nm = NetworkManager::new()
+                .map_err(|e| anyhow::anyhow!("P2P init failed: {}", e))?;
             println!(
-                "Federation bootstrap (best-effort) con relay: {}",
-                relay_info
+                "🔑 PeerId: {}  NodeId: {}",
+                nm.peer_id, nm.identity.node_id
             );
+            nm.run_node(relay_addr)
+                .await
+                .map_err(|e| anyhow::anyhow!("P2P node error: {}", e))?;
         }
     }
     Ok(())
