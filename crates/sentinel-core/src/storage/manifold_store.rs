@@ -445,7 +445,7 @@ mod tests {
     #[test]
     fn test_manifold_store_versions() {
         let store = temp_store();
-        let intent = Intent::new("Versioned project", vec![]);
+        let intent = Intent::new("Versioned project", Vec::<String>::new());
         let manifold = GoalManifold::new(intent);
 
         store.save_manifold(&manifold, None).unwrap();
