@@ -3413,41 +3413,60 @@ Ti propongo un piano concreto in 3 step: \
         }
 
         "agent_communication_history" => {
-            let limit = arguments.and_then(|a| a.get("limit")).and_then(|v| v.as_u64()).unwrap_or(50) as usize;
-            
-            // Mock message history
-            let messages: Vec<serde_json::Value> = vec![
-                serde_json::json!({
-                    "id": "msg-001",
-                    "from": "AuthWorker",
-                    "to": "ApiWorker",
-                    "type": "help_request",
-                    "content": "How should I expose auth middleware?",
-                    "timestamp": "2026-02-14T10:30:00Z"
-                }),
-                serde_json::json!({
-                    "id": "msg-002",
-                    "from": "ApiWorker",
-                    "to": null,
-                    "type": "pattern_share",
-                    "content": "Axum Auth Middleware Pattern",
-                    "timestamp": "2026-02-14T10:31:00Z"
-                }),
-                serde_json::json!({
-                    "id": "msg-003",
-                    "from": "AuthWorker",
-                    "to": "ApiWorker",
-                    "type": "handoff",
-                    "content": "Auth module complete. Context transferred.",
-                    "timestamp": "2026-02-14T10:45:00Z"
-                })
-            ];
+            // Legge la history reale dal ManifoldStore SQLite WAL
+            let limit = arguments
+                .and_then(|a| a.get("limit"))
+                .and_then(|v| v.as_u64())
+                .map(|v| v.clamp(1, 200) as usize)
+                .unwrap_or(50);
+            let agent_id = arguments
+                .and_then(|a| a.get("agent_id"))
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string());
 
-            let result = serde_json::json!({
-                "success": true,
-                "count": messages.len().min(limit),
-                "messages": messages.into_iter().take(limit).collect::<Vec<_>>()
-            });
+            let root = workspace_root();
+            let db_path = root.join(".sentinel").join("sentinel.db");
+
+            let result = match sentinel_core::storage::ManifoldStore::open(&db_path) {
+                Ok(store) => {
+                    match store.get_agent_messages(agent_id.as_deref(), limit) {
+                        Ok(messages) => {
+                            let msgs_json: Vec<serde_json::Value> = messages.iter().map(|m| {
+                                let payload: serde_json::Value = serde_json::from_str(&m.payload_json)
+                                    .unwrap_or(serde_json::json!({}));
+                                serde_json::json!({
+                                    "id": m.id,
+                                    "from": m.from_agent,
+                                    "to": m.to_agent,
+                                    "type": m.message_type,
+                                    "payload": payload,
+                                    "timestamp_ms": m.timestamp_ms,
+                                    "session_id": m.session_id
+                                })
+                            }).collect();
+                            serde_json::json!({
+                                "success": true,
+                                "count": msgs_json.len(),
+                                "source": "sqlite_wal",
+                                "db_path": db_path.display().to_string(),
+                                "messages": msgs_json
+                            })
+                        }
+                        Err(e) => serde_json::json!({ "success": false, "error": e.to_string() }),
+                    }
+                }
+                Err(_) => {
+                    // DB non ancora inizializzato: restituisce lista vuota (non mock)
+                    serde_json::json!({
+                        "success": true,
+                        "count": 0,
+                        "source": "sqlite_wal",
+                        "db_path": db_path.display().to_string(),
+                        "messages": [],
+                        "note": "Nessun messaggio registrato. Usa agent_communication_send per iniziare."
+                    })
+                }
+            };
 
             Some(serde_json::json!({ "content": [{ "type": "text", "text": result.to_string() }] }))
         }

@@ -93,6 +93,7 @@ pub mod memory;
 pub mod outcome_compiler;
 pub mod quality;
 pub mod security;
+pub mod storage;
 pub mod telemetry;
 pub mod types;
 
