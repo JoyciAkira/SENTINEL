@@ -1,5 +1,6 @@
 pub mod anthropic;
 pub mod gemini;
+pub mod gemini_cli;
 pub mod openai_compatible;
 pub mod router;
 pub mod unified;

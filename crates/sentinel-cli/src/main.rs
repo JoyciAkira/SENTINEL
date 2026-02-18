@@ -220,8 +220,11 @@ async fn main() -> anyhow::Result<()> {
             // Tentativo di usare LLM per una scomposizione più intelligente dei goal
             let gemini_key = std::env::var("GEMINI_API_KEY").ok();
             let openrouter_key = std::env::var("OPENROUTER_API_KEY").ok();
+            let gemini_cli_available =
+                std::env::var("GEMINI_CLI").as_deref() == Ok("1")
+                || sentinel_agent_native::providers::gemini_cli::is_gemini_cli_available();
 
-            if gemini_key.or(openrouter_key).is_some() {
+            if gemini_key.is_some() || openrouter_key.is_some() || gemini_cli_available {
                 use sentinel_agent_native::llm_integration::{LLMClient, LLMContext};
                 use sentinel_agent_native::openrouter::{OpenRouterClient, OpenRouterModel};
                 use sentinel_agent_native::providers::gemini::GeminiClient;
@@ -240,7 +243,15 @@ async fn main() -> anyhow::Result<()> {
                     previous_approaches: vec![],
                 };
 
-                let client: Box<dyn LLMClient> = if std::env::var("GEMINI_API_KEY").is_ok() {
+                // Selezione provider: priorità GeminiCLI (OAuth) > Gemini API key > OpenRouter
+                let use_gemini_cli = std::env::var("GEMINI_CLI").as_deref() == Ok("1")
+                    || (std::env::var("GEMINI_API_KEY").is_err()
+                        && sentinel_agent_native::providers::gemini_cli::is_gemini_cli_available());
+
+                let client: Box<dyn LLMClient> = if use_gemini_cli {
+                    println!("🤖 Usando Gemini CLI (Google AI Pro OAuth — no API key)");
+                    Box::new(sentinel_agent_native::providers::gemini_cli::GeminiCliClient::new())
+                } else if std::env::var("GEMINI_API_KEY").is_ok() {
                     let model = std::env::var("GEMINI_MODEL")
                         .unwrap_or_else(|_| "gemini-1.5-pro".to_string());
                     Box::new(GeminiClient::new(
@@ -262,10 +273,15 @@ async fn main() -> anyhow::Result<()> {
                 };
 
                 if let Ok(suggestion) = client.generate_code(&prompt, &context).await {
-                    let clean_json = suggestion
-                        .content
-                        .trim_matches(|c| c == '`' || c == ' ' || c == '\n')
-                        .trim_start_matches("json");
+                    // Estratto del JSON raw dall'eventuale risposta in markdown
+                    let raw = &suggestion.content;
+                    let clean_json = if let (Some(s), Some(e)) = (raw.find('['), raw.rfind(']')) {
+                        &raw[s..=e]
+                    } else {
+                        raw.trim_matches(|c: char| c == '`' || c.is_whitespace())
+                            .trim_start_matches("json")
+                            .trim()
+                    };
                     if let Ok(goal_descriptions) = serde_json::from_str::<Vec<String>>(clean_json) {
                         for desc in goal_descriptions {
                             if let Ok(g) = sentinel_core::goal_manifold::goal::Goal::builder()
