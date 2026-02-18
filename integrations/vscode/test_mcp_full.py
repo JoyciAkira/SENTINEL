@@ -298,8 +298,10 @@ else:
 log_test("orchestrate_task (multi-agent orchestration)")
 result, err = call_tool("orchestrate_task", {
     "task": "Implement JWT authentication middleware",
-    "complexity": "medium"
-})
+    "modes": ["sequential"],
+    "max_parallel": 1,
+    "subtask_count": 3
+}, timeout=60)
 text = extract_text(result)
 if result:
     log_pass(f"orchestrate_task responded: {text[:120]}")
@@ -311,7 +313,7 @@ if LLM_ENABLED:
     log_test("chat (LLM via proxy/provider — testo risposta semantica)")
     result, err = call_tool("chat", {
         "message": "What is SENTINEL? Answer in one sentence."
-    }, timeout=90)
+    }, timeout=120)
     text = extract_text(result)
     if result and not result.get("isError") and len(text) > 20:
         log_pass(f"chat LLM OK: {text[:200]}")
@@ -320,8 +322,10 @@ if LLM_ENABLED:
 
     log_test("suggest_goals (LLM goal suggestion)")
     result, err = call_tool("suggest_goals", {
-        "intent": "Build a production-ready REST API in Rust"
-    }, timeout=90)
+        "description": "Build a production-ready REST API in Rust",
+        "languages": ["rust"],
+        "frameworks": ["axum"]
+    }, timeout=120)
     text = extract_text(result)
     if result and not result.get("isError"):
         log_pass(f"suggest_goals OK: {text[:200]}")
