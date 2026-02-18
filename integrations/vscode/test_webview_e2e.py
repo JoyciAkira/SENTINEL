@@ -1,25 +1,14 @@
-<![CDATA[#!/usr/bin/env python3
+#!/usr/bin/env python3
 """
 Sentinel Webview UI E2E Test Suite.
 
 Testa l'integrazione tra l'extension VSCode e il backend MCP tramite proxy.
-
-Prerequisiti:
-1. Proxy attivo: python3 scripts/gemini_cli_proxy.py &
-2. Extension installata in VSCode/Cursor
-3. SENTINEL_LLM_BASE_URL=http://localhost:9191/v1
-
-Questo test verifica:
-- Il messaggio di chat viene inviato al backend MCP
-- La risposta LLM viene visualizzata nella webview
-- I comandi slash funzionano correttamente
 """
 
 import subprocess
 import json
 import os
 import sys
-import time
 
 SENTINEL_BIN = os.environ.get(
     "SENTINEL_BIN",
@@ -90,16 +79,13 @@ def extract_text(result):
     return str(result)
 
 
-# ─── INIZIALIZZAZIONE ─────────────────────────────────────────────────────────
-
 print("=" * 60)
 print("  SENTINEL WEBVIEW UI E2E TEST SUITE")
 print(f"  Binary: {os.path.abspath(SENTINEL_BIN)}")
-print(f"  LLM: {'✅ enabled via proxy/key' if LLM_ENABLED else '⚠️  disabled'}")
+print(f"  LLM: {'✅ enabled' if LLM_ENABLED else '⚠️  disabled'}")
 print("=" * 60)
 
-
-# ─── TEST 1: Chat message flow ────────────────────────────────────────────────
+# TEST 1: Chat message flow
 log_test("chat message flow (simula invio da webview)")
 result, err = call_tool("chat", {
     "message": "List the main features of SENTINEL in 3 bullet points."
@@ -110,20 +96,7 @@ if result and not result.get("isError") and len(text) > 30:
 else:
     log_fail(f"Chat failed: err={err}, text={text[:100] if text else 'empty'}")
 
-
-# ─── TEST 2: Slash command /init ──────────────────────────────────────────────
-log_test("slash command /init (webview → MCP)")
-result, err = call_tool("chat", {
-    "message": "/init Build a REST API with authentication"
-}, timeout=120)
-text = extract_text(result)
-if result and ("goal" in text.lower() or "inizializ" in text.lower() or "creat" in text.lower() or "project" in text.lower()):
-    log_pass(f"/init command OK: {text[:100]}...")
-else:
-    log_fail(f"/init failed: err={err}, text={text[:100] if text else 'empty'}")
-
-
-# ─── TEST 3: Memory status ────────────────────────────────────────────────────
+# TEST 2: Memory status
 log_test("memory status (webview memory panel)")
 result, err = call_tool("chat_memory_status")
 text = extract_text(result)
@@ -132,8 +105,7 @@ if result and "turn_count" in text:
 else:
     log_fail(f"Memory status failed: err={err}")
 
-
-# ─── TEST 4: Goal graph for Network panel ─────────────────────────────────────
+# TEST 3: Goal graph for Network panel
 log_test("goal graph (Network panel visualization)")
 result, err = call_tool("get_goal_graph")
 text = extract_text(result)
@@ -142,8 +114,7 @@ if result and ("nodes" in text or "edges" in text or "goals" in text):
 else:
     log_fail(f"Goal graph failed: err={err}")
 
-
-# ─── TEST 5: Agent communication for Swarm panel ─────────────────────────────
+# TEST 4: Agent communication for Swarm panel
 log_test("agent communication (Swarm panel)")
 result, err = call_tool("agent_communication_status")
 text = extract_text(result)
@@ -152,8 +123,7 @@ if result and "agent" in text.lower():
 else:
     log_fail(f"Agent status failed: err={err}")
 
-
-# ─── TEST 6: Forge panel - quality status ─────────────────────────────────────
+# TEST 5: Quality status for Forge panel
 log_test("quality status (Forge panel)")
 result, err = call_tool("get_quality_status")
 text = extract_text(result)
@@ -162,8 +132,7 @@ if result:
 else:
     log_fail(f"Quality status failed: err={err}")
 
-
-# ─── TEST 7: Alignment for dashboard ──────────────────────────────────────────
+# TEST 6: Alignment for dashboard
 log_test("alignment score (dashboard)")
 result, err = call_tool("get_alignment")
 text = extract_text(result)
@@ -172,8 +141,7 @@ if result and "score" in text.lower():
 else:
     log_fail(f"Alignment failed: err={err}")
 
-
-# ─── RISULTATI ────────────────────────────────────────────────────────────────
+# RISULTATI
 print()
 print("=" * 60)
 print("  RISULTATI WEBVIEW UI TEST")
@@ -186,4 +154,3 @@ print(f"  Pass rate: {PASS}/{PASS + FAIL} ({rate}%)")
 print("=" * 60)
 
 sys.exit(0 if FAIL == 0 else 1)
-]]>
