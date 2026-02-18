@@ -228,12 +228,13 @@ impl ManifoldStore {
         }
     }
 
-    /// Lista le ultime N versioni del manifold (metadati, senza payload)
+    /// Lista le ultime N versioni del manifold (metadati, senza payload).
+    /// Ordina per `version DESC` (AUTOINCREMENT stabile, non dipende dal clock).
     pub fn list_manifold_versions(&self, limit: usize) -> Result<Vec<ManifoldSnapshot>> {
         let mut stmt = self.conn.prepare(
             "SELECT version, integrity_hash, '' as payload_json, saved_at_ms, agent_id
              FROM manifold_snapshots
-             ORDER BY saved_at_ms DESC LIMIT ?1",
+             ORDER BY version DESC LIMIT ?1",
         )?;
 
         let rows = stmt
@@ -448,14 +449,18 @@ mod tests {
         let intent = Intent::new("Versioned project", Vec::<String>::new());
         let manifold = GoalManifold::new(intent);
 
-        store.save_manifold(&manifold, None).unwrap();
-        store.save_manifold(&manifold, None).unwrap();
-        store.save_manifold(&manifold, None).unwrap();
+        let v1 = store.save_manifold(&manifold, None).unwrap();
+        let v2 = store.save_manifold(&manifold, None).unwrap();
+        let v3 = store.save_manifold(&manifold, None).unwrap();
+
+        // Le versioni devono essere strettamente crescenti (AUTOINCREMENT)
+        assert!(v1 < v2 && v2 < v3, "versions must be strictly increasing: {} < {} < {}", v1, v2, v3);
 
         let versions = store.list_manifold_versions(10).unwrap();
         assert_eq!(versions.len(), 3);
-        // Ordine decrescente per saved_at_ms
-        assert!(versions[0].version >= versions[1].version);
+        // Ordine decrescente per version (AUTOINCREMENT garantisce unicità)
+        let vs: Vec<i64> = versions.iter().map(|s| s.version).collect();
+        assert!(vs[0] > vs[1] && vs[1] > vs[2], "list should be descending: {:?}", vs);
     }
 
     #[test]
