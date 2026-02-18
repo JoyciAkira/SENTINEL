@@ -105,6 +105,22 @@ enum Commands {
         dry_run: bool,
     },
 
+    /// Esegui il loop end-to-end: Architect → Worker → Verify → Repair
+    /// Non si ferma finché il goal non è raggiunto sul filesystem reale.
+    Agent {
+        /// Intent in linguaggio naturale (es. "Crea una REST API in Rust con auth JWT")
+        intent: String,
+        /// Directory di output dove generare il codice (default: ./sentinel-output)
+        #[arg(short, long, default_value = "sentinel-output")]
+        output: PathBuf,
+        /// Numero massimo di tentativi di repair per modulo (default: 3)
+        #[arg(long, default_value = "3")]
+        max_retries: usize,
+        /// Modello Gemini da usare (default: CLI default)
+        #[arg(short = 'm', long)]
+        model: Option<String>,
+    },
+
     /// Avvia la sincronizzazione con la rete Sentinel globale (Layer 9)
     Federate {
         /// Indirizzo del relay o del peer (opzionale)
@@ -583,6 +599,74 @@ async fn main() -> anyhow::Result<()> {
                 std::process::exit(1);
             }
         }
+        Commands::Agent {
+            intent,
+            output,
+            max_retries,
+            model,
+        } => {
+            use sentinel_agent_native::{E2EConfig, EndToEndAgent};
+
+            // Verifica che Gemini CLI sia disponibile
+            if !sentinel_agent_native::providers::gemini_cli::is_gemini_cli_available() {
+                eprintln!("❌ Gemini CLI non trovato nel PATH.");
+                eprintln!("   Installa con: npm install -g @google/gemini-cli");
+                eprintln!("   Poi autenticati con: gemini auth");
+                std::process::exit(1);
+            }
+
+            let workspace = if output.is_absolute() {
+                output.clone()
+            } else {
+                std::env::current_dir()?.join(&output)
+            };
+
+            let config = E2EConfig {
+                workspace,
+                max_repair_attempts: max_retries,
+                verbose: true,
+                gemini_model: model,
+            };
+
+            let agent = EndToEndAgent::new(config);
+            let report = agent.run(&intent).await?;
+
+            println!();
+            if report.success {
+                println!("╔══════════════════════════════════════════════════════════╗");
+                println!("║  ✅  GOAL RAGGIUNTO — SENTINEL END-TO-END COMPLETATO    ║");
+                println!("╚══════════════════════════════════════════════════════════╝");
+            } else {
+                println!("╔══════════════════════════════════════════════════════════╗");
+                println!("║  ⚠️   GOAL PARZIALMENTE RAGGIUNTO                       ║");
+                println!("╚══════════════════════════════════════════════════════════╝");
+            }
+            println!();
+            println!("📊 REPORT FINALE:");
+            println!("   Intent: {}", report.intent);
+            println!("   Moduli totali: {}", report.total_modules);
+            println!("   Moduli passati: {}", report.passed_modules);
+            println!("   Moduli falliti: {}", report.failed_modules);
+            println!("   Durata: {:.1}s", report.duration_secs);
+            println!("   Output: {}", report.workspace.display());
+            println!();
+            println!("📁 MODULI DETTAGLIO:");
+            for detail in &report.module_details {
+                let status = if detail.passed { "✅" } else { "❌" };
+                println!("   {} {} (tentativi: {})", status, detail.title, detail.attempts);
+                for (pred, passed) in &detail.predicate_results {
+                    println!("      {} {}", if *passed { "✓" } else { "✗" }, pred);
+                }
+                for f in &detail.generated_files {
+                    println!("      📄 {}", f.display());
+                }
+            }
+
+            if !report.success {
+                std::process::exit(1);
+            }
+        }
+
         Commands::Verify { sandbox } => {
             if sandbox {
                 let cwd = std::env::current_dir()?;

@@ -20,7 +20,7 @@ use crate::llm_integration::{
 };
 use sentinel_core::Uuid;
 
-const CLI_TIMEOUT_SECS: u64 = 60;
+const CLI_TIMEOUT_SECS: u64 = 180;
 const GEMINI_BIN: &str = "gemini";
 
 /// Risposta JSON del Gemini CLI v0.28+
@@ -105,7 +105,8 @@ impl GeminiCliClient {
         let start = Instant::now();
 
         let mut cmd = Command::new(&self.binary);
-        cmd.arg("-p").arg(prompt).arg("-o").arg("json");
+        // Usa --output-format (flag corretto per v0.28+), non -o
+        cmd.arg("-p").arg(prompt).arg("--output-format").arg("json");
 
         if let Some(model) = &self.model {
             cmd.arg("-m").arg(model);
@@ -124,10 +125,12 @@ impl GeminiCliClient {
             bail!("gemini CLI exited with error: {}", stderr.trim());
         }
 
-        // Prova a parsare il JSON; se fallisce, usa stdout come testo grezzo
-        let response_text = if let Ok(parsed) =
-            serde_json::from_slice::<GeminiCliResponse>(&output.stdout)
-        {
+        // L'output contiene righe di log prima del JSON (es. "Loaded cached credentials.")
+        // Estrae solo il blocco JSON cercando la prima '{' e l'ultima '}'
+        let raw_stdout = String::from_utf8_lossy(&output.stdout);
+        let json_str = extract_json_object(&raw_stdout);
+
+        if let Ok(parsed) = serde_json::from_str::<GeminiCliResponse>(&json_str) {
             // Estrae il conteggio token dagli stats
             let tokens = parsed
                 .stats
@@ -147,12 +150,23 @@ impl GeminiCliClient {
             );
 
             return Ok((parsed.response, tokens));
-        } else {
-            // Fallback: usa stdout come testo plain
-            String::from_utf8_lossy(&output.stdout).trim().to_string()
-        };
+        }
 
-        Ok((response_text, 0))
+        // Fallback: se il JSON non è parsabile, usa stdout come testo plain
+        // (rimuovendo le righe di log che precedono il contenuto utile)
+        let plain = raw_stdout
+            .lines()
+            .filter(|l| !l.starts_with("Loaded ") && !l.starts_with("Loading ") && !l.starts_with("Server ") && !l.starts_with("Error during") && !l.starts_with("Hook registry"))
+            .collect::<Vec<_>>()
+            .join("\n")
+            .trim()
+            .to_string();
+
+        if plain.is_empty() {
+            bail!("gemini CLI returned empty response. stdout: {}", raw_stdout.trim());
+        }
+
+        Ok((plain, 0))
     }
 
     fn make_suggestion(
@@ -301,6 +315,18 @@ fn build_code_prompt(prompt: &str, context: &LLMContext) -> String {
 
     parts.push(format!("Task: {}", prompt));
     parts.join("\n\n")
+}
+
+/// Estrae il primo oggetto JSON `{...}` da una stringa che può contenere
+/// righe di log prima del JSON (output tipico di Gemini CLI v0.28+).
+fn extract_json_object(raw: &str) -> String {
+    // Cerca la prima '{' e l'ultima '}' per isolare il blocco JSON
+    if let (Some(start), Some(end)) = (raw.find('{'), raw.rfind('}')) {
+        if start < end {
+            return raw[start..=end].to_string();
+        }
+    }
+    raw.trim().to_string()
 }
 
 /// Controlla se il Gemini CLI è disponibile nel PATH (sincrono, per startup check).

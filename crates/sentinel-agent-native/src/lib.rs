@@ -40,6 +40,7 @@ pub mod codegen;
 pub mod consensus;
 pub mod context;
 pub mod context_provider;
+pub mod end_to_end_agent;
 pub mod gateway;
 pub mod llm_integration;
 pub mod openrouter;
@@ -48,6 +49,8 @@ pub mod planning;
 pub mod providers;
 pub mod reasoning;
 pub mod swarm;
+
+pub use end_to_end_agent::{E2EConfig, E2EReport, EndToEndAgent, ModuleDetail};
 
 use anyhow::Result;
 use sentinel_core::{
