@@ -3,7 +3,9 @@ resolver = "2"
 members = [
     "crates/sentinel-core",
     "crates/sentinel-cli",
-    "crates/sentinel-agent-native", "crates/sentinel-sandbox",
+    "crates/sentinel-agent-native",
+    "crates/sentinel-sandbox",
+    "crates/sentinel-gateway",
 ]
 
 [workspace.package]

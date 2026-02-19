@@ -1,0 +1,47 @@
+[package]
+name = "sentinel-gateway"
+version = "0.1.0"
+edition = "2021"
+description = "Unified WebSocket Gateway for SENTINEL multi-channel communication"
+
+[dependencies]
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+futures = "0.3"
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# WebSocket
+tokio-tungstenite = { version = "0.21", features = ["native-tls"] }
+
+# HTTP for WebSocket upgrade
+axum = { version = "0.7", features = ["ws"] }
+tower = "0.4"
+tower-http = { version = "0.5", features = ["cors", "trace"] }
+
+# Tracing
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Internal crates
+sentinel-core = { path = "../sentinel-core" }
+
+# Utilities
+uuid = { version = "1", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+thiserror = "1"
+anyhow = "1"
+async-trait = "0.1"
+parking_lot = "0.12"
+url = "2.5"
+rand = "0.8"
+
+[dev-dependencies]
+tokio-test = "0.4"
+
+# Benchmarks will be added later
+# [[bench]]
+# name = "gateway_benchmark"
+# harness = false
