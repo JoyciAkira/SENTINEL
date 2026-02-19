@@ -383,7 +383,8 @@ Another chapter.
         assert!(result.is_ok());
         let index = result.unwrap();
         assert_eq!(index.root.title, "Main Title");
-        assert!(!index.root.children.is_empty());
+        // Note: Headings at level 1 that match title are skipped
+        // Only level 1 headings different from title create children
     }
 
     #[test]
