@@ -1,73 +1,54 @@
+/**
+ * MessageList - Clean message list with auto-scroll
+ * 
+ * Simplified: no more mode props, just messages
+ */
+
 import React, { useRef, useEffect } from "react";
 import { useStore } from "../../state/store";
 import MessageBubble from "./MessageBubble";
-import { Bot, ChevronRight } from "lucide-react";
+import { Bot, Sparkles } from "lucide-react";
 
-export default function MessageList({
-  compact = false,
-  clineMode = false,
-  simpleMode = false,
-  showInternals = false,
-  askWhy = false,
-}: {
-  compact?: boolean;
-  clineMode?: boolean;
-  simpleMode?: boolean;
-  showInternals?: boolean;
-  askWhy?: boolean;
-}) {
+export default function MessageList() {
   const messages = useStore((s) => s.messages);
   const bottomRef = useRef<HTMLDivElement>(null);
 
+  // Auto-scroll to bottom on new messages
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
-
-  if (messages.length === 0) {
-    if (clineMode) {
-      return (
-        <div className="sentinel-empty-hero">
-          <div className="sentinel-empty-hero__icon">
-            <Bot className="size-8" />
-          </div>
-          <h3>What can I do for you?</h3>
-          <div className="sentinel-empty-hero__recent">
-            <ChevronRight className="size-3" />
-            <span>Recent tasks</span>
-          </div>
-        </div>
-      );
+    if (bottomRef.current) {
+      bottomRef.current.scrollIntoView({ behavior: "smooth" });
     }
+  }, [messages.length, messages[messages.length - 1]?.content]);
+
+  // Empty state
+  if (messages.length === 0) {
     return (
-      <div className="h-full flex flex-col items-center justify-center p-8 text-center space-y-4 opacity-60">
-        <div className="size-12 rounded-2xl bg-primary/10 flex items-center justify-center">
-           <svg className="size-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
-           </svg>
+      <div className="h-full flex flex-col items-center justify-center p-8 text-center">
+        <div className="size-16 rounded-2xl bg-gradient-to-br from-emerald-500/10 to-teal-500/10 border border-emerald-500/10 flex items-center justify-center mb-4">
+          <Sparkles className="size-8 text-emerald-500/60" />
         </div>
-        <div className="space-y-1">
-          <p className="text-sm font-semibold text-foreground">No messages yet</p>
-          <p className="text-xs text-muted-foreground">Ask Sentinel to validate actions, check alignment, or plan your next steps.</p>
-        </div>
+        <h3 className="text-lg font-semibold text-foreground mb-2">
+          What would you like to build?
+        </h3>
+        <p className="text-sm text-muted-foreground max-w-xs">
+          Describe your project, ask questions, or run commands like{" "}
+          <code className="text-xs bg-muted/50 px-1.5 py-0.5 rounded">/init</code>
+        </p>
       </div>
     );
   }
 
   return (
-    <div className="h-full w-full overflow-auto sentinel-message-scroll">
-      <div className={compact ? "flex flex-col gap-3 p-3" : "flex flex-col gap-5 p-4"}>
+    <div className="h-full w-full overflow-y-auto overflow-x-hidden">
+      <div className="flex flex-col py-4 px-4">
         {messages.map((msg, index) => (
           <MessageBubble
             key={msg.id}
             message={msg}
             index={index}
-            compact={compact}
-            simpleMode={simpleMode}
-            showInternals={showInternals}
-            askWhy={askWhy}
           />
         ))}
-        <div ref={bottomRef} className="h-4" />
+        <div ref={bottomRef} className="h-4 flex-shrink-0" />
       </div>
     </div>
   );

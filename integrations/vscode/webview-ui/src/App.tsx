@@ -282,7 +282,7 @@ export default function App() {
                     hasConversation={messages.length > 0}
                   />
                 )}
-                <MessageList compact={false} clineMode={true} simpleMode={true} showInternals={false} askWhy={false} />
+                <MessageList />
               </div>
               <div className="chat-input-area">
                 <ChatInput compact={false} clineMode={true} />
