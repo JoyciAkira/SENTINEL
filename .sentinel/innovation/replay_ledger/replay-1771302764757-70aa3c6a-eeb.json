@@ -1,0 +1,19 @@
+{
+  "constitutional_spec_hash": "eeea0dfb72df37f76963fa90ec64193131029282941e70e880306014d14377ed",
+  "counterfactual_hash": "af191d5223f376b1f69c8dd1d6aa101052f88a56c4e363b9e269abb8aac87c3a",
+  "evidence_hash": "cc644d5b328463be93c2e6111b4f218739437d68fc86426c3e3818aae3630796",
+  "memory_hit_ids": [
+    "5bf94ee3-499a-40e8-aaeb-9c9faba9ea23",
+    "de978d8e-4694-4171-9a60-b7eea73acf93",
+    "cbbea885-7a7d-4d94-b39f-045e33ecb05a",
+    "0da1ef75-b46b-43af-be7f-dd5a3832e126",
+    "427fd361-9f1c-45ce-a382-dc3b8eacec28"
+  ],
+  "policy_simulation_hash": "8b436a5883fe2f3deafd52a8923a7b6985e0d2bea808a60cd582ce3f7e4e8ae1",
+  "response_hash": "10674dde26c5ed292f1dd0d5c6f0d070ae689c18a03d9d61465f3bdc41bc18fb",
+  "strict_goal_execution": true,
+  "timestamp": 1771302764757,
+  "turn_id": "70aa3c6a-eebf-4c80-b614-816bc54565ae",
+  "user_message": "Build this application using the \"Ops Dashboard\" blueprint.\nPrimary goal: Turn this spreadsheet workflow into a web app with forms, approval steps, and an admin dashboard.\nAudience: developer\n\nRequired modules:\n- KPI monitoring board\n- Incident workflow\n- Approval queue\n- Reliability and policy center\n\nNon-negotiable guardrails:\n- Read/write separation\n- Policy checks before action\n- SLO-based rollback triggers\n\nOutput policy:\n- outcome-first summary\n- bounded and deterministic implementation plan\n- explicit approvals before sensitive writes\n- minimal, reversible file changes\n",
+  "version": 1
+}

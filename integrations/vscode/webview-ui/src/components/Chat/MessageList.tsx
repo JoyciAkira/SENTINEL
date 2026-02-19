@@ -1,7 +1,6 @@
 import React, { useRef, useEffect } from "react";
 import { useStore } from "../../state/store";
 import MessageBubble from "./MessageBubble";
-import { ScrollArea } from "../ui/scroll-area";
 import { Bot, ChevronRight } from "lucide-react";
 
 export default function MessageList({
@@ -55,8 +54,8 @@ export default function MessageList({
   }
 
   return (
-    <ScrollArea className="h-full w-full sentinel-message-scroll">
-        <div className={compact ? "flex flex-col gap-3 p-3" : "flex flex-col gap-5 p-4"}>
+    <div className="h-full w-full overflow-auto sentinel-message-scroll">
+      <div className={compact ? "flex flex-col gap-3 p-3" : "flex flex-col gap-5 p-4"}>
         {messages.map((msg, index) => (
           <MessageBubble
             key={msg.id}
@@ -70,6 +69,6 @@ export default function MessageList({
         ))}
         <div ref={bottomRef} className="h-4" />
       </div>
-    </ScrollArea>
+    </div>
   );
 }

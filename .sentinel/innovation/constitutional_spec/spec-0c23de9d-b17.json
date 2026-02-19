@@ -1,0 +1,20 @@
+{
+  "constraints": [],
+  "invariants": [
+    "deterministic_output",
+    "explicit_paths",
+    "fail_safe_behavior",
+    "contract_preserving"
+  ],
+  "objective": "crea una todo list app",
+  "scope": {
+    "exclude": [],
+    "include": []
+  },
+  "success_signals": [
+    "safe_write_plan_generated_or_skipped",
+    "verification_commands_present",
+    "explainability_evidence_present"
+  ],
+  "version": 1
+}

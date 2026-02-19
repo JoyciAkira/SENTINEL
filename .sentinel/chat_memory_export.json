@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "turns": [
+    {
+      "id": "bb3105b9-c367-4947-8060-d41d3045364e",
+      "timestamp": 1771389562494,
+      "user": "What is SENTINEL?",
+      "assistant": "SENTINEL è un **Sistema Operativo Cognitivo (Cognitive OS)** distribuito a 10 livelli, progettato per garantire l'allineamento deterministico degli obiettivi negli agenti di codifica AI. Il suo scopo primario è eliminare il *cognitive drift* (perdita di focus sull'obiettivo) e il *context loss* attraverso un'architettura a 10 layer che integra verifica crittografica (Blake3/Ed25519) e validazione continua tramite Tree-Sitter.\n\n### Cosa fare adesso\n1.  **Inizializzazione**: Eseguire `sentinel init \"descrizione obiettivo\"` per definire la \"North Star\" (verità immutabile) nel *Goal Manifold* (Layer 1).\n2.  **Certificazione**: Lanciare `scripts/validate_sentinel.sh` per assicurarsi che l'ambiente locale sia allineato con i parametri di sicurezza e qualità.\n3.  **Federazione**: Attivare `sentinel federate` per connettersi alla rete P2P e ricevere broadcast di minacce in tempo reale (Zero-Trust).\n\n### Come farlo in sicurezza\n*   **Quality Gates**: Non bypassare mai le soglie minime (es. Allineamento Obiettivi > 85%, Copertura Test > 80%).\n*   **Verifica Sintattica**: Sfruttare l'integrazione Tree-Sitter per garantire codice corretto al 100%, eliminando le allucinazioni tipiche degli LLM.\n*   **Quorum Distribuito**: In operazioni critiche, assicurarsi che il punteggio di autorità (Human Authority = 1.0) sia sempre il fattore decisivo.\n\n### Rischi da monitorare\n*   **Affidabilità**: Attualmente 4 test su 150 falliscono (97.3% success rate); investigare le regressioni nei moduli core.\n*   **Governance**: Monitorare i \"Zero-Trust Threat Broadcast\" per rilevare comportamenti anomali di nodi federati o dipendenze corrotte.\n*   **Performance**: Rispettare il budget di memoria (1.5 MB per 10k turni) e la latenza di compattazione (45ms p95).\n\n**Razionale sintetico:**\nSentinel non è un semplice wrapper per LLM, ma un controllore deterministico (Controller) che usa l'LLM come motore di creatività supervisionata. La sua struttura a 10 livelli trasforma l'incertezza dei modelli probabilistici in un processo di ingegneria del software verificabile e sicuro su scala distribuita.",
+      "intent_summary": "What is SENTINEL?",
+      "evidence": [
+        "memory_hits=0",
+        "risk_flag=unknown",
+        "governance_pending=none"
+      ]
+    }
+  ]
+}

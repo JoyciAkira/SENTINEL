@@ -1,0 +1,19 @@
+{
+  "constitutional_spec_hash": "ff7c229454843e46bd28e8e3c3ae1ebca6e99042bf2fcd588f0b536f4f63ed08",
+  "counterfactual_hash": "af191d5223f376b1f69c8dd1d6aa101052f88a56c4e363b9e269abb8aac87c3a",
+  "evidence_hash": "cc644d5b328463be93c2e6111b4f218739437d68fc86426c3e3818aae3630796",
+  "memory_hit_ids": [
+    "d0a53b1b-a7f5-43d7-b45d-04d129f05aab",
+    "1eb1a471-0078-4644-a366-5a71f48b030b",
+    "7944bee6-5adf-489e-9ca6-cc5fb511b8ba",
+    "44bfcf6f-c8d6-4fab-87dd-eaf54f9ef74c",
+    "105ac69a-d900-441c-8722-ea53ecb04b29"
+  ],
+  "policy_simulation_hash": "8b436a5883fe2f3deafd52a8923a7b6985e0d2bea808a60cd582ce3f7e4e8ae1",
+  "response_hash": "10674dde26c5ed292f1dd0d5c6f0d070ae689c18a03d9d61465f3bdc41bc18fb",
+  "strict_goal_execution": false,
+  "timestamp": 1771457602248,
+  "turn_id": "25cc440a-d4d6-48aa-a571-a22feadee916",
+  "user_message": "What are the active goals?",
+  "version": 1
+}

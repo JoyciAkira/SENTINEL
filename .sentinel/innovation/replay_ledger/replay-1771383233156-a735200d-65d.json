@@ -1,0 +1,13 @@
+{
+  "constitutional_spec_hash": "9922912c95e8d8398324ee00a4e18ce93531d04efcdc98224ec4df7291dc3bd8",
+  "counterfactual_hash": "af191d5223f376b1f69c8dd1d6aa101052f88a56c4e363b9e269abb8aac87c3a",
+  "evidence_hash": "006fcc2bb388a35ae9d62756261bde0c76e88ba42a89915bd8938551f6cea29c",
+  "memory_hit_ids": [],
+  "policy_simulation_hash": "ef82757ba87119842d98d97cf1a37091ccbd5d58c0d0716d573291d27b0d40b7",
+  "response_hash": "eca3ba9dfce17bb0376491fd214c6b4c919d34047c8964e326812bd4d575b5a2",
+  "strict_goal_execution": false,
+  "timestamp": 1771383233156,
+  "turn_id": "a735200d-65de-47b7-a231-67b9b603c338",
+  "user_message": "What is SENTINEL? Answer in one sentence.",
+  "version": 1
+}

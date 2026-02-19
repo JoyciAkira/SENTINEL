@@ -8,6 +8,7 @@ pub mod atomic;
 pub mod dag;
 pub mod goal;
 pub mod predicate;
+pub mod predicate_sandbox;
 pub mod slicer;
 
 pub use self::InvariantSeverity as GoalInvariantSeverity;

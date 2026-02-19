@@ -1,0 +1,19 @@
+{
+  "constitutional_spec_hash": "ebd4508b39f2a11da4a34a45c3577b8f30920efdfa9490f8a00d9871badf7072",
+  "counterfactual_hash": "af191d5223f376b1f69c8dd1d6aa101052f88a56c4e363b9e269abb8aac87c3a",
+  "evidence_hash": "cc644d5b328463be93c2e6111b4f218739437d68fc86426c3e3818aae3630796",
+  "memory_hit_ids": [
+    "5f3a151b-bf3d-4627-9f2e-1e161d122c37",
+    "be8afe0f-9016-4b13-9c5f-ceefbb0845e4",
+    "19db1ad0-79ae-4233-b3a2-b48e4ac08022",
+    "70aa3c6a-eebf-4c80-b614-816bc54565ae",
+    "73b5f371-404e-4d58-b553-30ede351e08e"
+  ],
+  "policy_simulation_hash": "8b436a5883fe2f3deafd52a8923a7b6985e0d2bea808a60cd582ce3f7e4e8ae1",
+  "response_hash": "10674dde26c5ed292f1dd0d5c6f0d070ae689c18a03d9d61465f3bdc41bc18fb",
+  "strict_goal_execution": false,
+  "timestamp": 1771308083049,
+  "turn_id": "d2b91162-558f-44e8-b7fc-a84b51c7fccf",
+  "user_message": "cosa ne pensi?",
+  "version": 1
+}

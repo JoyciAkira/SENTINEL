@@ -2262,6 +2262,7 @@
   display: flex;
   flex-direction: column;
   height: 100%;
+  min-height: 0;
 }
 
 .chat-focus-header {
@@ -2300,6 +2301,7 @@
   flex-wrap: wrap;
   gap: 6px;
   padding: 6px 14px 0;
+  flex-shrink: 0;
 }
 
 .chat-focus-meta span {
@@ -2326,6 +2328,7 @@
 }
 
 .chat-input-area {
+  flex-shrink: 0;
   padding: 10px 14px 12px;
   border-top: 1px solid var(--vscode-panel-border);
   background: color-mix(in oklab, var(--vscode-editor-background) 96%, black);
@@ -2401,6 +2404,13 @@
 }
 
 .sentinel-message-scroll [data-slot="scroll-area-viewport"] {
+  scrollbar-gutter: stable both-edges;
+}
+
+.sentinel-message-scroll {
+  min-height: 0;
+  height: 100%;
+  overscroll-behavior: contain;
   scrollbar-gutter: stable both-edges;
 }
 

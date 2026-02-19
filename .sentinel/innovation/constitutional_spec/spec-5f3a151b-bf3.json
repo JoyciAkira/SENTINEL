@@ -1,0 +1,25 @@
+{
+  "constraints": [
+    "strict_goal_execution_mode"
+  ],
+  "invariants": [
+    "deterministic_output",
+    "explicit_paths",
+    "fail_safe_behavior",
+    "contract_preserving",
+    "minimal_blast_radius"
+  ],
+  "objective": "Build this application using the \"Ops Dashboard\" blueprint.\nPrimary goal: Turn this spreadsheet workflow into a web app with forms, approval steps, and an admin dashboard.\nAudience: developer\n\nRequired modules:\n- KPI monitoring board\n- Incident workflow\n- Approval queue\n- Reliability and policy center\n\nNon-negotiable guardrails:\n- Read/write separation\n- Policy checks before action\n- SLO-based rollback triggers\n\nOutput policy:\n- outcome-first summary\n- bounded and deterministic implementation plan\n- explicit approvals before sensitive writes\n- minimal, reversible file changes\n",
+  "scope": {
+    "exclude": [],
+    "include": [
+      "targeted_file_changes"
+    ]
+  },
+  "success_signals": [
+    "safe_write_plan_generated_or_skipped",
+    "verification_commands_present",
+    "explainability_evidence_present"
+  ],
+  "version": 1
+}

@@ -1,0 +1,15 @@
+{
+  "constitutional_spec_hash": "19048bacec6bc20e2f4f715411c2cf487d8270730c539672958a5d4d48b7dffe",
+  "counterfactual_hash": "af191d5223f376b1f69c8dd1d6aa101052f88a56c4e363b9e269abb8aac87c3a",
+  "evidence_hash": "310c2aecac51b91c3e1beb02f94b42627c90503cea3b60407d3d1f8ab6d74b1f",
+  "memory_hit_ids": [
+    "a735200d-65de-47b7-a231-67b9b603c338"
+  ],
+  "policy_simulation_hash": "ef82757ba87119842d98d97cf1a37091ccbd5d58c0d0716d573291d27b0d40b7",
+  "response_hash": "67417d92e57b160fc98bcae51dcdfa9280b60483b1e3bfdf0ae9374ac83e5be6",
+  "strict_goal_execution": false,
+  "timestamp": 1771383757270,
+  "turn_id": "1e533593-f32d-424d-a831-d32b14718299",
+  "user_message": "List the main features of SENTINEL in 3 bullet points.",
+  "version": 1
+}

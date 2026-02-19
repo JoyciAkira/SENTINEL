@@ -2,23 +2,23 @@
   "version": 1,
   "turns": [
     {
-      "id": "cbbea885-7a7d-4d94-b39f-045e33ecb05a",
-      "timestamp": 1771135485917,
-      "user": "Build this application using the \"Ops Dashboard\" blueprint.\nPrimary goal: Turn this spreadsheet workflow into a web app with forms, approval steps, and an admin dashboard.\nAudience: developer\n\nRequired modules:\n- KPI monitoring board\n- Incident workflow\n- Approval queue\n- Reliability and policy center\n\nNon-negotiable guardrails:\n- Read/write separation\n- Policy checks before action\n- SLO-based rollback triggers\n\nOutput policy:\n- outcome-first summary\n- bounded and deterministic implementation plan\n- explicit approvals before sensitive writes\n- minimal, reversible file changes\n",
-      "assistant": "Errore durante l'inferenza dell'agente. Verifica le API key.",
-      "intent_summary": "Build this application using the \"Ops Dashboard\" blueprint. Primary goal: Turn this spreadsheet workflow",
+      "id": "7944bee6-5adf-489e-9ca6-cc5fb511b8ba",
+      "timestamp": 1771390246612,
+      "user": "What is SENTINEL?",
+      "assistant": "**SENTINEL** è un **Sistema Operativo Cognitivo** per agenti di codifica AI, progettato per rendere impossibile il *goal drift* (deriva degli obiettivi) attraverso l'allineamento crittograficamente verificato e la validazione continua.\n\n### Cosa fare adesso\n1.  **Certificazione Locale**: Esegui `./scripts/validate_sentinel.sh` per verificare l'integrità dei 10 layer della tua installazione.\n2.  **Inizializzazione Progetto**: Usa `sentinel init \"[Obiettivo]\"` per stabilire il *Goal Manifold* (verità immutabile) del tuo workspace.\n3.  **Integrazione IDE**: Collega il tuo editor (Cursor/VS Code) tramite `sentinel mcp` per attivare i guardrail in tempo reale.\n\n### Come farlo in sicurezza\n*   **Zero-Trust Federation**: Se attivi la modalità P2P (`sentinel federate`), assicurati che la tua identità Ed25519 sia protetta; SENTINEL isola i pattern di successo ma richiede firme crittografiche per ogni decisione del quorum.\n*   **Sandbox Execution**: Ogni modifica suggerita dall'LLM deve passare il gate di **Tree-Sitter** (correttezza sintattica 100%) prima dell'applicazione.\n\n### Rischi da monitorare\n*   **Allineamento degli Obiettivi**: Monitora che il punteggio di allineamento non scenda sotto l'**85%** (soglia critica nei Quality Gates).\n*   **Integrità del Quorum**: In configurazioni multi-agente, verifica la distribuzione dell'autorità (Human: 1.0, Senior Node: 0.8) per prevenire decisioni autonome non autorizzate.\n*   **Budget delle Prestazioni**: Controlla la latenza di compattazione (p95 < 45ms) per evitare blocchi del thread principale durante l'iniezione del contesto.\n\n---\n\n**Razionale Sintetico:**\nSENTINEL risolve la perdita di contesto e la deriva cognitiva degli agenti AI trasformando l'input creativo dell'LLM (non deterministico) in output validati da una struttura a 10 layer deterministica e federata. L'evoluzione alla Phase 3 ha esteso il sistema da locale a una rete distribuita di intelligenza collettiva.",
+      "intent_summary": "What is SENTINEL?",
       "evidence": [
         "memory_hits=0",
-        "risk_flag=elevated",
+        "risk_flag=unknown",
         "governance_pending=none"
       ]
     },
     {
-      "id": "2dab52cd-88e8-4c29-9a24-cafcccff3f39",
-      "timestamp": 1771135501074,
-      "user": "inizia il progetto",
+      "id": "1eb1a471-0078-4644-a366-5a71f48b030b",
+      "timestamp": 1771449893842,
+      "user": "What is my project status?",
       "assistant": "Errore durante l'inferenza dell'agente. Verifica le API key.",
-      "intent_summary": "inizia il progetto",
+      "intent_summary": "What is my project status?",
       "evidence": [
         "memory_hits=1",
         "risk_flag=elevated",
@@ -26,11 +26,11 @@
       ]
     },
     {
-      "id": "0da1ef75-b46b-43af-be7f-dd5a3832e126",
-      "timestamp": 1771135521484,
-      "user": "Refine the current AppSpec while preserving contracts and deterministic behavior.\nReturn:\n1) Outcome-first sections: What I changed / What needs your approval / What happens next.\n2) A strict JSON block fenced as ```appspec``` with keys:\n   app, dataModel.entities, views, actions, policies, integrations, tests, meta.\nNo prose after the appspec block.\n\nCurrent AppSpec:\n```appspec\n{\n  \"version\": \"1.0\",\n  \"app\": {\n    \"name\": \"Inizia Il Progetto\",\n    \"summary\": \"Draft generated from the current intent and latest response. Primary entity: item.\"\n  },\n  \"dataModel\": {\n    \"entities\": [\n      {\n        \"name\": \"item\",\n        \"fields\": [\n          {\n            \"name\": \"id\",\n            \"type\": \"string\",\n            \"required\": true\n          },\n          {\n            \"name\": \"title\",\n            \"type\": \"string\",\n            \"required\": true\n          },\n          {\n            \"name\": \"status\",\n            \"type\": \"string\",\n            \"required\": true\n          },\n          {\n            \"name\": \"created_at\",\n            \"type\": \"date\",\n            \"required\": true\n          }\n        ]\n      }\n    ]\n  },\n  \"views\": [\n    {\n      \"id\": \"dashboard\",\n      \"type\": \"dashboard\",\n      \"title\": \"Operational Dashboard\"\n    },\n    {\n      \"id\": \"item_list\",\n      \"type\": \"list\",\n      \"title\": \"Item List\",\n      \"entity\": \"item\"\n    },\n    {\n      \"id\": \"item_form\",\n      \"type\": \"form\",\n      \"title\": \"Item Form\",\n      \"entity\": \"item\"\n    }\n  ],\n  \"actions\": [\n    {\n      \"id\": \"create_item\",\n      \"type\": \"create\",\n      \"title\": \"Create item\",\n      \"entity\": \"item\",\n      \"requiresApproval\": true\n    },\n    {\n      \"id\": \"update_item\",\n      \"type\": \"update\",\n      \"title\": \"Update item\",\n      \"entity\": \"item\",\n      \"requiresApproval\": true\n    },\n    {\n      \"id\": \"delete_item\",\n      \"type\": \"delete\",\n      \"title\": \"Delete item\",\n      \"entity\": \"item\",\n      \"requiresApproval\": true\n    },\n    {\n      \"id\": \"read_item\",\n      \"type\": \"read\",\n      \"title\": \"Read item\",\n      \"entity\": \"item\",\n      \"requiresApproval\": false\n    }\n  ],\n  \"policies\": [\n    {\n      \"id\": \"policy_contract\",\n      \"rule\": \"Public contracts are preserved unless explicit migration is provided.\",\n      \"level\": \"hard\"\n    },\n    {\n      \"id\": \"policy_determinism\",\n      \"rule\": \"Execution remains deterministic and bounded by explicit approvals.\",\n      \"level\": \"hard\"\n    },\n    {\n      \"id\": \"policy_visibility\",\n      \"rule\": \"Default responses remain outcome-first; internals are progressive details.\",\n      \"level\": \"soft\"\n    }\n  ],\n  \"integrations\": [],\n  \"tests\": [\n    {\n      \"id\": \"test_guardrail_existing\",\n      \"type\": \"integration\",\n      \"description\": \"Existing behavior remains unchanged for current user flows.\"\n    },\n    {\n      \"id\": \"test_regression_write_gate\",\n      \"type\": \"policy\",\n      \"description\": \"Sensitive file operations require explicit approval.\"\n    },\n    {\n      \"id\": \"test_appspec_smoke\",\n      \"type\": \"e2e\",\n      \"description\": \"Draft AppSpec generates a valid preview without runtime errors.\"\n    }\n  ],\n  \"meta\": {\n    \"source\": \"heuristic_v1\",\n    \"confidence\": 0.54,\n    \"generated_at\": \"2026-02-15T06:05:01.081Z\",\n    \"prompt_excerpt\": \"inizia il progetto\",\n    \"validation\": {\n      \"status\": \"fallback\"\n    }\n  }\n}\n```",
+      "id": "0c23de9d-b170-466b-bd0e-83dc287936b6",
+      "timestamp": 1771450706351,
+      "user": "crea una todo list app",
       "assistant": "Errore durante l'inferenza dell'agente. Verifica le API key.",
-      "intent_summary": "Refine the current AppSpec while preserving contracts and deterministic behavior. Return: 1) Outcome-first sections:",
+      "intent_summary": "crea una todo list app",
       "evidence": [
         "memory_hits=2",
         "risk_flag=elevated",
@@ -38,11 +38,11 @@
       ]
     },
     {
-      "id": "427fd361-9f1c-45ce-a382-dc3b8eacec28",
-      "timestamp": 1771199952878,
-      "user": "Implementa SOLO il primo goal pending del manifold.\nGoal ID: 0c2a35f8-4eae-4e53-bf96-c21b2be077ea\nGoal descrizione: Configure dependencies and build system: Kernel Foundation: Inizializzazione del core allineato ai vettori d'intento rilevati.\n\nVincoli obbligatori:\n- niente scaffolding iniziale\n- solo file changes mirati\n- test minimi necessari\n- comandi di verifica strettamente necessari\n- mantieni output con sezioni operative e path espliciti",
+      "id": "d0a53b1b-a7f5-43d7-b45d-04d129f05aab",
+      "timestamp": 1771453152449,
+      "user": "Build this application using the \"Ops Dashboard\" blueprint.\nPrimary goal: Turn this spreadsheet workflow into a web app with forms, approval steps, and an admin dashboard.\nAudience: developer\n\nRequired modules:\n- KPI monitoring board\n- Incident workflow\n- Approval queue\n- Reliability and policy center\n\nNon-negotiable guardrails:\n- Read/write separation\n- Policy checks before action\n- SLO-based rollback triggers\n\nOutput policy:\n- outcome-first summary\n- bounded and deterministic implementation plan\n- explicit approvals before sensitive writes\n- minimal, reversible file changes\n",
       "assistant": "Errore durante l'inferenza dell'agente. Verifica le API key.",
-      "intent_summary": "Implementa SOLO il primo goal pending del manifold. Goal ID: 0c2a35f8-4eae-4e53-bf96-c21b2be077ea Goal descrizione: Configure",
+      "intent_summary": "Build this application using the \"Ops Dashboard\" blueprint. Primary goal: Turn this spreadsheet workflow",
       "evidence": [
         "memory_hits=3",
         "risk_flag=elevated",
@@ -50,11 +50,11 @@
       ]
     },
     {
-      "id": "43790353-2ca1-4801-8b63-fac7102e90bc",
-      "timestamp": 1771199998543,
-      "user": "procedi",
+      "id": "105ac69a-d900-441c-8722-ea53ecb04b29",
+      "timestamp": 1771453191663,
+      "user": "get_goal_graph",
       "assistant": "Errore durante l'inferenza dell'agente. Verifica le API key.",
-      "intent_summary": "procedi",
+      "intent_summary": "get_goal_graph",
       "evidence": [
         "memory_hits=4",
         "risk_flag=elevated",
@@ -62,11 +62,11 @@
       ]
     },
     {
-      "id": "de978d8e-4694-4171-9a60-b7eea73acf93",
-      "timestamp": 1771200694834,
-      "user": "Build this application using the \"Ops Dashboard\" blueprint.\nPrimary goal: Turn this spreadsheet workflow into a web app with forms, approval steps, and an admin dashboard.\nAudience: developer\n\nRequired modules:\n- KPI monitoring board\n- Incident workflow\n- Approval queue\n- Reliability and policy center\n\nNon-negotiable guardrails:\n- Read/write separation\n- Policy checks before action\n- SLO-based rollback triggers\n\nOutput policy:\n- outcome-first summary\n- bounded and deterministic implementation plan\n- explicit approvals before sensitive writes\n- minimal, reversible file changes\n",
+      "id": "44bfcf6f-c8d6-4fab-87dd-eaf54f9ef74c",
+      "timestamp": 1771453192715,
+      "user": "get_goal_graph",
       "assistant": "Errore durante l'inferenza dell'agente. Verifica le API key.",
-      "intent_summary": "Build this application using the \"Ops Dashboard\" blueprint. Primary goal: Turn this spreadsheet workflow",
+      "intent_summary": "get_goal_graph",
       "evidence": [
         "memory_hits=5",
         "risk_flag=elevated",
@@ -74,11 +74,23 @@
       ]
     },
     {
-      "id": "5bf94ee3-499a-40e8-aaeb-9c9faba9ea23",
-      "timestamp": 1771201491218,
-      "user": "Build this application using the \"Ops Dashboard\" blueprint.\nPrimary goal: Turn this spreadsheet workflow into a web app with forms, approval steps, and an admin dashboard.\nAudience: developer\n\nRequired modules:\n- KPI monitoring board\n- Incident workflow\n- Approval queue\n- Reliability and policy center\n\nNon-negotiable guardrails:\n- Read/write separation\n- Policy checks before action\n- SLO-based rollback triggers\n\nOutput policy:\n- outcome-first summary\n- bounded and deterministic implementation plan\n- explicit approvals before sensitive writes\n- minimal, reversible file changes\n",
+      "id": "25cc440a-d4d6-48aa-a571-a22feadee916",
+      "timestamp": 1771457602248,
+      "user": "What are the active goals?",
       "assistant": "Errore durante l'inferenza dell'agente. Verifica le API key.",
-      "intent_summary": "Build this application using the \"Ops Dashboard\" blueprint. Primary goal: Turn this spreadsheet workflow",
+      "intent_summary": "What are the active goals?",
+      "evidence": [
+        "memory_hits=5",
+        "risk_flag=elevated",
+        "governance_pending=none"
+      ]
+    },
+    {
+      "id": "ca5a5162-0760-40e8-8f8c-5f776b93e8d0",
+      "timestamp": 1771475809796,
+      "user": "Implementa SOLO il primo goal pending del manifold.\nGoal ID: f8457d63-8e00-4a47-a247-e656483c71b2\nGoal descrizione: Kernel Foundation: Inizializzazione del core allineato ai vettori d'intento rilevati.\n\nVincoli obbligatori:\n- niente scaffolding iniziale\n- solo file changes mirati\n- test minimi necessari\n- comandi di verifica strettamente necessari\n- mantieni output con sezioni operative e path espliciti",
+      "assistant": "Errore durante l'inferenza dell'agente. Verifica le API key.",
+      "intent_summary": "Implementa SOLO il primo goal pending del manifold. Goal ID: f8457d63-8e00-4a47-a247-e656483c71b2 Goal descrizione: Kernel",
       "evidence": [
         "memory_hits=5",
         "risk_flag=elevated",

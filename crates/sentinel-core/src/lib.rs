@@ -92,6 +92,7 @@ pub mod learning;
 pub mod memory;
 pub mod outcome_compiler;
 pub mod quality;
+pub mod reasoning_index;
 pub mod security;
 pub mod storage;
 pub mod telemetry;

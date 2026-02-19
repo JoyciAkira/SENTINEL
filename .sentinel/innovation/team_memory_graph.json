@@ -1,117 +1,118 @@
 {
-  "edge_count": 9,
+  "edge_count": 8,
   "edges": [
     {
       "relation": "temporal",
-      "source": "cbbea885-7a7d-4d94-b39f-045e33ecb05a",
-      "target": "2dab52cd-88e8-4c29-9a24-cafcccff3f39",
+      "source": "7944bee6-5adf-489e-9ca6-cc5fb511b8ba",
+      "target": "1eb1a471-0078-4644-a366-5a71f48b030b",
       "weight": 1.0
     },
     {
       "relation": "temporal",
-      "source": "2dab52cd-88e8-4c29-9a24-cafcccff3f39",
-      "target": "0da1ef75-b46b-43af-be7f-dd5a3832e126",
+      "source": "1eb1a471-0078-4644-a366-5a71f48b030b",
+      "target": "0c23de9d-b170-466b-bd0e-83dc287936b6",
       "weight": 1.0
     },
     {
       "relation": "temporal",
-      "source": "0da1ef75-b46b-43af-be7f-dd5a3832e126",
-      "target": "427fd361-9f1c-45ce-a382-dc3b8eacec28",
+      "source": "0c23de9d-b170-466b-bd0e-83dc287936b6",
+      "target": "d0a53b1b-a7f5-43d7-b45d-04d129f05aab",
       "weight": 1.0
     },
     {
       "relation": "temporal",
-      "source": "427fd361-9f1c-45ce-a382-dc3b8eacec28",
-      "target": "43790353-2ca1-4801-8b63-fac7102e90bc",
+      "source": "d0a53b1b-a7f5-43d7-b45d-04d129f05aab",
+      "target": "105ac69a-d900-441c-8722-ea53ecb04b29",
       "weight": 1.0
     },
     {
       "relation": "temporal",
-      "source": "43790353-2ca1-4801-8b63-fac7102e90bc",
-      "target": "de978d8e-4694-4171-9a60-b7eea73acf93",
+      "source": "105ac69a-d900-441c-8722-ea53ecb04b29",
+      "target": "44bfcf6f-c8d6-4fab-87dd-eaf54f9ef74c",
       "weight": 1.0
     },
     {
       "relation": "temporal",
-      "source": "de978d8e-4694-4171-9a60-b7eea73acf93",
-      "target": "5bf94ee3-499a-40e8-aaeb-9c9faba9ea23",
+      "source": "44bfcf6f-c8d6-4fab-87dd-eaf54f9ef74c",
+      "target": "25cc440a-d4d6-48aa-a571-a22feadee916",
+      "weight": 1.0
+    },
+    {
+      "relation": "temporal",
+      "source": "25cc440a-d4d6-48aa-a571-a22feadee916",
+      "target": "ca5a5162-0760-40e8-8f8c-5f776b93e8d0",
       "weight": 1.0
     },
     {
       "relation": "semantic_overlap",
-      "source": "cbbea885-7a7d-4d94-b39f-045e33ecb05a",
-      "target": "de978d8e-4694-4171-9a60-b7eea73acf93",
-      "weight": 6.0
-    },
-    {
-      "relation": "semantic_overlap",
-      "source": "cbbea885-7a7d-4d94-b39f-045e33ecb05a",
-      "target": "5bf94ee3-499a-40e8-aaeb-9c9faba9ea23",
-      "weight": 6.0
-    },
-    {
-      "relation": "semantic_overlap",
-      "source": "de978d8e-4694-4171-9a60-b7eea73acf93",
-      "target": "5bf94ee3-499a-40e8-aaeb-9c9faba9ea23",
-      "weight": 6.0
+      "source": "105ac69a-d900-441c-8722-ea53ecb04b29",
+      "target": "44bfcf6f-c8d6-4fab-87dd-eaf54f9ef74c",
+      "weight": 3.0
     }
   ],
-  "generated_at": 1771201491222,
-  "graph_hash": "5a3fc66c9e39cd8f5dcfa21038a0fca5db1d2a8bfa2d623cc2497a378fccab01",
-  "node_count": 7,
+  "generated_at": 1771475809800,
+  "graph_hash": "5f5b4ce053322e6e31a95f835e5a266b27426bf91ec14827ef93c324d2b2a77c",
+  "node_count": 8,
   "nodes": [
     {
-      "id": "cbbea885-7a7d-4d94-b39f-045e33ecb05a",
+      "id": "7944bee6-5adf-489e-9ca6-cc5fb511b8ba",
+      "intent_summary": "What is SENTINEL?",
+      "lamport": 1771390246612,
+      "provenance_hash": "a0eba87545af6a8ffc54d679f345003ccd3f11154ada25d7aacc45da2b44a3f8",
+      "timestamp": 1771390246612
+    },
+    {
+      "id": "1eb1a471-0078-4644-a366-5a71f48b030b",
+      "intent_summary": "What is my project status?",
+      "lamport": 1771449893842,
+      "provenance_hash": "188e8b4cdd1ca734b92e58eb9b4f0198b52afbd23178ad8a3193db14eec73528",
+      "timestamp": 1771449893842
+    },
+    {
+      "id": "0c23de9d-b170-466b-bd0e-83dc287936b6",
+      "intent_summary": "crea una todo list app",
+      "lamport": 1771450706351,
+      "provenance_hash": "ede78e795962029c58c2cf15cc13115f55d42596cfd12940d62a7ff0ee2fd331",
+      "timestamp": 1771450706351
+    },
+    {
+      "id": "d0a53b1b-a7f5-43d7-b45d-04d129f05aab",
       "intent_summary": "Build this application using the \"Ops Dashboard\" blueprint. Primary goal: Turn this spreadsheet workflow",
-      "lamport": 1771135485917,
-      "provenance_hash": "a8923ef6fdf1de37bdf9a4a7bdd9028c55307611ff18a69038ecd41f50ab77f8",
-      "timestamp": 1771135485917
+      "lamport": 1771453152449,
+      "provenance_hash": "e7ddf7ab4bd2a3ae8778492315f2c127ee03e9677907926157045e7025ee54d4",
+      "timestamp": 1771453152449
     },
     {
-      "id": "2dab52cd-88e8-4c29-9a24-cafcccff3f39",
-      "intent_summary": "inizia il progetto",
-      "lamport": 1771135501074,
-      "provenance_hash": "175cbce3a238ca6467c305426962d0c10a5cac995788e073a78dec3e0f88857d",
-      "timestamp": 1771135501074
+      "id": "105ac69a-d900-441c-8722-ea53ecb04b29",
+      "intent_summary": "get_goal_graph",
+      "lamport": 1771453191663,
+      "provenance_hash": "7510e5679f41e78e2c88b8a3aeae740fb4947149a724db39b93e375241170327",
+      "timestamp": 1771453191663
     },
     {
-      "id": "0da1ef75-b46b-43af-be7f-dd5a3832e126",
-      "intent_summary": "Refine the current AppSpec while preserving contracts and deterministic behavior. Return: 1) Outcome-first sections:",
-      "lamport": 1771135521484,
-      "provenance_hash": "4e659f46e40a38b6125ca9851da6925165ec817414af014447b452c4144f180a",
-      "timestamp": 1771135521484
+      "id": "44bfcf6f-c8d6-4fab-87dd-eaf54f9ef74c",
+      "intent_summary": "get_goal_graph",
+      "lamport": 1771453192715,
+      "provenance_hash": "57fa0c41c2b9ac1067d6402ce053f9ed6817dcc28a2231fa9f9d80a9ea5cc262",
+      "timestamp": 1771453192715
     },
     {
-      "id": "427fd361-9f1c-45ce-a382-dc3b8eacec28",
-      "intent_summary": "Implementa SOLO il primo goal pending del manifold. Goal ID: 0c2a35f8-4eae-4e53-bf96-c21b2be077ea Goal descrizione: Configure",
-      "lamport": 1771199952878,
-      "provenance_hash": "2246b67f59b67a5be35a6fee6c3511320715ab331cded8b6cc7ef4b1f43c7f18",
-      "timestamp": 1771199952878
+      "id": "25cc440a-d4d6-48aa-a571-a22feadee916",
+      "intent_summary": "What are the active goals?",
+      "lamport": 1771457602248,
+      "provenance_hash": "eb22c7208a5fd0ce6b55640f61f48f9d0033707a2e844538b96d0406ecb0fbc7",
+      "timestamp": 1771457602248
     },
     {
-      "id": "43790353-2ca1-4801-8b63-fac7102e90bc",
-      "intent_summary": "procedi",
-      "lamport": 1771199998543,
-      "provenance_hash": "68e3f46a66a72cee13fc8b3abcaca279f2f3aa95d8720e811dbd58010b55bbe0",
-      "timestamp": 1771199998543
-    },
-    {
-      "id": "de978d8e-4694-4171-9a60-b7eea73acf93",
-      "intent_summary": "Build this application using the \"Ops Dashboard\" blueprint. Primary goal: Turn this spreadsheet workflow",
-      "lamport": 1771200694834,
-      "provenance_hash": "b912db045dc0b4db49a8a5e9ecd95cbcbde78febbdddc937bed915fc4e5cda4d",
-      "timestamp": 1771200694834
-    },
-    {
-      "id": "5bf94ee3-499a-40e8-aaeb-9c9faba9ea23",
-      "intent_summary": "Build this application using the \"Ops Dashboard\" blueprint. Primary goal: Turn this spreadsheet workflow",
-      "lamport": 1771201491218,
-      "provenance_hash": "e16d63c94b2bdd060214d6d0edc78f672beb2ff91b15b41bd586665c6994e912",
-      "timestamp": 1771201491218
+      "id": "ca5a5162-0760-40e8-8f8c-5f776b93e8d0",
+      "intent_summary": "Implementa SOLO il primo goal pending del manifold. Goal ID: f8457d63-8e00-4a47-a247-e656483c71b2 Goal descrizione: Kernel",
+      "lamport": 1771475809796,
+      "provenance_hash": "eae99533e1e4c3087b45793b8d7b4c23045e38893f85d96210926bbf98998d3e",
+      "timestamp": 1771475809796
     }
   ],
-  "signature": "f36d73b8aacb8f9c2ea451c15efe6f8cda700403abe2eec3f280aead11bb1c98bc34150dcb13ef49cd77118b8ef9b7d418940e8f2943baa1cdd0dcafd532a20a",
+  "signature": "09bd04610fdaa7466d60a6aa9448f90ff3ef66f17fd4eb0c6633230e8e29f9713dece8440026cd0063dce18f30411dcca7aa4f2d46db6ddfcdfcb07e8129b00d",
   "signature_scheme": "ed25519-blake3-v1",
-  "signer_public_key": "6785d1ba3d2323d085baede5085b456c8efb7e70456bc8670c920e63519d8292",
+  "signer_public_key": "eab928f8a4fd290d803031017a37b8585877d3f934e98bb0e0422cd4c39ab983",
   "version": 1
 }
