@@ -145,6 +145,19 @@ enum Commands {
         #[command(subcommand)]
         action: GovernanceAction,
     },
+
+    /// Avvia il Gateway WebSocket unificato (multi-channel: VSCode, CLI, Web UI)
+    Gateway {
+        /// Porta del gateway (default: 18789)
+        #[arg(short, long, default_value = "18789")]
+        port: u16,
+        /// Host binding (default: 127.0.0.1)
+        #[arg(long, default_value = "127.0.0.1")]
+        host: String,
+        /// Abilita tracing dettagliato
+        #[arg(short, long)]
+        verbose: bool,
+    },
 }
 
 #[derive(Subcommand)]
@@ -849,7 +862,56 @@ async fn main() -> anyhow::Result<()> {
                 .await
                 .map_err(|e| anyhow::anyhow!("P2P node error: {}", e))?;
         }
+        Commands::Gateway { port, host, verbose } => {
+            run_gateway(port, host, verbose).await?;
+        }
     }
+    Ok(())
+}
+
+/// Run the SENTINEL Gateway
+async fn run_gateway(port: u16, host: String, verbose: bool) -> anyhow::Result<()> {
+    use sentinel_gateway::{Gateway, GatewayConfig};
+
+    // Initialize tracing if verbose
+    if verbose {
+        tracing_subscriber::fmt()
+            .with_max_level(tracing::Level::DEBUG)
+            .init();
+    } else {
+        tracing_subscriber::fmt()
+            .with_max_level(tracing::Level::INFO)
+            .init();
+    }
+
+    let config = GatewayConfig::default()
+        .with_host(host.clone())
+        .with_port(port);
+
+    println!("╔══════════════════════════════════════════════════════════╗");
+    println!("║           🦞 SENTINEL GATEWAY — MULTI-CHANNEL            ║");
+    println!("╚══════════════════════════════════════════════════════════╝");
+    println!();
+    println!("📡 WebSocket Server: ws://{}:{}", host, port);
+    println!("🔗 HTTP Endpoints:");
+    println!("   • GET  /         — Landing page");
+    println!("   • GET  /health   — Health check");
+    println!("   • GET  /status   — Gateway status");
+    println!("   • WS   /ws       — WebSocket connection");
+    println!();
+    println!("🎯 Supported Channels:");
+    println!("   • VSCode Extension");
+    println!("   • CLI Client");
+    println!("   • Web UI");
+    println!("   • REST API");
+    println!();
+    println!("Press Ctrl+C to stop the gateway");
+    println!();
+
+    let gateway = Gateway::new(config);
+    gateway.start().await
+        .map_err(|e| anyhow::anyhow!("Gateway error: {}", e))?;
+
     Ok(())
 }
 

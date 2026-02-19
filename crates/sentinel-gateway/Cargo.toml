@@ -38,6 +38,9 @@ parking_lot = "0.12"
 url = "2.5"
 rand = "0.8"
 
+# CLI for binary
+clap = { version = "4.4", features = ["derive"] }
+
 [dev-dependencies]
 tokio-test = "0.4"
 

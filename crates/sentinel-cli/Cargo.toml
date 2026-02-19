@@ -10,6 +10,7 @@ license.workspace = true
 sentinel-core = { path = "../sentinel-core" }
 sentinel-agent-native = { path = "../sentinel-agent-native" }
 sentinel-sandbox = { path = "../sentinel-sandbox" }
+sentinel-gateway = { path = "../sentinel-gateway" }
 
 # CLI Parsing
 clap = { version = "4.4", features = ["derive"] }
@@ -36,3 +37,7 @@ blake3 = { workspace = true }
 ed25519-dalek = { workspace = true }
 hex = "0.4"
 colored = "2.1"
+
+# Tracing for Gateway
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
