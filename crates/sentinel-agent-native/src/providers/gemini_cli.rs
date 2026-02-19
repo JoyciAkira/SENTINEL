@@ -15,8 +15,8 @@ use tokio::time::timeout;
 use std::time::Duration;
 
 use crate::llm_integration::{
-    DocFormat, ExplanationStyle, ImprovementMetric, LLMClient, LLMContext, LLMSuggestion,
-    LLMSuggestionType,
+    DocFormat, ExplanationStyle, ImprovementMetric, LLMChatClient, LLMChatCompletion, LLMClient,
+    LLMContext, LLMSuggestion, LLMSuggestionType,
 };
 use sentinel_core::Uuid;
 
@@ -387,6 +387,26 @@ impl LLMClient for GeminiCliClient {
                 style: ExplanationStyle::StepByStep,
             },
         ))
+    }
+}
+
+#[async_trait::async_trait]
+impl LLMChatClient for GeminiCliClient {
+    async fn chat_completion(
+        &self,
+        system_prompt: &str,
+        user_prompt: &str,
+    ) -> Result<LLMChatCompletion> {
+        let full_prompt = format!(
+            "System instructions:\n{}\n\nUser request:\n{}",
+            system_prompt, user_prompt
+        );
+        let (content, tokens) = self.call(&full_prompt).await?;
+        Ok(LLMChatCompletion {
+            llm_name: "GeminiCLI/GoogleAIPro".to_string(),
+            content,
+            token_cost: tokens,
+        })
     }
 }
 

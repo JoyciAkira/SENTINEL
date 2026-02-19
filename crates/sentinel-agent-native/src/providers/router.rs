@@ -8,6 +8,7 @@ use crate::llm_integration::{LLMChatClient, LLMChatCompletion};
 use crate::openrouter::{OpenRouterClient, OpenRouterModel};
 use crate::providers::anthropic::AnthropicClient;
 use crate::providers::gemini::GeminiClient;
+use crate::providers::gemini_cli::GeminiCliClient;
 use crate::providers::openai_compatible::OpenAICompatibleClient;
 
 #[derive(Debug, Deserialize)]
@@ -54,6 +55,9 @@ pub enum ProviderConfig {
         model: Option<String>,
         temperature: Option<f64>,
         max_tokens: Option<u32>,
+    },
+    GeminiCli {
+        model: Option<String>,
     },
     OpenAICompatible {
         name: Option<String>,
@@ -141,6 +145,7 @@ impl ProviderRouter {
             order.push(provider.to_lowercase());
         }
         order.extend(vec![
+            "gemini_cli".to_string(),
             "openai_auth".to_string(),
             "openrouter".to_string(),
             "openai".to_string(),
@@ -322,6 +327,21 @@ impl ProviderRouter {
                     client: Arc::new(client),
                 }
             }
+            ProviderConfig::GeminiCli { model } => {
+                // Gemini CLI uses OAuth - no API key required!
+                if !crate::providers::gemini_cli::is_gemini_cli_available() {
+                    tracing::warn!("Gemini CLI not found in PATH. Install with: npm install -g @anthropic-ai/gemini-cli");
+                    return Ok(None);
+                }
+                let mut client = GeminiCliClient::new();
+                if let Some(m) = model {
+                    client = client.with_model(m.clone());
+                }
+                ProviderEntry {
+                    name: name.to_string(),
+                    client: Arc::new(client),
+                }
+            }
             ProviderConfig::OpenAICompatible {
                 name,
                 api_key,
@@ -447,6 +467,21 @@ impl ProviderRouter {
                 let model =
                     std::env::var("GEMINI_MODEL").unwrap_or_else(|_| "gemini-1.5-pro".to_string());
                 let client = GeminiClient::new(api_key, model);
+                Ok(Some(ProviderEntry {
+                    name: name.to_string(),
+                    client: Arc::new(client),
+                }))
+            }
+            "gemini_cli" => {
+                // Gemini CLI uses OAuth - no API key required!
+                if !crate::providers::gemini_cli::is_gemini_cli_available() {
+                    return Ok(None);
+                }
+                let model = std::env::var("GEMINI_CLI_MODEL").ok();
+                let mut client = GeminiCliClient::new();
+                if let Some(m) = model {
+                    client = client.with_model(m);
+                }
                 Ok(Some(ProviderEntry {
                     name: name.to_string(),
                     client: Arc::new(client),

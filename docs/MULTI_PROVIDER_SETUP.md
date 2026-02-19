@@ -8,6 +8,7 @@ SENTINEL SWARM now supports **40+ LLM providers** with automatic fallback, inspi
 - **OpenAI** (GPT-4, GPT-3.5, o1)
 - **Anthropic** (Claude 3.5, Claude 3)
 - **Google** (Gemini 1.5 Pro, Gemini Flash)
+- **Google Gemini CLI** (OAuth-based, no API key required!)
 - **Azure OpenAI**
 
 ### Inference Providers  
@@ -52,6 +53,11 @@ export SENTINEL_LLM_MODEL="llama3.2:latest"
 
 # Option F: Groq (fast)
 export GROQ_API_KEY="gsk_..."
+
+# Option G: Gemini CLI (OAuth - no API key needed!)
+# First install: npm install -g @anthropic-ai/gemini-cli
+# Then authenticate: gemini auth login
+# That's it! No API key required.
 ```
 
 ### Option 2: Configuration File (Advanced)
@@ -375,6 +381,74 @@ println!("Response: {}", response.content);
 println!("Provider used: {}", response.provider);
 println!("Tokens: {}", response.usage.total_tokens);
 ```
+
+## Gemini CLI (OAuth - No API Key Required!)
+
+Google Gemini CLI is a **special provider** that uses OAuth authentication instead of API keys. This means you can use Google AI Pro models without any API key!
+
+### Installation
+
+```bash
+# Install Gemini CLI
+npm install -g @anthropic-ai/gemini-cli
+
+# Authenticate with Google
+gemini auth login
+```
+
+### Configuration
+
+Add to `sentinel_llm_config.json`:
+
+```json
+{
+  "providers": {
+    "gemini_cli": {
+      "type": "gemini_cli",
+      "model": null
+    }
+  }
+}
+```
+
+Or use environment variable:
+```bash
+export SENTINEL_LLM_PROVIDER="gemini_cli"
+```
+
+### Features
+
+- **No API Key Required**: Uses your Google account OAuth
+- **Automatic Fallback**: If the primary model is rate-limited (HTTP 429), automatically tries fallback models
+- **Fallback Models**: gemini-2.0-flash, gemini-2.0-flash-lite, gemini-1.5-flash, gemini-1.5-flash-8b
+- **Free with Google AI Pro**: Uses your existing Google AI Pro subscription
+
+### Usage
+
+```rust
+use sentinel_agent_native::providers::router::ProviderRouter;
+use sentinel_agent_native::llm_integration::LLMChatClient;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let router = ProviderRouter::from_env()?;
+    
+    let result = router.chat_completion(
+        "You are a helpful assistant.",
+        "Hello, how are you?"
+    ).await?;
+    
+    println!("Response: {}", result.content);
+    println!("Provider: {}", result.llm_name);
+    Ok(())
+}
+```
+
+### Legal Note
+
+✅ **Legal**: Gemini CLI is Apache 2.0 open-source. The `--prompt` mode is explicitly designed for scripting. You use your own Google AI Pro subscription.
+
+❌ **Not Legal**: Reselling access or sharing credentials.
 
 ## Next Steps
 

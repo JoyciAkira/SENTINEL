@@ -1,8 +1,13 @@
 {
   "default": "openrouter",
-  "fallbacks": ["openai", "anthropic"],
+  "fallbacks": ["gemini_cli", "openai", "anthropic"],
   
   "providers": {
+    "gemini_cli": {
+      "type": "gemini_cli",
+      "model": null
+    },
+    
     "openrouter": {
       "type": "openrouter",
       "api_key_env": "OPENROUTER_API_KEY",
