@@ -78,7 +78,7 @@ impl GeminiCliClient {
     /// Ritorna Ok(model_name) se disponibile, Err altrimenti.
     pub async fn probe(&self) -> Result<String> {
         let out = timeout(
-            Duration::from_secs(10),
+            Duration::from_secs(60), // Aumentato per caricamento estensioni MCP
             Command::new(&self.binary)
                 .arg("-p")
                 .arg("respond with exactly: ok")
