@@ -11,6 +11,7 @@ categories = ["development-tools", "command-line-utilities"]
 
 [dependencies]
 sentinel-core = { path = "../sentinel-core", version = "0.1.0" }
+sentinel-sandbox = { path = "../sentinel-sandbox", version = "0.1.0" }
 tokio = { version = "1.35", features = ["full"] }
 async-trait = "0.1"
 reqwest = { version = "0.11", features = ["json", "rustls-tls"] }

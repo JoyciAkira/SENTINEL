@@ -9,6 +9,8 @@ pub mod dag;
 pub mod goal;
 pub mod predicate;
 pub mod predicate_sandbox;
+
+pub use predicate_sandbox::{SandboxExecutor, SandboxEvidence, SandboxEvaluation, TestResultsSummary, PredicateSandboxExt};
 pub mod slicer;
 
 pub use self::InvariantSeverity as GoalInvariantSeverity;

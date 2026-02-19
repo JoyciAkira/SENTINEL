@@ -48,7 +48,10 @@ pub mod orchestrator;
 pub mod planning;
 pub mod providers;
 pub mod reasoning;
+pub mod sandbox_adapter;
 pub mod swarm;
+
+pub use sandbox_adapter::SandboxAdapter;
 
 pub use end_to_end_agent::{E2EConfig, E2EReport, EndToEndAgent, ModuleDetail};
 

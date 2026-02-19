@@ -54,6 +54,14 @@ pub enum SentinelError {
         context: String,
         source: Box<SentinelError>,
     },
+
+    /// Sandbox execution errors
+    #[error("Sandbox error: {0}")]
+    Sandbox(String),
+
+    /// Runtime errors
+    #[error("Runtime error: {0}")]
+    Runtime(String),
 }
 
 /// Errors related to Goal operations

@@ -2814,3 +2814,192 @@
     display: none;
   }
 }
+
+/* ========================================
+   REASONING TRACE COMPONENT
+   ======================================== */
+
+.reasoning-trace-container {
+  border: 1px solid var(--sentinel-border);
+  border-radius: 12px;
+  background: color-mix(in oklab, var(--sentinel-surface) 94%, transparent);
+  overflow: hidden;
+}
+
+.reasoning-trace-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--sentinel-border);
+  background: color-mix(in oklab, var(--sentinel-surface-2) 90%, transparent);
+}
+
+.reasoning-trace-header h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.confidence-badge {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--sentinel-accent-soft) 70%, transparent);
+  border: 1px solid color-mix(in oklab, var(--sentinel-accent) 30%, var(--sentinel-border));
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--sentinel-ink);
+}
+
+.reasoning-query {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--sentinel-border);
+  font-size: 12px;
+  background: color-mix(in oklab, var(--sentinel-surface) 96%, transparent);
+}
+
+.reasoning-query strong {
+  color: var(--sentinel-muted);
+  text-transform: uppercase;
+  font-size: 10px;
+  letter-spacing: 0.05em;
+}
+
+.reasoning-steps {
+  padding: 12px 16px;
+  display: grid;
+  gap: 12px;
+}
+
+.reasoning-step {
+  border: 1px solid var(--sentinel-border);
+  border-radius: 10px;
+  background: color-mix(in oklab, var(--sentinel-surface-2) 92%, transparent);
+  overflow: hidden;
+}
+
+.step-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: color-mix(in oklab, var(--sentinel-surface) 90%, transparent);
+  border-bottom: 1px solid var(--sentinel-border);
+}
+
+.step-number {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: color-mix(in oklab, var(--sentinel-accent) 20%, transparent);
+  border: 1px solid color-mix(in oklab, var(--sentinel-accent) 40%, var(--sentinel-border));
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--sentinel-ink);
+}
+
+.step-action {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--sentinel-ink);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.step-content {
+  padding: 10px 12px;
+  display: grid;
+  gap: 8px;
+}
+
+.step-observation,
+.step-decision,
+.step-node {
+  display: grid;
+  gap: 4px;
+}
+
+.step-observation .label,
+.step-decision .label,
+.step-node .label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--sentinel-muted);
+}
+
+.step-observation .value,
+.step-decision .value {
+  font-size: 12px;
+  color: var(--sentinel-ink);
+  line-height: 1.4;
+}
+
+.step-node code {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: color-mix(in oklab, var(--sentinel-surface) 80%, black);
+  color: var(--sentinel-muted);
+}
+
+.reasoning-rationale {
+  padding: 12px 16px;
+  border-top: 1px solid var(--sentinel-border);
+  background: color-mix(in oklab, var(--sentinel-surface) 96%, transparent);
+}
+
+.reasoning-rationale strong {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--sentinel-muted);
+}
+
+.reasoning-rationale p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--sentinel-ink);
+}
+
+.reasoning-trace-loading,
+.reasoning-trace-error,
+.reasoning-trace-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 32px;
+  text-align: center;
+  color: var(--sentinel-muted);
+  font-size: 13px;
+}
+
+.loading-spinner {
+  width: 24px;
+  height: 24px;
+  border: 2px solid var(--sentinel-border);
+  border-top-color: var(--sentinel-accent);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.error-icon,
+.empty-icon {
+  font-size: 32px;
+}
+
+.reasoning-trace-error {
+  color: var(--sentinel-danger);
+}
