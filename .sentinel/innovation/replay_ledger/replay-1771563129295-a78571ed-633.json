@@ -1,0 +1,19 @@
+{
+  "constitutional_spec_hash": "daedf798eda45ea6a71c396463d2847acd95b0a6b1ae01d2a306322cc583e3bf",
+  "counterfactual_hash": "af191d5223f376b1f69c8dd1d6aa101052f88a56c4e363b9e269abb8aac87c3a",
+  "evidence_hash": "cc644d5b328463be93c2e6111b4f218739437d68fc86426c3e3818aae3630796",
+  "memory_hit_ids": [
+    "cf20ae6d-a908-45d8-8404-421458d99ea4",
+    "b0e618ac-720d-43cb-8ff2-2ea897e61cdb",
+    "9eedb2d2-e002-4a8a-b19f-adcd4a0c949e",
+    "75508e96-6a9f-418f-9996-6e06279d8a29",
+    "e34b75ab-5515-4030-9647-82875e1c17a9"
+  ],
+  "policy_simulation_hash": "8b436a5883fe2f3deafd52a8923a7b6985e0d2bea808a60cd582ce3f7e4e8ae1",
+  "response_hash": "10674dde26c5ed292f1dd0d5c6f0d070ae689c18a03d9d61465f3bdc41bc18fb",
+  "strict_goal_execution": false,
+  "timestamp": 1771563129295,
+  "turn_id": "a78571ed-633a-4199-8c51-17b8d74e7b98",
+  "user_message": "Sync Manuale con Hydration",
+  "version": 1
+}

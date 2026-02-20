@@ -1,0 +1,19 @@
+{
+  "constitutional_spec_hash": "2f13c334f3a3f3689faf821decd26bae1142a5af937a076d87ac79c824ad9630",
+  "counterfactual_hash": "af191d5223f376b1f69c8dd1d6aa101052f88a56c4e363b9e269abb8aac87c3a",
+  "evidence_hash": "cc644d5b328463be93c2e6111b4f218739437d68fc86426c3e3818aae3630796",
+  "memory_hit_ids": [
+    "aeaf409e-85af-47b8-9c03-c36bb66f3003",
+    "c0ac4019-1c41-4efa-9820-9486cbaa6035",
+    "75508e96-6a9f-418f-9996-6e06279d8a29",
+    "b494b3ea-ac0c-4ec0-adba-fac172053d67",
+    "a6e61fae-4790-4406-9a57-d092c5c1c485"
+  ],
+  "policy_simulation_hash": "8b436a5883fe2f3deafd52a8923a7b6985e0d2bea808a60cd582ce3f7e4e8ae1",
+  "response_hash": "e79a3e699b395ccec6dc807f17f009278de442acf8de9a89541089e40fd902a4",
+  "strict_goal_execution": false,
+  "timestamp": 1771562970938,
+  "turn_id": "7bebe527-eb6c-4bfc-842b-2af37bcf7168",
+  "user_message": "**Conversione Funzionale**",
+  "version": 1
+}

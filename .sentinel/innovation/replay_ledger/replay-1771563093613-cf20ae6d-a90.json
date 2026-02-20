@@ -1,0 +1,19 @@
+{
+  "constitutional_spec_hash": "8e5b0cb694823dd663c8a96b36d9cf6b0a136cb55057421b2e74ba17408d8796",
+  "counterfactual_hash": "af191d5223f376b1f69c8dd1d6aa101052f88a56c4e363b9e269abb8aac87c3a",
+  "evidence_hash": "cc644d5b328463be93c2e6111b4f218739437d68fc86426c3e3818aae3630796",
+  "memory_hit_ids": [
+    "9eedb2d2-e002-4a8a-b19f-adcd4a0c949e",
+    "348890bb-0fac-4aa0-8594-0a6373160b3f",
+    "4415011a-5765-45a9-aaed-423a6ca42b0d",
+    "7bebe527-eb6c-4bfc-842b-2af37bcf7168",
+    "c0ac4019-1c41-4efa-9820-9486cbaa6035"
+  ],
+  "policy_simulation_hash": "8b436a5883fe2f3deafd52a8923a7b6985e0d2bea808a60cd582ce3f7e4e8ae1",
+  "response_hash": "50880ca0c2ab2f1e5268bbb282393b5f5a97bae2fe75afdb6e0b175cea98e676",
+  "strict_goal_execution": false,
+  "timestamp": 1771563093613,
+  "turn_id": "cf20ae6d-a908-45d8-8404-421458d99ea4",
+  "user_message": "**Zustand (Raccomandato)**",
+  "version": 1
+}

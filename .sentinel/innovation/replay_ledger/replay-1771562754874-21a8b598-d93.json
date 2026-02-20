@@ -1,0 +1,19 @@
+{
+  "constitutional_spec_hash": "ae512367e4d18d1fbe10b3aba5b73e25afae6d65b97799ac914c9c22295369f7",
+  "counterfactual_hash": "af191d5223f376b1f69c8dd1d6aa101052f88a56c4e363b9e269abb8aac87c3a",
+  "evidence_hash": "cc644d5b328463be93c2e6111b4f218739437d68fc86426c3e3818aae3630796",
+  "memory_hit_ids": [
+    "348890bb-0fac-4aa0-8594-0a6373160b3f",
+    "7dab52eb-86c1-474e-9044-f3ff75341145",
+    "32fea854-92e8-4a1d-9652-f3547015d04c",
+    "cb8cddd3-ce4b-40df-970c-db94ce231b3f",
+    "4d18e3af-6a04-407e-b4f4-2de3ffc06057"
+  ],
+  "policy_simulation_hash": "8b436a5883fe2f3deafd52a8923a7b6985e0d2bea808a60cd582ce3f7e4e8ae1",
+  "response_hash": "1f1c2cb04c5e6afd31456729e40a1c4f6aa28a785439aecbf28f3d1cca924e4c",
+  "strict_goal_execution": false,
+  "timestamp": 1771562754874,
+  "turn_id": "21a8b598-d93b-4327-80ac-86efaa77206e",
+  "user_message": "Stato UI Persistente",
+  "version": 1
+}

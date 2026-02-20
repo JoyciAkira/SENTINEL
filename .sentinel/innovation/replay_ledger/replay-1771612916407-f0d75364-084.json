@@ -1,0 +1,19 @@
+{
+  "constitutional_spec_hash": "afef8e74380146d702ee82a4c7d10360ab242df46f5a6a5cc451f0f08519374f",
+  "counterfactual_hash": "af191d5223f376b1f69c8dd1d6aa101052f88a56c4e363b9e269abb8aac87c3a",
+  "evidence_hash": "cc644d5b328463be93c2e6111b4f218739437d68fc86426c3e3818aae3630796",
+  "memory_hit_ids": [
+    "9126a0ac-ccdc-4d7b-9e51-31a1c5eb2e9e",
+    "4d18e3af-6a04-407e-b4f4-2de3ffc06057",
+    "05bc4d8b-fa0d-44c4-b759-5edf700780d9",
+    "a0880742-549a-4cdf-97f4-3f537673f9a8",
+    "c4676b8d-bf5e-44ec-8315-1a6aeaf4ec17"
+  ],
+  "policy_simulation_hash": "8b436a5883fe2f3deafd52a8923a7b6985e0d2bea808a60cd582ce3f7e4e8ae1",
+  "response_hash": "5ca31178c36954539291acea2b3275a85521c1dfbf968934eab46df6d0259642",
+  "strict_goal_execution": false,
+  "timestamp": 1771612916407,
+  "turn_id": "f0d75364-084f-45aa-952b-27e444120943",
+  "user_message": "crea una app per therapy tools per individuals e couples",
+  "version": 1
+}

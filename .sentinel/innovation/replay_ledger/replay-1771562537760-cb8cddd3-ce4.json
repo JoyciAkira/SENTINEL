@@ -1,0 +1,19 @@
+{
+  "constitutional_spec_hash": "32fb7a8203da7a749d5cc8a33fc22decc40574e54493b09e0f6cd3a1e2e96d21",
+  "counterfactual_hash": "af191d5223f376b1f69c8dd1d6aa101052f88a56c4e363b9e269abb8aac87c3a",
+  "evidence_hash": "cc644d5b328463be93c2e6111b4f218739437d68fc86426c3e3818aae3630796",
+  "memory_hit_ids": [
+    "c4d93e66-4a07-45cc-bf7d-9ef78e2e1c67",
+    "a0880742-549a-4cdf-97f4-3f537673f9a8",
+    "512de09f-7b92-44fd-a3f4-aa32ccc98715",
+    "7dab52eb-86c1-474e-9044-f3ff75341145",
+    "4d18e3af-6a04-407e-b4f4-2de3ffc06057"
+  ],
+  "policy_simulation_hash": "8b436a5883fe2f3deafd52a8923a7b6985e0d2bea808a60cd582ce3f7e4e8ae1",
+  "response_hash": "784e0d3b0247ec59e77860d8aade48425876395dc3368ca69460fc79123d6801",
+  "strict_goal_execution": false,
+  "timestamp": 1771562537760,
+  "turn_id": "cb8cddd3-ce4b-40df-970c-db94ce231b3f",
+  "user_message": "Web App (PWA)",
+  "version": 1
+}

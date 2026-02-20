@@ -1,0 +1,19 @@
+{
+  "constitutional_spec_hash": "7aaffccf02df50545d45c58c3b614a85b3c7c074da8592139a90e6682e01560d",
+  "counterfactual_hash": "af191d5223f376b1f69c8dd1d6aa101052f88a56c4e363b9e269abb8aac87c3a",
+  "evidence_hash": "cc644d5b328463be93c2e6111b4f218739437d68fc86426c3e3818aae3630796",
+  "memory_hit_ids": [
+    "ea4b6755-e558-4848-a347-11bbb932ac7d",
+    "2eb5c1da-d861-45ef-b857-a289564e5ea4",
+    "7dab52eb-86c1-474e-9044-f3ff75341145",
+    "b7f67d58-c375-4045-9d74-0eec1215bc5b",
+    "ceba2d0b-b14b-4414-ab3b-6832f59c97c5"
+  ],
+  "policy_simulation_hash": "8b436a5883fe2f3deafd52a8923a7b6985e0d2bea808a60cd582ce3f7e4e8ae1",
+  "response_hash": "88139efcef3866249c768df23c0fabb97e4e9175b36e6c62d9cdba122353c48d",
+  "strict_goal_execution": false,
+  "timestamp": 1771611909086,
+  "turn_id": "c8fb133b-9e73-4c4c-83c1-51e4f3f48b9d",
+  "user_message": "Stato Strutturato",
+  "version": 1
+}

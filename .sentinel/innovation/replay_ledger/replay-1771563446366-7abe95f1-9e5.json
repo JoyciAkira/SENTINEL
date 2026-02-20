@@ -1,0 +1,19 @@
+{
+  "constitutional_spec_hash": "42bf580988a0883009c2918bbb8fe63d6d1438b58790c0b745df3300ce6c01e4",
+  "counterfactual_hash": "af191d5223f376b1f69c8dd1d6aa101052f88a56c4e363b9e269abb8aac87c3a",
+  "evidence_hash": "cc644d5b328463be93c2e6111b4f218739437d68fc86426c3e3818aae3630796",
+  "memory_hit_ids": [
+    "88f5e737-ce49-472c-83cc-75cfbb1999a5",
+    "4415011a-5765-45a9-aaed-423a6ca42b0d",
+    "7bebe527-eb6c-4bfc-842b-2af37bcf7168",
+    "2eb5c1da-d861-45ef-b857-a289564e5ea4",
+    "30c026d6-71b4-40ef-a4d2-2993ac91b872"
+  ],
+  "policy_simulation_hash": "8b436a5883fe2f3deafd52a8923a7b6985e0d2bea808a60cd582ce3f7e4e8ae1",
+  "response_hash": "10674dde26c5ed292f1dd0d5c6f0d070ae689c18a03d9d61465f3bdc41bc18fb",
+  "strict_goal_execution": false,
+  "timestamp": 1771563446366,
+  "turn_id": "7abe95f1-9e5f-48cf-9359-a6c8a1d58875",
+  "user_message": "Stato UI & Interazione",
+  "version": 1
+}

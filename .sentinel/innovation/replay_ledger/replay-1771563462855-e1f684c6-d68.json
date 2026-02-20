@@ -1,0 +1,19 @@
+{
+  "constitutional_spec_hash": "04e5ef014921ed64c1ea0db212324e07a3782d9ba1c37084ebc400a7dc806f25",
+  "counterfactual_hash": "af191d5223f376b1f69c8dd1d6aa101052f88a56c4e363b9e269abb8aac87c3a",
+  "evidence_hash": "cc644d5b328463be93c2e6111b4f218739437d68fc86426c3e3818aae3630796",
+  "memory_hit_ids": [
+    "30c026d6-71b4-40ef-a4d2-2993ac91b872",
+    "75508e96-6a9f-418f-9996-6e06279d8a29",
+    "96c9ac20-a247-48a6-aa66-5ba58b498c18",
+    "7abe95f1-9e5f-48cf-9359-a6c8a1d58875",
+    "88f5e737-ce49-472c-83cc-75cfbb1999a5"
+  ],
+  "policy_simulation_hash": "8b436a5883fe2f3deafd52a8923a7b6985e0d2bea808a60cd582ce3f7e4e8ae1",
+  "response_hash": "48815dd14e38f3f67c334126bba079ad258fcc9d038756f77bd7a58780d9def7",
+  "strict_goal_execution": false,
+  "timestamp": 1771563462855,
+  "turn_id": "e1f684c6-d685-47ea-a791-200e7968f12a",
+  "user_message": "riprova",
+  "version": 1
+}

@@ -1,0 +1,19 @@
+{
+  "constitutional_spec_hash": "6c190e6628bea8bc73070ae8a8bbd5839b3957b4c57280e83c1ca07894dd8403",
+  "counterfactual_hash": "af191d5223f376b1f69c8dd1d6aa101052f88a56c4e363b9e269abb8aac87c3a",
+  "evidence_hash": "cc644d5b328463be93c2e6111b4f218739437d68fc86426c3e3818aae3630796",
+  "memory_hit_ids": [
+    "2ac09fe7-ebcb-4213-a219-4cdf116be69b",
+    "2eb5c1da-d861-45ef-b857-a289564e5ea4",
+    "3470cee5-b922-4e3f-aad0-967c3deabd86",
+    "e1f684c6-d685-47ea-a791-200e7968f12a",
+    "88f5e737-ce49-472c-83cc-75cfbb1999a5"
+  ],
+  "policy_simulation_hash": "8b436a5883fe2f3deafd52a8923a7b6985e0d2bea808a60cd582ce3f7e4e8ae1",
+  "response_hash": "411385871b48580d8e3042adab073d571f4262feaff70489bc249b42659e0086",
+  "strict_goal_execution": false,
+  "timestamp": 1771608610577,
+  "turn_id": "76cd543a-b765-46b1-bb54-a220a8e77dc9",
+  "user_message": "Middleware Automatico",
+  "version": 1
+}

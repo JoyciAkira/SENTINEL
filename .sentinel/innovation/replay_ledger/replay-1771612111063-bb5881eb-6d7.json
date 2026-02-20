@@ -1,0 +1,19 @@
+{
+  "constitutional_spec_hash": "32a7ef7ae996f5d4547ccae00a950bfc104eded243d3dc0af5cc5fb81cc92537",
+  "counterfactual_hash": "af191d5223f376b1f69c8dd1d6aa101052f88a56c4e363b9e269abb8aac87c3a",
+  "evidence_hash": "cc644d5b328463be93c2e6111b4f218739437d68fc86426c3e3818aae3630796",
+  "memory_hit_ids": [
+    "c8fb133b-9e73-4c4c-83c1-51e4f3f48b9d",
+    "9d3ce140-aa56-4de0-ba7a-264dcdc0c251",
+    "aeaf409e-85af-47b8-9c03-c36bb66f3003",
+    "ae2457d5-1ec2-415a-b9b0-53405f7965c9",
+    "ea4b6755-e558-4848-a347-11bbb932ac7d"
+  ],
+  "policy_simulation_hash": "8b436a5883fe2f3deafd52a8923a7b6985e0d2bea808a60cd582ce3f7e4e8ae1",
+  "response_hash": "db9b12fbb81f863df66b436d57d5ed9c35be17762c316b5784efedd437493e45",
+  "strict_goal_execution": false,
+  "timestamp": 1771612111063,
+  "turn_id": "bb5881eb-6d74-44a1-ba50-5e50dacb7306",
+  "user_message": "Basso volume / Alta frequenza",
+  "version": 1
+}

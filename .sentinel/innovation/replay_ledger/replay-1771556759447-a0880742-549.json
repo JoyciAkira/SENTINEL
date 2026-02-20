@@ -1,0 +1,19 @@
+{
+  "constitutional_spec_hash": "d253b84f1363c334a576060f470a100443f84378decc9f33656d1bce2221e78e",
+  "counterfactual_hash": "af191d5223f376b1f69c8dd1d6aa101052f88a56c4e363b9e269abb8aac87c3a",
+  "evidence_hash": "cc644d5b328463be93c2e6111b4f218739437d68fc86426c3e3818aae3630796",
+  "memory_hit_ids": [
+    "c4676b8d-bf5e-44ec-8315-1a6aeaf4ec17",
+    "512de09f-7b92-44fd-a3f4-aa32ccc98715",
+    "2bcf1048-2767-48c9-b07c-e721be2cdbe1",
+    "3470cee5-b922-4e3f-aad0-967c3deabd86",
+    "ae2457d5-1ec2-415a-b9b0-53405f7965c9"
+  ],
+  "policy_simulation_hash": "8b436a5883fe2f3deafd52a8923a7b6985e0d2bea808a60cd582ce3f7e4e8ae1",
+  "response_hash": "45b8d9e072c7318caf8e86533df314182c3821c19de5f0d63429749cbf9eb2de",
+  "strict_goal_execution": false,
+  "timestamp": 1771556759447,
+  "turn_id": "a0880742-549a-4cdf-97f4-3f537673f9a8",
+  "user_message": "crea una todo list app completa",
+  "version": 1
+}

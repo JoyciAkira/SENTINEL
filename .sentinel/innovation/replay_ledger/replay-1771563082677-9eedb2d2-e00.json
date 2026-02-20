@@ -1,0 +1,19 @@
+{
+  "constitutional_spec_hash": "d2c804244f12ee5e18479f34343e9358c5b5a5807f3968949b5fd510e4eb9da5",
+  "counterfactual_hash": "af191d5223f376b1f69c8dd1d6aa101052f88a56c4e363b9e269abb8aac87c3a",
+  "evidence_hash": "cc644d5b328463be93c2e6111b4f218739437d68fc86426c3e3818aae3630796",
+  "memory_hit_ids": [
+    "4415011a-5765-45a9-aaed-423a6ca42b0d",
+    "c4676b8d-bf5e-44ec-8315-1a6aeaf4ec17",
+    "c0ac4019-1c41-4efa-9820-9486cbaa6035",
+    "348890bb-0fac-4aa0-8594-0a6373160b3f",
+    "7bebe527-eb6c-4bfc-842b-2af37bcf7168"
+  ],
+  "policy_simulation_hash": "8b436a5883fe2f3deafd52a8923a7b6985e0d2bea808a60cd582ce3f7e4e8ae1",
+  "response_hash": "ab9b00f95438d87fdd3e47d613e748a073e75db1b4772ee3add8d0b54c852b3c",
+  "strict_goal_execution": false,
+  "timestamp": 1771563082677,
+  "turn_id": "9eedb2d2-e002-4a8a-b19f-adcd4a0c949e",
+  "user_message": "State Manager Centralizzato (Zustand/Redux)",
+  "version": 1
+}

@@ -1,0 +1,19 @@
+{
+  "constitutional_spec_hash": "c3e3e89fbc43710c80eca55d1c22997019ff0beaead1c431b5060ef4f807a2ed",
+  "counterfactual_hash": "af191d5223f376b1f69c8dd1d6aa101052f88a56c4e363b9e269abb8aac87c3a",
+  "evidence_hash": "cc644d5b328463be93c2e6111b4f218739437d68fc86426c3e3818aae3630796",
+  "memory_hit_ids": [
+    "092bf226-7710-4673-8e8d-846fb2ec129f",
+    "4921ef34-9b2d-4d59-bba6-46e578dbac8a",
+    "7dab52eb-86c1-474e-9044-f3ff75341145",
+    "a0880742-549a-4cdf-97f4-3f537673f9a8",
+    "f0d75364-084f-45aa-952b-27e444120943"
+  ],
+  "policy_simulation_hash": "8b436a5883fe2f3deafd52a8923a7b6985e0d2bea808a60cd582ce3f7e4e8ae1",
+  "response_hash": "c6cf6e35589c17524ab87af0690d907a0513756dcf5c7520496c8288b98292b2",
+  "strict_goal_execution": false,
+  "timestamp": 1771613179049,
+  "turn_id": "3a189dd8-494f-446f-980d-59de3ea5491e",
+  "user_message": "Session-Only / Temporary",
+  "version": 1
+}

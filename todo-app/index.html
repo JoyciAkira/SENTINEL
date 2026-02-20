@@ -5,65 +5,382 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sentinel Todo App</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        :root { --primary: #3b82f6; --success: #22c55e; --warning: #f59e0b; --danger: #ef4444; }
+        .dark { --bg: #1f2937; --card: #374151; --text: #f3f4f6; --muted: #9ca3af; }
+        .light { --bg: #f3f4f6; --card: #ffffff; --text: #1f2937; --muted: #6b7280; }
+        body { background: var(--bg); color: var(--text); transition: all 0.3s; }
+        .card { background: var(--card); }
+        .muted { color: var(--muted); }
+        @keyframes slideIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+        .slide-in { animation: slideIn 0.3s ease-out; }
+        .task-item { transition: all 0.2s; }
+        .task-item:hover { transform: translateX(4px); }
+        .priority-high { border-left: 4px solid var(--danger); }
+        .priority-medium { border-left: 4px solid var(--warning); }
+        .priority-low { border-left: 4px solid var(--success); }
+        .progress-bar { transition: width 0.5s ease-out; }
+        .dragging { opacity: 0.5; transform: scale(1.02); }
+        .drag-over { border: 2px dashed var(--primary) !important; }
+    </style>
 </head>
-<body class="bg-gray-100 p-8">
-    <div class="max-w-md mx-auto bg-white p-6 rounded-lg shadow-xl">
-        <h1 class="text-2xl font-bold mb-4 text-gray-800">Task Manager</h1>
-        <div class="flex mb-4">
-            <input type="text" id="taskInput" placeholder="Nuovo task..." class="flex-1 border p-2 rounded-l focus:outline-none focus:ring-2 focus:ring-blue-500">
-            <button onclick="addTask()" class="bg-blue-600 text-white px-4 py-2 rounded-r hover:bg-blue-700 transition">Aggiungi</button>
+<body class="light min-h-screen p-4 md:p-8">
+    <div class="max-w-2xl mx-auto">
+        <!-- Header -->
+        <header class="card rounded-xl shadow-lg p-6 mb-6">
+            <div class="flex justify-between items-center mb-4">
+                <div>
+                    <h1 class="text-2xl font-bold flex items-center gap-2">🎯 Sentinel Todo</h1>
+                    <p class="muted text-sm mt-1">Task management deterministico</p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button onclick="toggleTheme()" class="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition" title="Toggle tema">
+                        <span id="themeIcon">🌙</span>
+                    </button>
+                    <button onclick="exportData()" class="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition" title="Esporta">📥</button>
+                    <button onclick="showImport()" class="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition" title="Importa">📤</button>
+                </div>
+            </div>
+            <!-- Progress -->
+            <div class="mb-4">
+                <div class="flex justify-between text-sm mb-1">
+                    <span class="muted">Progresso</span>
+                    <span id="progressText" class="font-semibold">0%</span>
+                </div>
+                <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                    <div id="progressBar" class="progress-bar bg-gradient-to-r from-blue-500 to-green-500 h-2 rounded-full" style="width: 0%"></div>
+                </div>
+            </div>
+            <!-- Stats -->
+            <div class="grid grid-cols-4 gap-2 text-center">
+                <div class="p-2 rounded-lg bg-blue-100 dark:bg-blue-900">
+                    <div id="statTotal" class="text-xl font-bold">0</div>
+                    <div class="text-xs muted">Totali</div>
+                </div>
+                <div class="p-2 rounded-lg bg-green-100 dark:bg-green-900">
+                    <div id="statCompleted" class="text-xl font-bold">0</div>
+                    <div class="text-xs muted">Fatti</div>
+                </div>
+                <div class="p-2 rounded-lg bg-yellow-100 dark:bg-yellow-900">
+                    <div id="statPending" class="text-xl font-bold">0</div>
+                    <div class="text-xs muted">In corso</div>
+                </div>
+                <div class="p-2 rounded-lg bg-red-100 dark:bg-red-900">
+                    <div id="statOverdue" class="text-xl font-bold">0</div>
+                    <div class="text-xs muted">Scaduti</div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Add Task -->
+        <div class="card rounded-xl shadow-lg p-6 mb-6">
+            <div class="flex gap-2 mb-4">
+                <input type="text" id="taskInput" placeholder="Nuovo task..." 
+                    class="flex-1 p-3 rounded-lg border dark:border-gray-600 dark:bg-gray-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    onkeypress="if(event.key==='Enter') addTask()">
+                <button onclick="addTask()" class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-semibold">+ Aggiungi</button>
+            </div>
+            <div class="flex flex-wrap gap-4">
+                <select id="taskPriority" class="p-2 rounded-lg border dark:border-gray-600 dark:bg-gray-800">
+                    <option value="low">🟢 Bassa</option>
+                    <option value="medium" selected>🟡 Media</option>
+                    <option value="high">🔴 Alta</option>
+                </select>
+                <select id="taskCategory" class="p-2 rounded-lg border dark:border-gray-600 dark:bg-gray-800">
+                    <option value="personal">👤 Personale</option>
+                    <option value="work">💼 Lavoro</option>
+                    <option value="shopping">🛒 Shopping</option>
+                    <option value="health">🏥 Salute</option>
+                </select>
+                <input type="date" id="taskDueDate" class="p-2 rounded-lg border dark:border-gray-600 dark:bg-gray-800">
+            </div>
         </div>
-        <ul id="taskList" class="space-y-2"></ul>
+
+        <!-- Filters -->
+        <div class="card rounded-xl shadow-lg p-4 mb-6">
+            <div class="flex flex-wrap gap-2 items-center justify-between">
+                <div class="flex flex-wrap gap-2">
+                    <button onclick="setFilter('all')" class="filter-btn px-3 py-1 rounded-lg transition bg-blue-600 text-white" data-filter="all">Tutti</button>
+                    <button onclick="setFilter('active')" class="filter-btn px-3 py-1 rounded-lg transition bg-gray-200" data-filter="active">Attivi</button>
+                    <button onclick="setFilter('completed')" class="filter-btn px-3 py-1 rounded-lg transition bg-gray-200" data-filter="completed">Fatti</button>
+                    <button onclick="setFilter('overdue')" class="filter-btn px-3 py-1 rounded-lg transition bg-gray-200" data-filter="overdue">Scaduti</button>
+                </div>
+                <input type="text" id="searchInput" placeholder="🔍 Cerca..." onkeyup="renderTasks()" class="p-1 px-2 rounded-lg border dark:border-gray-600 dark:bg-gray-800 text-sm">
+            </div>
+        </div>
+
+        <!-- Task List -->
+        <div id="taskList" class="space-y-2 mb-6"></div>
+
+        <!-- Footer -->
+        <footer class="text-center muted text-sm">
+            <p>Drag & drop per riordinare • Doppio click per modificare • Dati salvati localmente</p>
+        </footer>
+    </div>
+
+    <!-- Edit Modal -->
+    <div id="editModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="card rounded-xl p-6 max-w-md w-full mx-4">
+            <h3 class="text-lg font-bold mb-4">Modifica task</h3>
+            <input type="hidden" id="editTaskId">
+            <input type="text" id="editTaskText" class="w-full p-3 rounded-lg border dark:border-gray-600 dark:bg-gray-800 mb-4">
+            <div class="flex gap-4 mb-4">
+                <select id="editTaskPriority" class="flex-1 p-2 rounded-lg border dark:border-gray-600 dark:bg-gray-800">
+                    <option value="low">🟢 Bassa</option>
+                    <option value="medium">🟡 Media</option>
+                    <option value="high">🔴 Alta</option>
+                </select>
+                <select id="editTaskCategory" class="flex-1 p-2 rounded-lg border dark:border-gray-600 dark:bg-gray-800">
+                    <option value="personal">👤 Personale</option>
+                    <option value="work">💼 Lavoro</option>
+                    <option value="shopping">🛒 Shopping</option>
+                    <option value="health">🏥 Salute</option>
+                </select>
+            </div>
+            <input type="date" id="editTaskDueDate" class="w-full p-2 rounded-lg border dark:border-gray-600 dark:bg-gray-800 mb-4">
+            <div class="flex justify-end gap-2">
+                <button onclick="closeEditModal()" class="px-4 py-2 bg-gray-600 text-white rounded-lg">Annulla</button>
+                <button onclick="saveEdit()" class="px-4 py-2 bg-blue-600 text-white rounded-lg">Salva</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Import Modal -->
+    <div id="importModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="card rounded-xl p-6 max-w-md w-full mx-4">
+            <h3 class="text-lg font-bold mb-4">Importa dati</h3>
+            <textarea id="importTextarea" placeholder="Incolla qui i dati JSON..." class="w-full h-40 p-3 rounded-lg border dark:border-gray-600 dark:bg-gray-800 mb-4"></textarea>
+            <div class="flex justify-end gap-2">
+                <button onclick="closeImportModal()" class="px-4 py-2 bg-gray-600 text-white rounded-lg">Annulla</button>
+                <button onclick="confirmImport()" class="px-4 py-2 bg-blue-600 text-white rounded-lg">Importa</button>
+            </div>
+        </div>
     </div>
 
     <script>
-        const taskInput = document.getElementById('taskInput');
-        const taskList = document.getElementById('taskList');
-        let tasks = JSON.parse(localStorage.getItem('sentinel_tasks')) || [];
+        let tasks = [];
+        let currentFilter = 'all';
+        let draggedItem = null;
+        let isDark = false;
 
-        function renderTasks() {
-            taskList.innerHTML = '';
-            tasks.forEach((task, index) => {
-                const li = document.createElement('li');
-                li.className = "flex justify-between items-center p-2 bg-gray-50 rounded border";
-                li.innerHTML = `
-                    <span class="${task.completed ? 'line-through text-gray-400' : ''}">${sanitize(task.text)}</span>
-                    <div>
-                        <button onclick="toggleTask(${index})" class="text-green-600 mr-2">✓</button>
-                        <button onclick="deleteTask(${index})" class="text-red-600">✕</button>
-                    </div>
-                `;
-                taskList.appendChild(li);
-            });
-            localStorage.setItem('sentinel_tasks', JSON.stringify(tasks));
+        function init() {
+            const stored = localStorage.getItem('sentinel_todo_v2');
+            if (stored) tasks = JSON.parse(stored);
+            isDark = localStorage.getItem('sentinel_theme') === 'dark';
+            applyTheme();
+            renderTasks();
+        }
+
+        function applyTheme() {
+            document.body.classList.toggle('dark', isDark);
+            document.body.classList.toggle('light', !isDark);
+            document.getElementById('themeIcon').textContent = isDark ? '☀️' : '🌙';
+        }
+
+        function toggleTheme() {
+            isDark = !isDark;
+            localStorage.setItem('sentinel_theme', isDark ? 'dark' : 'light');
+            applyTheme();
+        }
+
+        function saveToStorage() {
+            localStorage.setItem('sentinel_todo_v2', JSON.stringify(tasks));
         }
 
         function addTask() {
-            const text = taskInput.value.trim();
-            if (text) {
-                tasks.push({ text, completed: false });
-                taskInput.value = '';
+            const input = document.getElementById('taskInput');
+            const text = input.value.trim();
+            if (!text) return;
+            const task = {
+                id: Date.now().toString(),
+                text,
+                completed: false,
+                priority: document.getElementById('taskPriority').value,
+                category: document.getElementById('taskCategory').value,
+                dueDate: document.getElementById('taskDueDate').value || null,
+                createdAt: new Date().toISOString(),
+                completedAt: null
+            };
+            tasks.unshift(task);
+            saveToStorage();
+            input.value = '';
+            renderTasks();
+        }
+
+        function toggleTask(id) {
+            const task = tasks.find(t => t.id === id);
+            if (task) {
+                task.completed = !task.completed;
+                task.completedAt = task.completed ? new Date().toISOString() : null;
+                saveToStorage();
                 renderTasks();
             }
         }
 
-        function toggleTask(index) {
-            tasks[index].completed = !tasks[index].completed;
+        function deleteTask(id) {
+            tasks = tasks.filter(t => t.id !== id);
+            saveToStorage();
             renderTasks();
         }
 
-        function deleteTask(index) {
-            tasks.splice(index, 1);
+        function setFilter(filter) {
+            currentFilter = filter;
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                const isActive = btn.dataset.filter === filter;
+                btn.classList.toggle('bg-blue-600', isActive);
+                btn.classList.toggle('text-white', isActive);
+                btn.classList.toggle('bg-gray-200', !isActive);
+            });
             renderTasks();
         }
 
-        function sanitize(str) {
-            const temp = document.createElement('div');
-            temp.textContent = str;
-            return temp.innerHTML;
+        function getFilteredTasks() {
+            const search = document.getElementById('searchInput').value.toLowerCase();
+            const today = new Date().toISOString().split('T')[0];
+            return tasks.filter(task => {
+                if (search && !task.text.toLowerCase().includes(search)) return false;
+                switch (currentFilter) {
+                    case 'active': return !task.completed;
+                    case 'completed': return task.completed;
+                    case 'overdue': return !task.completed && task.dueDate && task.dueDate < today;
+                    default: return true;
+                }
+            });
         }
 
-        renderTasks();
+        function renderTasks() {
+            const container = document.getElementById('taskList');
+            const filtered = getFilteredTasks();
+            if (filtered.length === 0) {
+                container.innerHTML = '<div class="card rounded-xl p-8 text-center"><div class="text-4xl mb-2">📭</div><p class="muted">Nessun task</p></div>';
+            } else {
+                container.innerHTML = filtered.map(task => {
+                    const today = new Date().toISOString().split('T')[0];
+                    const isOverdue = !task.completed && task.dueDate && task.dueDate < today;
+                    const catEmoji = { personal: '👤', work: '💼', shopping: '🛒', health: '🏥' }[task.category] || '📋';
+                    return `
+                        <div class="card rounded-lg p-4 shadow task-item priority-${task.priority} slide-in cursor-pointer ${isOverdue ? 'bg-red-50 dark:bg-red-900/20' : ''}"
+                            draggable="true" data-id="${task.id}"
+                            ondblclick="openEditModal('${task.id}')"
+                            ondragstart="handleDragStart(event, '${task.id}')"
+                            ondragover="handleDragOver(event)"
+                            ondrop="handleDrop(event, '${task.id}')"
+                            ondragend="handleDragEnd()">
+                            <div class="flex items-center gap-3">
+                                <input type="checkbox" ${task.completed ? 'checked' : ''} onclick="event.stopPropagation(); toggleTask('${task.id}')" class="w-5 h-5 rounded cursor-pointer">
+                                <div class="flex-1 min-w-0">
+                                    <div class="flex items-center gap-2">
+                                        <span class="${task.completed ? 'line-through muted' : ''} font-medium truncate">${escapeHtml(task.text)}</span>
+                                        ${isOverdue ? '<span class="text-red-500 text-xs">⚠️ SCADUTO</span>' : ''}
+                                    </div>
+                                    <div class="flex items-center gap-3 text-xs muted mt-1">
+                                        <span>${catEmoji} ${task.category}</span>
+                                        ${task.dueDate ? `<span class="${isOverdue ? 'text-red-500' : ''}">📅 ${task.dueDate}</span>` : ''}
+                                    </div>
+                                </div>
+                                <div class="flex items-center gap-1">
+                                    <button onclick="event.stopPropagation(); toggleTask('${task.id}')" class="p-1 hover:bg-green-100 rounded">${task.completed ? '↩️' : '✅'}</button>
+                                    <button onclick="event.stopPropagation(); openEditModal('${task.id}')" class="p-1 hover:bg-blue-100 rounded">✏️</button>
+                                    <button onclick="event.stopPropagation(); deleteTask('${task.id}')" class="p-1 hover:bg-red-100 rounded">🗑</button>
+                                </div>
+                            </div>
+                        </div>`;
+                }).join('');
+            }
+            updateStats();
+        }
+
+        function updateStats() {
+            const total = tasks.length;
+            const completed = tasks.filter(t => t.completed).length;
+            const pending = tasks.filter(t => !t.completed).length;
+            const today = new Date().toISOString().split('T')[0];
+            const overdue = tasks.filter(t => !t.completed && t.dueDate && t.dueDate < today).length;
+            document.getElementById('statTotal').textContent = total;
+            document.getElementById('statCompleted').textContent = completed;
+            document.getElementById('statPending').textContent = pending;
+            document.getElementById('statOverdue').textContent = overdue;
+            const progress = total > 0 ? Math.round((completed / total) * 100) : 0;
+            document.getElementById('progressText').textContent = `${progress}%`;
+            document.getElementById('progressBar').style.width = `${progress}%`;
+        }
+
+        function openEditModal(id) {
+            const task = tasks.find(t => t.id === id);
+            if (!task) return;
+            document.getElementById('editTaskId').value = id;
+            document.getElementById('editTaskText').value = task.text;
+            document.getElementById('editTaskPriority').value = task.priority;
+            document.getElementById('editTaskCategory').value = task.category;
+            document.getElementById('editTaskDueDate').value = task.dueDate || '';
+            document.getElementById('editModal').classList.remove('hidden');
+        }
+
+        function closeEditModal() { document.getElementById('editModal').classList.add('hidden'); }
+
+        function saveEdit() {
+            const id = document.getElementById('editTaskId').value;
+            const task = tasks.find(t => t.id === id);
+            if (!task) return;
+            task.text = document.getElementById('editTaskText').value.trim();
+            task.priority = document.getElementById('editTaskPriority').value;
+            task.category = document.getElementById('editTaskCategory').value;
+            task.dueDate = document.getElementById('editTaskDueDate').value || null;
+            saveToStorage();
+            closeEditModal();
+            renderTasks();
+        }
+
+        function handleDragStart(e, id) { draggedItem = id; e.target.classList.add('dragging'); }
+        function handleDragOver(e) { e.preventDefault(); e.currentTarget.classList.add('drag-over'); }
+        function handleDrop(e, targetId) {
+            e.preventDefault();
+            e.currentTarget.classList.remove('drag-over');
+            if (!draggedItem || draggedItem === targetId) return;
+            const dragIdx = tasks.findIndex(t => t.id === draggedItem);
+            const targetIdx = tasks.findIndex(t => t.id === targetId);
+            if (dragIdx !== -1 && targetIdx !== -1) {
+                const [removed] = tasks.splice(dragIdx, 1);
+                tasks.splice(targetIdx, 0, removed);
+                saveToStorage();
+                renderTasks();
+            }
+        }
+        function handleDragEnd() { document.querySelectorAll('.task-item').forEach(el => el.classList.remove('dragging', 'drag-over')); draggedItem = null; }
+
+        function exportData() {
+            const data = JSON.stringify(tasks, null, 2);
+            const blob = new Blob([data], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'sentinel-todo-backup.json';
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function showImport() { document.getElementById('importModal').classList.remove('hidden'); }
+        function closeImportModal() { document.getElementById('importModal').classList.add('hidden'); }
+
+        function confirmImport() {
+            try {
+                const data = JSON.parse(document.getElementById('importTextarea').value);
+                if (Array.isArray(data)) {
+                    tasks = data;
+                    saveToStorage();
+                    closeImportModal();
+                    renderTasks();
+                } else { alert('Formato non valido'); }
+            } catch (e) { alert('Errore parsing JSON: ' + e.message); }
+        }
+
+        function escapeHtml(str) {
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
+        init();
     </script>
 </body>
 </html>

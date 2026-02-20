@@ -1,0 +1,19 @@
+{
+  "constitutional_spec_hash": "f134bacb99692af43ed69e27f1b94dbb23418b33f0cdb87317cc4fca8b5c6dae",
+  "counterfactual_hash": "af191d5223f376b1f69c8dd1d6aa101052f88a56c4e363b9e269abb8aac87c3a",
+  "evidence_hash": "cc644d5b328463be93c2e6111b4f218739437d68fc86426c3e3818aae3630796",
+  "memory_hit_ids": [
+    "30c026d6-71b4-40ef-a4d2-2993ac91b872",
+    "9eedb2d2-e002-4a8a-b19f-adcd4a0c949e",
+    "32fea854-92e8-4a1d-9652-f3547015d04c",
+    "cb8cddd3-ce4b-40df-970c-db94ce231b3f",
+    "c4676b8d-bf5e-44ec-8315-1a6aeaf4ec17"
+  ],
+  "policy_simulation_hash": "8b436a5883fe2f3deafd52a8923a7b6985e0d2bea808a60cd582ce3f7e4e8ae1",
+  "response_hash": "c32a662503297f919615f45c3218a84516fab278dbb9e7d5df3fdc14f23bd055",
+  "strict_goal_execution": false,
+  "timestamp": 1771563288841,
+  "turn_id": "2eb5c1da-d861-45ef-b857-a289564e5ea4",
+  "user_message": "UI & Local State",
+  "version": 1
+}

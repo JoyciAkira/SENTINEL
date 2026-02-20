@@ -1,0 +1,19 @@
+{
+  "constitutional_spec_hash": "28cb536172d0dff6372c45cc20b1f0c531e55008cccf029cc5edb8880043203f",
+  "counterfactual_hash": "af191d5223f376b1f69c8dd1d6aa101052f88a56c4e363b9e269abb8aac87c3a",
+  "evidence_hash": "cc644d5b328463be93c2e6111b4f218739437d68fc86426c3e3818aae3630796",
+  "memory_hit_ids": [
+    "9126a0ac-ccdc-4d7b-9e51-31a1c5eb2e9e",
+    "2eb5c1da-d861-45ef-b857-a289564e5ea4",
+    "9eedb2d2-e002-4a8a-b19f-adcd4a0c949e",
+    "348890bb-0fac-4aa0-8594-0a6373160b3f",
+    "32fea854-92e8-4a1d-9652-f3547015d04c"
+  ],
+  "policy_simulation_hash": "8b436a5883fe2f3deafd52a8923a7b6985e0d2bea808a60cd582ce3f7e4e8ae1",
+  "response_hash": "c77248ebbe99af03d59866d1abc7647b14dde19c6fe726471a304b82df871fa4",
+  "strict_goal_execution": false,
+  "timestamp": 1771608250425,
+  "turn_id": "2ac09fe7-ebcb-4213-a219-4cdf116be69b",
+  "user_message": "Browser Local Storage",
+  "version": 1
+}

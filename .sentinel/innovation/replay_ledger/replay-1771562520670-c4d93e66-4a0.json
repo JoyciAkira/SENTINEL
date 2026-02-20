@@ -1,0 +1,19 @@
+{
+  "constitutional_spec_hash": "0ccfc24e3f3ec217911473f13e46bdb64bbef6ad3cb78e9405514d6518d9e657",
+  "counterfactual_hash": "af191d5223f376b1f69c8dd1d6aa101052f88a56c4e363b9e269abb8aac87c3a",
+  "evidence_hash": "cc644d5b328463be93c2e6111b4f218739437d68fc86426c3e3818aae3630796",
+  "memory_hit_ids": [
+    "852142b6-34e5-4b58-bcbb-483e55410ec8",
+    "05bc4d8b-fa0d-44c4-b759-5edf700780d9",
+    "b494b3ea-ac0c-4ec0-adba-fac172053d67",
+    "c4676b8d-bf5e-44ec-8315-1a6aeaf4ec17",
+    "512de09f-7b92-44fd-a3f4-aa32ccc98715"
+  ],
+  "policy_simulation_hash": "8b436a5883fe2f3deafd52a8923a7b6985e0d2bea808a60cd582ce3f7e4e8ae1",
+  "response_hash": "57931e8ed358557fd4363d45f0dcfc0b6ce83977c77af8b06b9c72a248b4252d",
+  "strict_goal_execution": false,
+  "timestamp": 1771562520670,
+  "turn_id": "c4d93e66-4a07-45cc-bf7d-9ef78e2e1c67",
+  "user_message": "**Local-First (Single User)**",
+  "version": 1
+}

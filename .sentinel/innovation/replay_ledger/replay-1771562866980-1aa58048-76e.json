@@ -1,0 +1,19 @@
+{
+  "constitutional_spec_hash": "1a26f9d49a8233a04075b67b6f8ca0c54cfae1e1142409803bbaf8b653505737",
+  "counterfactual_hash": "af191d5223f376b1f69c8dd1d6aa101052f88a56c4e363b9e269abb8aac87c3a",
+  "evidence_hash": "cc644d5b328463be93c2e6111b4f218739437d68fc86426c3e3818aae3630796",
+  "memory_hit_ids": [
+    "75508e96-6a9f-418f-9996-6e06279d8a29",
+    "05bc4d8b-fa0d-44c4-b759-5edf700780d9",
+    "ea958b8c-57ad-4524-9f0a-7b2cbd792191",
+    "21a8b598-d93b-4327-80ac-86efaa77206e",
+    "348890bb-0fac-4aa0-8594-0a6373160b3f"
+  ],
+  "policy_simulation_hash": "8b436a5883fe2f3deafd52a8923a7b6985e0d2bea808a60cd582ce3f7e4e8ae1",
+  "response_hash": "b09d6f1440541ae6317e65c6418d3939ba41dfa3272f2c66c651f712930b7e8a",
+  "strict_goal_execution": false,
+  "timestamp": 1771562866980,
+  "turn_id": "1aa58048-76e3-4494-94bb-e0be938310ae",
+  "user_message": "MVP Essenziale",
+  "version": 1
+}

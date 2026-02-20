@@ -1636,21 +1636,60 @@ fn extract_goal_suggestions(content: &str) -> Option<Vec<String>> {
 fn build_system_prompt() -> String {
     "You are Sentinel, an AI Product Manager and Senior Software Architect integrated with Sentinel Protocol.
 
-## ⛔ HARD-GATE: DESIGN FIRST, CODE LATER
+## ⚡ DETERMINISTIC EXECUTION MODE
 
-**CRITICAL RULE**: Do NOT write ANY code until you have:
-1. Understood the user's intent through questions
-2. Proposed 2-3 approaches with trade-offs
-3. Presented the design in sections
-4. Received explicit user approval
+**CORE PRINCIPLE**: Act FIRST, ask ONLY when genuinely blocked by missing critical information.
 
-This applies to EVERY request - even \"simple\" ones. Simple projects are where unexamined assumptions cause the most wasted work.
+**DEFAULT BEHAVIOR**:
+1. Make REASONABLE ASSUMPTIONS based on context
+2. EXECUTE immediately with best practices
+3. Present COMPLETE solutions, not questions
+4. Only ask if there's a GENUINE technical blocker (rare)
+
+This applies to EVERY request. Most \"questions\" are actually delays that frustrate users.
+
+## 🔘 INTERACTIVE CHOICE BUTTONS (MANDATORY)
+
+**CRITICAL**: When proposing approaches or asking the user to choose between options, ALWAYS use this EXACT format:
+
+A) First option title
+   Brief description of first approach
+   
+B) Second option title
+   Brief description of second approach
+   
+C) Third option title
+   Brief description of third approach
+
+The user can CLICK these buttons to select their choice. This format is parsed automatically and rendered as interactive buttons.
+
+**Rules for choice buttons:**
+- ALWAYS provide at least 2 options (A, B, C)
+- Each option MUST start with `A)`, `B)`, or `C)` on its own line
+- Keep titles SHORT (1-5 words)
+- Add a brief description on the next line
+- Use this format in EVERY response where a decision is needed
+- After the user clicks, continue with the chosen approach
+
+**Example:**
+```
+Ecco 3 approcci per la tua todo app:
+
+A) Web App Minimal
+   React + Express + SQLite, setup veloce, ideale per uso personale
+   
+B) Full-Stack Completo
+   React + Node + PostgreSQL + Auth JWT, produzione-ready
+   
+C) API-First
+   Backend REST con documentazione OpenAPI, frontend separato
+```
 
 ## Your Role
 You are NOT a passive code generator. You are a PROACTIVE GUIDE that:
 1. **EXPLORES** project context first (files, docs, recent changes)
-2. **ASKS** clarifying questions ONE AT A TIME
-3. **PROPOSES** 2-3 approaches with your recommendation
+2. **ASKS** clarifying questions with CHOICE BUTTONS
+3. **PROPOSES** 2-3 approaches using A/B/C format
 4. **PRESENTS** design in sections, getting approval after each
 5. **THEN** and ONLY THEN writes code
 
@@ -1661,13 +1700,13 @@ You are NOT a passive code generator. You are a PROACTIVE GUIDE that:
 - Read relevant documentation
 - Understand current architecture
 
-### Step 2: Ask Questions (ONE AT A TIME)
-- Prefer multiple choice over open-ended questions
+### Step 2: Ask Questions (ONE AT A TIME with CHOICE BUTTONS)
+- ALWAYS use A/B/C format for options
 - Focus on: purpose, constraints, success criteria
 - Do NOT overwhelm with multiple questions
 
-### Step 3: Propose Approaches
-- Always present 2-3 different approaches
+### Step 3: Propose Approaches (MANDATORY A/B/C FORMAT)
+- Always present 2-3 different approaches as clickable options
 - Explain trade-offs for each
 - Lead with your recommendation and explain why
 
@@ -1692,18 +1731,31 @@ path: relative/path/to/file.ext
 
 DO NOT immediately write code. Instead:
 
-1. **ASK**: \"What's the primary use case? Personal tasks, team collaboration, or project management?\"
-2. **PROPOSE**: \"I see 3 approaches: (A) Minimal personal app, (B) Team collaboration with sharing, (C) Full project management. I recommend (A) for simplicity, here's why...\"
-3. **PRESENT**: Design sections (architecture → components → features)
-4. **GET APPROVAL**: \"Does this design look good? Should I proceed?\"
+1. **PROPOSE WITH BUTTONS**:
+```
+Capisco che vuoi una todo app. Quale approccio preferisci?
+
+A) App Personale
+   Minimal, veloce, SQLite locale
+   
+B) Team Collaboration  
+   Condivisione, auth, PostgreSQL
+   
+C) API REST
+   Backend documentato, frontend a parte
+```
+
+2. **WAIT** for user to click a button
+3. **PRESENT**: Design sections
+4. **GET APPROVAL**: \"Procedo con questo design?\"
 5. **THEN CODE**: Generate complete, production-ready files
 
 ## Response Format (ALWAYS in Italian)
 
 Before approval:
 1. **🎯 Capisco che vuoi...** - What I understood
-2. **❓ Una domanda...** - ONE clarifying question
-3. **📋 Ecco 3 approcci...** - Options with trade-offs
+2. **❓ Una domanda...** - ONE question with A/B/C options
+3. **📋 Ecco 3 approcci:** - A/B/C format options
 4. **🎨 Il design...** - Design sections with approval checkpoints
 
 After approval:
@@ -1714,12 +1766,14 @@ After approval:
 
 ❌ Jumping straight to code
 ❌ Asking multiple questions at once
-❌ Proposing only one approach
+❌ Proposing only one approach (ALWAYS use A/B/C)
 ❌ Writing minimal/basic implementations
 ❌ Skipping design validation
+❌ Forgetting A/B/C format when decisions are needed
 
 ## Key Principles
 
+- **Choice buttons for every decision** - Use A/B/C format
 - **One question at a time** - Don't overwhelm
 - **Multiple choice preferred** - Easier for user
 - **YAGNI ruthlessly** - Remove unnecessary features
@@ -3464,41 +3518,150 @@ Ti propongo un piano concreto in 3 step: \
         }
 
         "agent_communication_status" => {
-            let agents = vec![
-                serde_json::json!({
-                    "id": "architect-001",
-                    "name": "MasterArchitect",
-                    "status": "active",
-                    "capabilities": ["IntegrationExpert", "ApiExpert", "FrontendExpert"],
-                    "current_task": "Orchestrating workflow"
-                }),
-                serde_json::json!({
-                    "id": "auth-001",
-                    "name": "AuthWorker",
-                    "status": "idle",
-                    "capabilities": ["AuthExpert", "CodeReviewer"],
-                    "current_task": null
-                }),
-                serde_json::json!({
-                    "id": "api-001",
-                    "name": "ApiWorker",
-                    "status": "busy",
-                    "capabilities": ["ApiExpert", "DatabaseExpert"],
-                    "current_task": "Implementing TaskAPI endpoints"
-                }),
-                serde_json::json!({
-                    "id": "ui-001",
-                    "name": "UiWorker",
-                    "status": "busy",
-                    "capabilities": ["FrontendExpert", "TestExpert"],
-                    "current_task": "Building TaskBoard components"
-                })
-            ];
+            // Derive REAL agent status from GoalManifold
+            let manifold = get_manifold().ok();
+            let mut agents: Vec<serde_json::Value> = Vec::new();
+            
+            // Always have the MasterArchitect (orchestrator)
+            let orchestrator_status = if manifold.is_some() { "active" } else { "idle" };
+            let orchestrator_task = manifold.as_ref().and_then(|m| {
+                let pending_count = m.goal_dag.goals()
+                    .filter(|g| matches!(g.status, sentinel_core::types::GoalStatus::Pending))
+                    .count();
+                if pending_count > 0 {
+                    Some(format!("Orchestrating {} pending goals", pending_count))
+                } else {
+                    None
+                }
+            });
+            agents.push(serde_json::json!({
+                "id": "architect-001",
+                "name": "MasterArchitect",
+                "status": orchestrator_status,
+                "capabilities": ["IntegrationExpert", "ApiExpert", "FrontendExpert"],
+                "current_task": orchestrator_task
+            }));
+            
+            // Derive workers from goal types in the manifold
+            if let Some(ref m) = manifold {
+                let goals: Vec<_> = m.goal_dag.goals().collect();
+                
+                // Check for API-related goals
+                let api_goals: Vec<_> = goals.iter()
+                    .filter(|g| {
+                        let desc = g.description.to_ascii_lowercase();
+                        (desc.contains("api") || desc.contains("endpoint") || desc.contains("backend") || desc.contains("rest"))
+                            && matches!(g.status, sentinel_core::types::GoalStatus::InProgress | sentinel_core::types::GoalStatus::Pending)
+                    })
+                    .collect();
+                if !api_goals.is_empty() {
+                    let in_progress = api_goals.iter()
+                        .filter(|g| matches!(g.status, sentinel_core::types::GoalStatus::InProgress))
+                        .count();
+                    agents.push(serde_json::json!({
+                        "id": "api-001",
+                        "name": "ApiWorker",
+                        "status": if in_progress > 0 { "busy" } else { "idle" },
+                        "capabilities": ["ApiExpert", "DatabaseExpert"],
+                        "current_task": if in_progress > 0 {
+                            Some(format!("Implementing: {}", api_goals.iter()
+                                .find(|g| matches!(g.status, sentinel_core::types::GoalStatus::InProgress))
+                                .map(|g| g.description.as_str())
+                                .unwrap_or("API endpoints")))
+                        } else { None }
+                    }));
+                }
+                
+                // Check for UI/Frontend goals
+                let ui_goals: Vec<_> = goals.iter()
+                    .filter(|g| {
+                        let desc = g.description.to_ascii_lowercase();
+                        (desc.contains("ui") || desc.contains("frontend") || desc.contains("component") || desc.contains("react") || desc.contains("vue"))
+                            && matches!(g.status, sentinel_core::types::GoalStatus::InProgress | sentinel_core::types::GoalStatus::Pending)
+                    })
+                    .collect();
+                if !ui_goals.is_empty() {
+                    let in_progress = ui_goals.iter()
+                        .filter(|g| matches!(g.status, sentinel_core::types::GoalStatus::InProgress))
+                        .count();
+                    agents.push(serde_json::json!({
+                        "id": "ui-001",
+                        "name": "UiWorker",
+                        "status": if in_progress > 0 { "busy" } else { "idle" },
+                        "capabilities": ["FrontendExpert", "TestExpert"],
+                        "current_task": if in_progress > 0 {
+                            Some(format!("Building: {}", ui_goals.iter()
+                                .find(|g| matches!(g.status, sentinel_core::types::GoalStatus::InProgress))
+                                .map(|g| g.description.as_str())
+                                .unwrap_or("UI components")))
+                        } else { None }
+                    }));
+                }
+                
+                // Check for Auth/Security goals
+                let auth_goals: Vec<_> = goals.iter()
+                    .filter(|g| {
+                        let desc = g.description.to_ascii_lowercase();
+                        (desc.contains("auth") || desc.contains("security") || desc.contains("login") || desc.contains("jwt"))
+                            && matches!(g.status, sentinel_core::types::GoalStatus::InProgress | sentinel_core::types::GoalStatus::Pending)
+                    })
+                    .collect();
+                if !auth_goals.is_empty() {
+                    let in_progress = auth_goals.iter()
+                        .filter(|g| matches!(g.status, sentinel_core::types::GoalStatus::InProgress))
+                        .count();
+                    agents.push(serde_json::json!({
+                        "id": "auth-001",
+                        "name": "AuthWorker",
+                        "status": if in_progress > 0 { "busy" } else { "idle" },
+                        "capabilities": ["AuthExpert", "SecurityExpert"],
+                        "current_task": if in_progress > 0 {
+                            Some(format!("Implementing: {}", auth_goals.iter()
+                                .find(|g| matches!(g.status, sentinel_core::types::GoalStatus::InProgress))
+                                .map(|g| g.description.as_str())
+                                .unwrap_or("Auth system")))
+                        } else { None }
+                    }));
+                }
+                
+                // Check for Test goals
+                let test_goals: Vec<_> = goals.iter()
+                    .filter(|g| {
+                        let desc = g.description.to_ascii_lowercase();
+                        (desc.contains("test") || desc.contains("spec") || desc.contains("coverage"))
+                            && matches!(g.status, sentinel_core::types::GoalStatus::InProgress | sentinel_core::types::GoalStatus::Pending)
+                    })
+                    .collect();
+                if !test_goals.is_empty() {
+                    let in_progress = test_goals.iter()
+                        .filter(|g| matches!(g.status, sentinel_core::types::GoalStatus::InProgress))
+                        .count();
+                    agents.push(serde_json::json!({
+                        "id": "test-001",
+                        "name": "TestWorker",
+                        "status": if in_progress > 0 { "busy" } else { "idle" },
+                        "capabilities": ["TestExpert", "QualityExpert"],
+                        "current_task": if in_progress > 0 {
+                            Some(format!("Testing: {}", test_goals.iter()
+                                .find(|g| matches!(g.status, sentinel_core::types::GoalStatus::InProgress))
+                                .map(|g| g.description.as_str())
+                                .unwrap_or("Test suite")))
+                        } else { None }
+                    }));
+                }
+            }
+            
+            // If no manifold or no goals, return minimal status
+            if agents.len() == 1 && manifold.is_none() {
+                agents[0]["current_task"] = serde_json::json!("No project initialized");
+            }
 
             let result = serde_json::json!({
                 "success": true,
                 "agent_count": agents.len(),
-                "agents": agents
+                "agents": agents,
+                "source": "manifold_derived",
+                "project_initialized": manifold.is_some()
             });
 
             Some(serde_json::json!({ "content": [{ "type": "text", "text": result.to_string() }] }))

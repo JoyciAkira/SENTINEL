@@ -39,21 +39,31 @@ export default function MessageBubble({ message, index }: MessageBubbleProps) {
   const containsChoices = !isUser && hasChoices(message.content);
   const displayContent = containsChoices ? extractQuestionBeforeChoices(message.content) : message.content;
   
-  // Build reasoning trace data
+  // Build reasoning trace data - USE REAL VALUES from backend
   const reasoningTrace: ReasoningTraceData | null = useMemo(() => {
     if (!message.thoughtChain || message.thoughtChain.length === 0) return null;
     
+    // Use real alignment_score from backend, fallback to 0.85 only if not available
+    const realConfidence = message.explainability?.alignment_score != null 
+      ? message.explainability.alignment_score / 100.0 // Convert from 0-100 to 0-1
+      : 0.85;
+    
+    // Build rationale from evidence if available
+    const rationale = message.explainability?.evidence?.length 
+      ? message.explainability.evidence.join(" | ")
+      : message.content.slice(0, 200);
+    
     return {
-      query: message.content.slice(0, 100),
-      steps: message.thoughtChain.map((thought, i) => ({
+      query: message.explainability?.intent_summary || message.content.slice(0, 100),
+      steps: message.thoughtChain!.map((thought, i) => ({
         action: `Step ${i + 1}`,
         observation: thought,
-        decision: "Proceeding with analysis",
+        decision: i < message.thoughtChain!.length - 1 ? "Proceeding with analysis" : "Analysis complete",
       })),
-      confidence: 0.85,
-      rationale: message.content.slice(0, 200),
+      confidence: realConfidence,
+      rationale: rationale,
     };
-  }, [message.thoughtChain, message.content]);
+  }, [message.thoughtChain, message.content, message.explainability]);
 
   // Handlers
   const handleCopy = async () => {

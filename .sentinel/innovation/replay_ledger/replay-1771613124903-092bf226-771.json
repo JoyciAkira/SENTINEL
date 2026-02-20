@@ -1,0 +1,19 @@
+{
+  "constitutional_spec_hash": "f3c557ac5fe89d2796b07093afff21c1ad09647eb2e0c76e524655856c219f0e",
+  "counterfactual_hash": "af191d5223f376b1f69c8dd1d6aa101052f88a56c4e363b9e269abb8aac87c3a",
+  "evidence_hash": "cc644d5b328463be93c2e6111b4f218739437d68fc86426c3e3818aae3630796",
+  "memory_hit_ids": [
+    "f0d75364-084f-45aa-952b-27e444120943",
+    "bb5881eb-6d74-44a1-ba50-5e50dacb7306",
+    "c8fb133b-9e73-4c4c-83c1-51e4f3f48b9d",
+    "ea4b6755-e558-4848-a347-11bbb932ac7d",
+    "b7f67d58-c375-4045-9d74-0eec1215bc5b"
+  ],
+  "policy_simulation_hash": "8b436a5883fe2f3deafd52a8923a7b6985e0d2bea808a60cd582ce3f7e4e8ae1",
+  "response_hash": "f57ad67f4d0a31f02983d2e4272e6d52d9048af919609423414c5564edc0bcb8",
+  "strict_goal_execution": false,
+  "timestamp": 1771613124903,
+  "turn_id": "092bf226-7710-4673-8e8d-846fb2ec129f",
+  "user_message": "Journaling & Riflessione",
+  "version": 1
+}

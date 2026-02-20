@@ -1,0 +1,19 @@
+{
+  "constitutional_spec_hash": "2be8f74c69dc872c033e3ea503309ef1cfdb75e06c33305305e1935bd95d88de",
+  "counterfactual_hash": "af191d5223f376b1f69c8dd1d6aa101052f88a56c4e363b9e269abb8aac87c3a",
+  "evidence_hash": "cc644d5b328463be93c2e6111b4f218739437d68fc86426c3e3818aae3630796",
+  "memory_hit_ids": [
+    "b7f67d58-c375-4045-9d74-0eec1215bc5b",
+    "2ac09fe7-ebcb-4213-a219-4cdf116be69b",
+    "7bebe527-eb6c-4bfc-842b-2af37bcf7168",
+    "21a8b598-d93b-4327-80ac-86efaa77206e",
+    "348890bb-0fac-4aa0-8594-0a6373160b3f"
+  ],
+  "policy_simulation_hash": "8b436a5883fe2f3deafd52a8923a7b6985e0d2bea808a60cd582ce3f7e4e8ae1",
+  "response_hash": "f98dcf275488a29a76ffcf23e98df658d8d8605e6d99b11f7bf927d9ba6dd052",
+  "strict_goal_execution": false,
+  "timestamp": 1771611649109,
+  "turn_id": "ea4b6755-e558-4848-a347-11bbb932ac7d",
+  "user_message": "Custom Hook Dedicato",
+  "version": 1
+}

@@ -1,0 +1,19 @@
+{
+  "constitutional_spec_hash": "160a0890e2e4a167b02f518a32349bd98d88356fe1a82e2ceeae584d3ef70ef0",
+  "counterfactual_hash": "af191d5223f376b1f69c8dd1d6aa101052f88a56c4e363b9e269abb8aac87c3a",
+  "evidence_hash": "cc644d5b328463be93c2e6111b4f218739437d68fc86426c3e3818aae3630796",
+  "memory_hit_ids": [
+    "9d3ce140-aa56-4de0-ba7a-264dcdc0c251",
+    "c0ac4019-1c41-4efa-9820-9486cbaa6035",
+    "348890bb-0fac-4aa0-8594-0a6373160b3f",
+    "c4676b8d-bf5e-44ec-8315-1a6aeaf4ec17",
+    "ceba2d0b-b14b-4414-ab3b-6832f59c97c5"
+  ],
+  "policy_simulation_hash": "8b436a5883fe2f3deafd52a8923a7b6985e0d2bea808a60cd582ce3f7e4e8ae1",
+  "response_hash": "b58eeff8d8a77d67f8ed085825a7f54a88b854a974d67f45cdae08c26a4daecb",
+  "strict_goal_execution": false,
+  "timestamp": 1771611430964,
+  "turn_id": "b7f67d58-c375-4045-9d74-0eec1215bc5b",
+  "user_message": "Dati Semplici",
+  "version": 1
+}

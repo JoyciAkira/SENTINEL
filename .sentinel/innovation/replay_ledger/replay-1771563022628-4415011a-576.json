@@ -1,0 +1,19 @@
+{
+  "constitutional_spec_hash": "c48a1a21dabfeb2686eea9835c4f22200d93748a48a8df8bcf863edc4e7f6b14",
+  "counterfactual_hash": "af191d5223f376b1f69c8dd1d6aa101052f88a56c4e363b9e269abb8aac87c3a",
+  "evidence_hash": "cc644d5b328463be93c2e6111b4f218739437d68fc86426c3e3818aae3630796",
+  "memory_hit_ids": [
+    "7bebe527-eb6c-4bfc-842b-2af37bcf7168",
+    "75508e96-6a9f-418f-9996-6e06279d8a29",
+    "21a8b598-d93b-4327-80ac-86efaa77206e",
+    "348890bb-0fac-4aa0-8594-0a6373160b3f",
+    "e34b75ab-5515-4030-9647-82875e1c17a9"
+  ],
+  "policy_simulation_hash": "8b436a5883fe2f3deafd52a8923a7b6985e0d2bea808a60cd582ce3f7e4e8ae1",
+  "response_hash": "0d6ed7d885732f516e04b4e538fca90ab31a5a163f4c3d3ffc9e54644e666d7b",
+  "strict_goal_execution": false,
+  "timestamp": 1771563022628,
+  "turn_id": "4415011a-5765-45a9-aaed-423a6ca42b0d",
+  "user_message": "Logica di Interazione UI",
+  "version": 1
+}

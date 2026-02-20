@@ -1,0 +1,19 @@
+{
+  "constitutional_spec_hash": "5be4b98d3c726ebae6c5d311582fa6cfc6a12b0e8605aa1e53308c5c41577431",
+  "counterfactual_hash": "af191d5223f376b1f69c8dd1d6aa101052f88a56c4e363b9e269abb8aac87c3a",
+  "evidence_hash": "cc644d5b328463be93c2e6111b4f218739437d68fc86426c3e3818aae3630796",
+  "memory_hit_ids": [
+    "4d18e3af-6a04-407e-b4f4-2de3ffc06057",
+    "a0880742-549a-4cdf-97f4-3f537673f9a8",
+    "512de09f-7b92-44fd-a3f4-aa32ccc98715",
+    "c4676b8d-bf5e-44ec-8315-1a6aeaf4ec17",
+    "2bcf1048-2767-48c9-b07c-e721be2cdbe1"
+  ],
+  "policy_simulation_hash": "8b436a5883fe2f3deafd52a8923a7b6985e0d2bea808a60cd582ce3f7e4e8ae1",
+  "response_hash": "7fe6eb53f9e107994c7cb8b1f3b67ce616569df38995f17527d70127f4a71aa8",
+  "strict_goal_execution": false,
+  "timestamp": 1771562477746,
+  "turn_id": "852142b6-34e5-4b58-bcbb-483e55410ec8",
+  "user_message": "voglio creare un'app per gestire task",
+  "version": 1
+}

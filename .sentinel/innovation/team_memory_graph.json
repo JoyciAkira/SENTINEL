@@ -1,5 +1,5 @@
 {
-  "edge_count": 44,
+  "edge_count": 117,
   "edges": [
     {
       "relation": "temporal",
@@ -110,6 +110,270 @@
       "weight": 1.0
     },
     {
+      "relation": "temporal",
+      "source": "b494b3ea-ac0c-4ec0-adba-fac172053d67",
+      "target": "a0880742-549a-4cdf-97f4-3f537673f9a8",
+      "weight": 1.0
+    },
+    {
+      "relation": "temporal",
+      "source": "a0880742-549a-4cdf-97f4-3f537673f9a8",
+      "target": "05bc4d8b-fa0d-44c4-b759-5edf700780d9",
+      "weight": 1.0
+    },
+    {
+      "relation": "temporal",
+      "source": "05bc4d8b-fa0d-44c4-b759-5edf700780d9",
+      "target": "4d18e3af-6a04-407e-b4f4-2de3ffc06057",
+      "weight": 1.0
+    },
+    {
+      "relation": "temporal",
+      "source": "4d18e3af-6a04-407e-b4f4-2de3ffc06057",
+      "target": "7dab52eb-86c1-474e-9044-f3ff75341145",
+      "weight": 1.0
+    },
+    {
+      "relation": "temporal",
+      "source": "7dab52eb-86c1-474e-9044-f3ff75341145",
+      "target": "852142b6-34e5-4b58-bcbb-483e55410ec8",
+      "weight": 1.0
+    },
+    {
+      "relation": "temporal",
+      "source": "852142b6-34e5-4b58-bcbb-483e55410ec8",
+      "target": "c4d93e66-4a07-45cc-bf7d-9ef78e2e1c67",
+      "weight": 1.0
+    },
+    {
+      "relation": "temporal",
+      "source": "c4d93e66-4a07-45cc-bf7d-9ef78e2e1c67",
+      "target": "cb8cddd3-ce4b-40df-970c-db94ce231b3f",
+      "weight": 1.0
+    },
+    {
+      "relation": "temporal",
+      "source": "cb8cddd3-ce4b-40df-970c-db94ce231b3f",
+      "target": "e34b75ab-5515-4030-9647-82875e1c17a9",
+      "weight": 1.0
+    },
+    {
+      "relation": "temporal",
+      "source": "e34b75ab-5515-4030-9647-82875e1c17a9",
+      "target": "b0e618ac-720d-43cb-8ff2-2ea897e61cdb",
+      "weight": 1.0
+    },
+    {
+      "relation": "temporal",
+      "source": "b0e618ac-720d-43cb-8ff2-2ea897e61cdb",
+      "target": "1ee68cf9-1e1b-4032-84c2-ce306feabe65",
+      "weight": 1.0
+    },
+    {
+      "relation": "temporal",
+      "source": "1ee68cf9-1e1b-4032-84c2-ce306feabe65",
+      "target": "96c9ac20-a247-48a6-aa66-5ba58b498c18",
+      "weight": 1.0
+    },
+    {
+      "relation": "temporal",
+      "source": "96c9ac20-a247-48a6-aa66-5ba58b498c18",
+      "target": "32fea854-92e8-4a1d-9652-f3547015d04c",
+      "weight": 1.0
+    },
+    {
+      "relation": "temporal",
+      "source": "32fea854-92e8-4a1d-9652-f3547015d04c",
+      "target": "348890bb-0fac-4aa0-8594-0a6373160b3f",
+      "weight": 1.0
+    },
+    {
+      "relation": "temporal",
+      "source": "348890bb-0fac-4aa0-8594-0a6373160b3f",
+      "target": "21a8b598-d93b-4327-80ac-86efaa77206e",
+      "weight": 1.0
+    },
+    {
+      "relation": "temporal",
+      "source": "21a8b598-d93b-4327-80ac-86efaa77206e",
+      "target": "ea958b8c-57ad-4524-9f0a-7b2cbd792191",
+      "weight": 1.0
+    },
+    {
+      "relation": "temporal",
+      "source": "ea958b8c-57ad-4524-9f0a-7b2cbd792191",
+      "target": "75508e96-6a9f-418f-9996-6e06279d8a29",
+      "weight": 1.0
+    },
+    {
+      "relation": "temporal",
+      "source": "75508e96-6a9f-418f-9996-6e06279d8a29",
+      "target": "1aa58048-76e3-4494-94bb-e0be938310ae",
+      "weight": 1.0
+    },
+    {
+      "relation": "temporal",
+      "source": "1aa58048-76e3-4494-94bb-e0be938310ae",
+      "target": "c0ac4019-1c41-4efa-9820-9486cbaa6035",
+      "weight": 1.0
+    },
+    {
+      "relation": "temporal",
+      "source": "c0ac4019-1c41-4efa-9820-9486cbaa6035",
+      "target": "aeaf409e-85af-47b8-9c03-c36bb66f3003",
+      "weight": 1.0
+    },
+    {
+      "relation": "temporal",
+      "source": "aeaf409e-85af-47b8-9c03-c36bb66f3003",
+      "target": "7bebe527-eb6c-4bfc-842b-2af37bcf7168",
+      "weight": 1.0
+    },
+    {
+      "relation": "temporal",
+      "source": "7bebe527-eb6c-4bfc-842b-2af37bcf7168",
+      "target": "4415011a-5765-45a9-aaed-423a6ca42b0d",
+      "weight": 1.0
+    },
+    {
+      "relation": "temporal",
+      "source": "4415011a-5765-45a9-aaed-423a6ca42b0d",
+      "target": "9eedb2d2-e002-4a8a-b19f-adcd4a0c949e",
+      "weight": 1.0
+    },
+    {
+      "relation": "temporal",
+      "source": "9eedb2d2-e002-4a8a-b19f-adcd4a0c949e",
+      "target": "cf20ae6d-a908-45d8-8404-421458d99ea4",
+      "weight": 1.0
+    },
+    {
+      "relation": "temporal",
+      "source": "cf20ae6d-a908-45d8-8404-421458d99ea4",
+      "target": "a78571ed-633a-4199-8c51-17b8d74e7b98",
+      "weight": 1.0
+    },
+    {
+      "relation": "temporal",
+      "source": "a78571ed-633a-4199-8c51-17b8d74e7b98",
+      "target": "30c026d6-71b4-40ef-a4d2-2993ac91b872",
+      "weight": 1.0
+    },
+    {
+      "relation": "temporal",
+      "source": "30c026d6-71b4-40ef-a4d2-2993ac91b872",
+      "target": "2eb5c1da-d861-45ef-b857-a289564e5ea4",
+      "weight": 1.0
+    },
+    {
+      "relation": "temporal",
+      "source": "2eb5c1da-d861-45ef-b857-a289564e5ea4",
+      "target": "88f5e737-ce49-472c-83cc-75cfbb1999a5",
+      "weight": 1.0
+    },
+    {
+      "relation": "temporal",
+      "source": "88f5e737-ce49-472c-83cc-75cfbb1999a5",
+      "target": "7abe95f1-9e5f-48cf-9359-a6c8a1d58875",
+      "weight": 1.0
+    },
+    {
+      "relation": "temporal",
+      "source": "7abe95f1-9e5f-48cf-9359-a6c8a1d58875",
+      "target": "e1f684c6-d685-47ea-a791-200e7968f12a",
+      "weight": 1.0
+    },
+    {
+      "relation": "temporal",
+      "source": "e1f684c6-d685-47ea-a791-200e7968f12a",
+      "target": "5374000f-0a9d-4983-be4a-674ca677eaeb",
+      "weight": 1.0
+    },
+    {
+      "relation": "temporal",
+      "source": "5374000f-0a9d-4983-be4a-674ca677eaeb",
+      "target": "89c23769-4519-4746-ab29-54ccbdc2c3fc",
+      "weight": 1.0
+    },
+    {
+      "relation": "temporal",
+      "source": "89c23769-4519-4746-ab29-54ccbdc2c3fc",
+      "target": "9126a0ac-ccdc-4d7b-9e51-31a1c5eb2e9e",
+      "weight": 1.0
+    },
+    {
+      "relation": "temporal",
+      "source": "9126a0ac-ccdc-4d7b-9e51-31a1c5eb2e9e",
+      "target": "2ac09fe7-ebcb-4213-a219-4cdf116be69b",
+      "weight": 1.0
+    },
+    {
+      "relation": "temporal",
+      "source": "2ac09fe7-ebcb-4213-a219-4cdf116be69b",
+      "target": "76cd543a-b765-46b1-bb54-a220a8e77dc9",
+      "weight": 1.0
+    },
+    {
+      "relation": "temporal",
+      "source": "76cd543a-b765-46b1-bb54-a220a8e77dc9",
+      "target": "ceba2d0b-b14b-4414-ab3b-6832f59c97c5",
+      "weight": 1.0
+    },
+    {
+      "relation": "temporal",
+      "source": "ceba2d0b-b14b-4414-ab3b-6832f59c97c5",
+      "target": "9d3ce140-aa56-4de0-ba7a-264dcdc0c251",
+      "weight": 1.0
+    },
+    {
+      "relation": "temporal",
+      "source": "9d3ce140-aa56-4de0-ba7a-264dcdc0c251",
+      "target": "b7f67d58-c375-4045-9d74-0eec1215bc5b",
+      "weight": 1.0
+    },
+    {
+      "relation": "temporal",
+      "source": "b7f67d58-c375-4045-9d74-0eec1215bc5b",
+      "target": "ea4b6755-e558-4848-a347-11bbb932ac7d",
+      "weight": 1.0
+    },
+    {
+      "relation": "temporal",
+      "source": "ea4b6755-e558-4848-a347-11bbb932ac7d",
+      "target": "c8fb133b-9e73-4c4c-83c1-51e4f3f48b9d",
+      "weight": 1.0
+    },
+    {
+      "relation": "temporal",
+      "source": "c8fb133b-9e73-4c4c-83c1-51e4f3f48b9d",
+      "target": "bb5881eb-6d74-44a1-ba50-5e50dacb7306",
+      "weight": 1.0
+    },
+    {
+      "relation": "temporal",
+      "source": "bb5881eb-6d74-44a1-ba50-5e50dacb7306",
+      "target": "f0d75364-084f-45aa-952b-27e444120943",
+      "weight": 1.0
+    },
+    {
+      "relation": "temporal",
+      "source": "f0d75364-084f-45aa-952b-27e444120943",
+      "target": "092bf226-7710-4673-8e8d-846fb2ec129f",
+      "weight": 1.0
+    },
+    {
+      "relation": "temporal",
+      "source": "092bf226-7710-4673-8e8d-846fb2ec129f",
+      "target": "4921ef34-9b2d-4d59-bba6-46e578dbac8a",
+      "weight": 1.0
+    },
+    {
+      "relation": "temporal",
+      "source": "4921ef34-9b2d-4d59-bba6-46e578dbac8a",
+      "target": "3a189dd8-494f-446f-980d-59de3ea5491e",
+      "weight": 1.0
+    },
+    {
       "relation": "semantic_overlap",
       "source": "0c23de9d-b170-466b-bd0e-83dc287936b6",
       "target": "086e9969-7540-4c91-92bd-4976a7f6fb8c",
@@ -143,6 +407,24 @@
       "relation": "semantic_overlap",
       "source": "0c23de9d-b170-466b-bd0e-83dc287936b6",
       "target": "c4676b8d-bf5e-44ec-8315-1a6aeaf4ec17",
+      "weight": 5.0
+    },
+    {
+      "relation": "semantic_overlap",
+      "source": "0c23de9d-b170-466b-bd0e-83dc287936b6",
+      "target": "a0880742-549a-4cdf-97f4-3f537673f9a8",
+      "weight": 5.0
+    },
+    {
+      "relation": "semantic_overlap",
+      "source": "0c23de9d-b170-466b-bd0e-83dc287936b6",
+      "target": "05bc4d8b-fa0d-44c4-b759-5edf700780d9",
+      "weight": 5.0
+    },
+    {
+      "relation": "semantic_overlap",
+      "source": "0c23de9d-b170-466b-bd0e-83dc287936b6",
+      "target": "4d18e3af-6a04-407e-b4f4-2de3ffc06057",
       "weight": 5.0
     },
     {
@@ -201,6 +483,24 @@
     },
     {
       "relation": "semantic_overlap",
+      "source": "086e9969-7540-4c91-92bd-4976a7f6fb8c",
+      "target": "a0880742-549a-4cdf-97f4-3f537673f9a8",
+      "weight": 6.0
+    },
+    {
+      "relation": "semantic_overlap",
+      "source": "086e9969-7540-4c91-92bd-4976a7f6fb8c",
+      "target": "05bc4d8b-fa0d-44c4-b759-5edf700780d9",
+      "weight": 6.0
+    },
+    {
+      "relation": "semantic_overlap",
+      "source": "086e9969-7540-4c91-92bd-4976a7f6fb8c",
+      "target": "4d18e3af-6a04-407e-b4f4-2de3ffc06057",
+      "weight": 6.0
+    },
+    {
+      "relation": "semantic_overlap",
       "source": "ae2457d5-1ec2-415a-b9b0-53405f7965c9",
       "target": "3470cee5-b922-4e3f-aad0-967c3deabd86",
       "weight": 6.0
@@ -225,6 +525,24 @@
     },
     {
       "relation": "semantic_overlap",
+      "source": "ae2457d5-1ec2-415a-b9b0-53405f7965c9",
+      "target": "a0880742-549a-4cdf-97f4-3f537673f9a8",
+      "weight": 6.0
+    },
+    {
+      "relation": "semantic_overlap",
+      "source": "ae2457d5-1ec2-415a-b9b0-53405f7965c9",
+      "target": "05bc4d8b-fa0d-44c4-b759-5edf700780d9",
+      "weight": 6.0
+    },
+    {
+      "relation": "semantic_overlap",
+      "source": "ae2457d5-1ec2-415a-b9b0-53405f7965c9",
+      "target": "4d18e3af-6a04-407e-b4f4-2de3ffc06057",
+      "weight": 6.0
+    },
+    {
+      "relation": "semantic_overlap",
       "source": "3470cee5-b922-4e3f-aad0-967c3deabd86",
       "target": "2bcf1048-2767-48c9-b07c-e721be2cdbe1",
       "weight": 6.0
@@ -239,6 +557,24 @@
       "relation": "semantic_overlap",
       "source": "3470cee5-b922-4e3f-aad0-967c3deabd86",
       "target": "c4676b8d-bf5e-44ec-8315-1a6aeaf4ec17",
+      "weight": 6.0
+    },
+    {
+      "relation": "semantic_overlap",
+      "source": "3470cee5-b922-4e3f-aad0-967c3deabd86",
+      "target": "a0880742-549a-4cdf-97f4-3f537673f9a8",
+      "weight": 6.0
+    },
+    {
+      "relation": "semantic_overlap",
+      "source": "3470cee5-b922-4e3f-aad0-967c3deabd86",
+      "target": "05bc4d8b-fa0d-44c4-b759-5edf700780d9",
+      "weight": 6.0
+    },
+    {
+      "relation": "semantic_overlap",
+      "source": "3470cee5-b922-4e3f-aad0-967c3deabd86",
+      "target": "4d18e3af-6a04-407e-b4f4-2de3ffc06057",
       "weight": 6.0
     },
     {
@@ -261,14 +597,116 @@
     },
     {
       "relation": "semantic_overlap",
+      "source": "2bcf1048-2767-48c9-b07c-e721be2cdbe1",
+      "target": "a0880742-549a-4cdf-97f4-3f537673f9a8",
+      "weight": 6.0
+    },
+    {
+      "relation": "semantic_overlap",
+      "source": "2bcf1048-2767-48c9-b07c-e721be2cdbe1",
+      "target": "05bc4d8b-fa0d-44c4-b759-5edf700780d9",
+      "weight": 6.0
+    },
+    {
+      "relation": "semantic_overlap",
+      "source": "2bcf1048-2767-48c9-b07c-e721be2cdbe1",
+      "target": "4d18e3af-6a04-407e-b4f4-2de3ffc06057",
+      "weight": 6.0
+    },
+    {
+      "relation": "semantic_overlap",
       "source": "512de09f-7b92-44fd-a3f4-aa32ccc98715",
       "target": "c4676b8d-bf5e-44ec-8315-1a6aeaf4ec17",
       "weight": 6.0
+    },
+    {
+      "relation": "semantic_overlap",
+      "source": "512de09f-7b92-44fd-a3f4-aa32ccc98715",
+      "target": "a0880742-549a-4cdf-97f4-3f537673f9a8",
+      "weight": 6.0
+    },
+    {
+      "relation": "semantic_overlap",
+      "source": "512de09f-7b92-44fd-a3f4-aa32ccc98715",
+      "target": "05bc4d8b-fa0d-44c4-b759-5edf700780d9",
+      "weight": 6.0
+    },
+    {
+      "relation": "semantic_overlap",
+      "source": "512de09f-7b92-44fd-a3f4-aa32ccc98715",
+      "target": "4d18e3af-6a04-407e-b4f4-2de3ffc06057",
+      "weight": 6.0
+    },
+    {
+      "relation": "semantic_overlap",
+      "source": "c4676b8d-bf5e-44ec-8315-1a6aeaf4ec17",
+      "target": "a0880742-549a-4cdf-97f4-3f537673f9a8",
+      "weight": 6.0
+    },
+    {
+      "relation": "semantic_overlap",
+      "source": "c4676b8d-bf5e-44ec-8315-1a6aeaf4ec17",
+      "target": "05bc4d8b-fa0d-44c4-b759-5edf700780d9",
+      "weight": 6.0
+    },
+    {
+      "relation": "semantic_overlap",
+      "source": "c4676b8d-bf5e-44ec-8315-1a6aeaf4ec17",
+      "target": "4d18e3af-6a04-407e-b4f4-2de3ffc06057",
+      "weight": 6.0
+    },
+    {
+      "relation": "semantic_overlap",
+      "source": "a0880742-549a-4cdf-97f4-3f537673f9a8",
+      "target": "05bc4d8b-fa0d-44c4-b759-5edf700780d9",
+      "weight": 6.0
+    },
+    {
+      "relation": "semantic_overlap",
+      "source": "a0880742-549a-4cdf-97f4-3f537673f9a8",
+      "target": "4d18e3af-6a04-407e-b4f4-2de3ffc06057",
+      "weight": 6.0
+    },
+    {
+      "relation": "semantic_overlap",
+      "source": "05bc4d8b-fa0d-44c4-b759-5edf700780d9",
+      "target": "4d18e3af-6a04-407e-b4f4-2de3ffc06057",
+      "weight": 6.0
+    },
+    {
+      "relation": "semantic_overlap",
+      "source": "7dab52eb-86c1-474e-9044-f3ff75341145",
+      "target": "cb8cddd3-ce4b-40df-970c-db94ce231b3f",
+      "weight": 2.0
+    },
+    {
+      "relation": "semantic_overlap",
+      "source": "32fea854-92e8-4a1d-9652-f3547015d04c",
+      "target": "c0ac4019-1c41-4efa-9820-9486cbaa6035",
+      "weight": 3.0
+    },
+    {
+      "relation": "semantic_overlap",
+      "source": "348890bb-0fac-4aa0-8594-0a6373160b3f",
+      "target": "2ac09fe7-ebcb-4213-a219-4cdf116be69b",
+      "weight": 3.0
+    },
+    {
+      "relation": "semantic_overlap",
+      "source": "5374000f-0a9d-4983-be4a-674ca677eaeb",
+      "target": "89c23769-4519-4746-ab29-54ccbdc2c3fc",
+      "weight": 5.0
+    },
+    {
+      "relation": "semantic_overlap",
+      "source": "9126a0ac-ccdc-4d7b-9e51-31a1c5eb2e9e",
+      "target": "f0d75364-084f-45aa-952b-27e444120943",
+      "weight": 3.0
     }
   ],
-  "generated_at": 1771556474321,
-  "graph_hash": "3c2a6821d26152752708429a8209c82ddb591f81f4fe5bb9a18b9135a8431723",
-  "node_count": 19,
+  "generated_at": 1771613179057,
+  "graph_hash": "9c8f7509700b4dce2b87a648a9777798bdbe7cc0040b433f65dda195edededd8",
+  "node_count": 63,
   "nodes": [
     {
       "id": "7944bee6-5adf-489e-9ca6-cc5fb511b8ba",
@@ -402,9 +840,317 @@
       "lamport": 1771556474314,
       "provenance_hash": "1da5c0151eb0f08fdfb28075171408a6274e6d1c7af9564a5b1e6fdff5b8da6c",
       "timestamp": 1771556474314
+    },
+    {
+      "id": "a0880742-549a-4cdf-97f4-3f537673f9a8",
+      "intent_summary": "crea una todo list app completa",
+      "lamport": 1771556759447,
+      "provenance_hash": "4280c951ad2b7b675bf5760a71b77581ea088d9a1f287c749732b9b8588bd73a",
+      "timestamp": 1771556759447
+    },
+    {
+      "id": "05bc4d8b-fa0d-44c4-b759-5edf700780d9",
+      "intent_summary": "crea una todo list app completa",
+      "lamport": 1771556998960,
+      "provenance_hash": "44a09e8329103d933e0147954699065c140dbc34583e98af2e292b03cc126c0e",
+      "timestamp": 1771556998960
+    },
+    {
+      "id": "4d18e3af-6a04-407e-b4f4-2de3ffc06057",
+      "intent_summary": "crea una todo list app completa",
+      "lamport": 1771559938297,
+      "provenance_hash": "30b6e2b13ca055d273e5fcea9482c765f0380f04dbc597ff04185a89520ee150",
+      "timestamp": 1771559938297
+    },
+    {
+      "id": "7dab52eb-86c1-474e-9044-f3ff75341145",
+      "intent_summary": "**Web App** (es. React/Next.js)",
+      "lamport": 1771559953295,
+      "provenance_hash": "2271567faa3ba4ef7b118256425d6440e8b79da0860814542456f14d79492b16",
+      "timestamp": 1771559953295
+    },
+    {
+      "id": "852142b6-34e5-4b58-bcbb-483e55410ec8",
+      "intent_summary": "voglio creare un'app per gestire task",
+      "lamport": 1771562477746,
+      "provenance_hash": "5467342af54e46da5e7bbe98b8127e8a4ae68d92f68fcb558d999bd13c6bdce4",
+      "timestamp": 1771562477746
+    },
+    {
+      "id": "c4d93e66-4a07-45cc-bf7d-9ef78e2e1c67",
+      "intent_summary": "**Local-First (Single User)**",
+      "lamport": 1771562520670,
+      "provenance_hash": "6d5bf7f662974aa175a962c49168b380beb5d651785a5dbb57b0c6356315fa93",
+      "timestamp": 1771562520670
+    },
+    {
+      "id": "cb8cddd3-ce4b-40df-970c-db94ce231b3f",
+      "intent_summary": "Web App (PWA)",
+      "lamport": 1771562537760,
+      "provenance_hash": "be2a9815b0ff75281689677579f10ac707c2129e5add421b80539ec2f605cc6f",
+      "timestamp": 1771562537760
+    },
+    {
+      "id": "e34b75ab-5515-4030-9647-82875e1c17a9",
+      "intent_summary": "IndexedDB con Dexie.js",
+      "lamport": 1771562558544,
+      "provenance_hash": "5f0701a311990e88c90ce30616e97cf72c1e15ef295ed0e4ff6103dbdaa5fc73",
+      "timestamp": 1771562558544
+    },
+    {
+      "id": "b0e618ac-720d-43cb-8ff2-2ea897e61cdb",
+      "intent_summary": "Schema Flat",
+      "lamport": 1771562576266,
+      "provenance_hash": "c6d164ac031b0e386f07de157dd3daeddda7ea4f12549cf60379605cb6d89411",
+      "timestamp": 1771562576266
+    },
+    {
+      "id": "1ee68cf9-1e1b-4032-84c2-ce306feabe65",
+      "intent_summary": "**Single Table**",
+      "lamport": 1771562632078,
+      "provenance_hash": "844d0cde9f9d5fc99ea724b8f353dbd73a632722793bea1e17b6fa5ce2d9ed5e",
+      "timestamp": 1771562632078
+    },
+    {
+      "id": "96c9ac20-a247-48a6-aa66-5ba58b498c18",
+      "intent_summary": "riprova",
+      "lamport": 1771562648399,
+      "provenance_hash": "7ed7ad579ba69d4865622907c39d9f29d4755d92dd97cd052152d6692f9f853d",
+      "timestamp": 1771562648399
+    },
+    {
+      "id": "32fea854-92e8-4a1d-9652-f3547015d04c",
+      "intent_summary": "React + Tailwind CSS",
+      "lamport": 1771562672604,
+      "provenance_hash": "d2b4009549d0c870eee4f6b62526ef8a520ad3e841a5fe8c5b08b8e19456b9e9",
+      "timestamp": 1771562672604
+    },
+    {
+      "id": "348890bb-0fac-4aa0-8594-0a6373160b3f",
+      "intent_summary": "Local Storage / Browser",
+      "lamport": 1771562704983,
+      "provenance_hash": "d31996596baee325d8c4edad68e25ee161c614dab56ac6d40fbfbd9e0b656919",
+      "timestamp": 1771562704983
+    },
+    {
+      "id": "21a8b598-d93b-4327-80ac-86efaa77206e",
+      "intent_summary": "Stato UI Persistente",
+      "lamport": 1771562754874,
+      "provenance_hash": "a2a50211026a067ae7e9d0299bc103a77d2361ac4283e70e93daacb5aefcc788",
+      "timestamp": 1771562754874
+    },
+    {
+      "id": "ea958b8c-57ad-4524-9f0a-7b2cbd792191",
+      "intent_summary": "Semplice (LocalStorage)",
+      "lamport": 1771562784649,
+      "provenance_hash": "3d2b5fbe7365b6fcf0e8fd47ff984678b1fecff90b701ff6c9bbfda43f0638f2",
+      "timestamp": 1771562784649
+    },
+    {
+      "id": "75508e96-6a9f-418f-9996-6e06279d8a29",
+      "intent_summary": "riprova",
+      "lamport": 1771562846253,
+      "provenance_hash": "1bf01bcc9efba15a8471725988e50b39422a47696feeffcc56f2a840f3c7c875",
+      "timestamp": 1771562846253
+    },
+    {
+      "id": "1aa58048-76e3-4494-94bb-e0be938310ae",
+      "intent_summary": "MVP Essenziale",
+      "lamport": 1771562866980,
+      "provenance_hash": "f4fad9149ae20de09389cd02305126df3f13d65bdd3f2bdd2ca92f37da397e01",
+      "timestamp": 1771562866980
+    },
+    {
+      "id": "c0ac4019-1c41-4efa-9820-9486cbaa6035",
+      "intent_summary": "React + Tailwind CSS",
+      "lamport": 1771562881732,
+      "provenance_hash": "1b8025da5f8cf33ef4122cb0f9ef2d1579d16f50e7223cc5e16eb71848ad8eaf",
+      "timestamp": 1771562881732
+    },
+    {
+      "id": "aeaf409e-85af-47b8-9c03-c36bb66f3003",
+      "intent_summary": "Landing Page Interattiva",
+      "lamport": 1771562899881,
+      "provenance_hash": "10f85499bfa8c5e465c0add4655372af5e503608727ff2fbc630d750d1a0721b",
+      "timestamp": 1771562899881
+    },
+    {
+      "id": "7bebe527-eb6c-4bfc-842b-2af37bcf7168",
+      "intent_summary": "**Conversione Funzionale**",
+      "lamport": 1771562970938,
+      "provenance_hash": "c42908c28e6a880fe4868267cfb73228dc0c3d5b32bc87e79c7777e0ea07156f",
+      "timestamp": 1771562970938
+    },
+    {
+      "id": "4415011a-5765-45a9-aaed-423a6ca42b0d",
+      "intent_summary": "Logica di Interazione UI",
+      "lamport": 1771563022628,
+      "provenance_hash": "75d6e011719a2cb6046a2344278adb29675b9fdfadf8aba26d6a0db1eba9a52c",
+      "timestamp": 1771563022628
+    },
+    {
+      "id": "9eedb2d2-e002-4a8a-b19f-adcd4a0c949e",
+      "intent_summary": "State Manager Centralizzato (Zustand/Redux)",
+      "lamport": 1771563082677,
+      "provenance_hash": "79f70c9932fb14ea967ec7e23797e0020f829e0f86e7ae2dc8eeba986216a55b",
+      "timestamp": 1771563082677
+    },
+    {
+      "id": "cf20ae6d-a908-45d8-8404-421458d99ea4",
+      "intent_summary": "**Zustand (Raccomandato)**",
+      "lamport": 1771563093613,
+      "provenance_hash": "782e43882516e9df87b66a1cda6787a1909abfbb51de31dc298fd80e3c941919",
+      "timestamp": 1771563093613
+    },
+    {
+      "id": "a78571ed-633a-4199-8c51-17b8d74e7b98",
+      "intent_summary": "Sync Manuale con Hydration",
+      "lamport": 1771563129295,
+      "provenance_hash": "c617e8f38087e317bf7163b6a409b0cf4bee218dc383f94c345dff89cd0114d9",
+      "timestamp": 1771563129295
+    },
+    {
+      "id": "30c026d6-71b4-40ef-a4d2-2993ac91b872",
+      "intent_summary": "riprova",
+      "lamport": 1771563220109,
+      "provenance_hash": "1859b28178db7ab6384d71fbe59e976d94721871af9b8b4dd3b7aac54699a475",
+      "timestamp": 1771563220109
+    },
+    {
+      "id": "2eb5c1da-d861-45ef-b857-a289564e5ea4",
+      "intent_summary": "UI & Local State",
+      "lamport": 1771563288841,
+      "provenance_hash": "ef6652dc27a638598dfe120dcb305bae3f8562c3633a19142dcf0af23411d730",
+      "timestamp": 1771563288841
+    },
+    {
+      "id": "88f5e737-ce49-472c-83cc-75cfbb1999a5",
+      "intent_summary": "Zustand",
+      "lamport": 1771563334428,
+      "provenance_hash": "f5cd26dfd3e0a75edabb64d169d33421601299458ea61bebc6358016cdf83539",
+      "timestamp": 1771563334428
+    },
+    {
+      "id": "7abe95f1-9e5f-48cf-9359-a6c8a1d58875",
+      "intent_summary": "Stato UI & Interazione",
+      "lamport": 1771563446366,
+      "provenance_hash": "5a8a56cc04b9888226f35c5f23c7050f4157459610b86e9475f2020d3af59fe0",
+      "timestamp": 1771563446366
+    },
+    {
+      "id": "e1f684c6-d685-47ea-a791-200e7968f12a",
+      "intent_summary": "riprova",
+      "lamport": 1771563462855,
+      "provenance_hash": "d21182c513d2ece8a6f3d4c8227374e4e13077fb5211d3ff06bd87ed436780e1",
+      "timestamp": 1771563462855
+    },
+    {
+      "id": "5374000f-0a9d-4983-be4a-674ca677eaeb",
+      "intent_summary": "va bene zustand. inizia a creare l app",
+      "lamport": 1771563548063,
+      "provenance_hash": "d3ee087c6979ec3309ac332320aa82e228fd1554a20b775f353942ee42f72ac6",
+      "timestamp": 1771563548063
+    },
+    {
+      "id": "89c23769-4519-4746-ab29-54ccbdc2c3fc",
+      "intent_summary": "va bene zustand. inizia a creare l app",
+      "lamport": 1771563633497,
+      "provenance_hash": "947286b087bd68fa4e64d35b42e9882d7d3ae1d8c987c1d10a4fe609ddd65695",
+      "timestamp": 1771563633497
+    },
+    {
+      "id": "9126a0ac-ccdc-4d7b-9e51-31a1c5eb2e9e",
+      "intent_summary": "crea una todo list app completa",
+      "lamport": 1771608126898,
+      "provenance_hash": "01587547304a34b62d1615e71c99bc7f5ad1da9369e6f9457556d06160a3d1a6",
+      "timestamp": 1771608126898
+    },
+    {
+      "id": "2ac09fe7-ebcb-4213-a219-4cdf116be69b",
+      "intent_summary": "Browser Local Storage",
+      "lamport": 1771608250425,
+      "provenance_hash": "507d5103872b975527800fc25494d13e948fb9c2d4c662998e1c6946f8b632e9",
+      "timestamp": 1771608250425
+    },
+    {
+      "id": "76cd543a-b765-46b1-bb54-a220a8e77dc9",
+      "intent_summary": "Middleware Automatico",
+      "lamport": 1771608610577,
+      "provenance_hash": "ee80ba4f1a8e26d5d87e89bf844ca7dca907d54175022f8ec2505a49cabe918a",
+      "timestamp": 1771608610577
+    },
+    {
+      "id": "ceba2d0b-b14b-4414-ab3b-6832f59c97c5",
+      "intent_summary": "Persistenza Automatica",
+      "lamport": 1771610146742,
+      "provenance_hash": "a728f89c5fe94246b02ca2d44d9be03f6122165893d335892cc18b33d6532601",
+      "timestamp": 1771610146742
+    },
+    {
+      "id": "9d3ce140-aa56-4de0-ba7a-264dcdc0c251",
+      "intent_summary": "Persistenza Locale Pura",
+      "lamport": 1771610730949,
+      "provenance_hash": "74627b3bbb891a31a19505e896b439907a70cc26f33600f9f8b8a9dfcd1aea5e",
+      "timestamp": 1771610730949
+    },
+    {
+      "id": "b7f67d58-c375-4045-9d74-0eec1215bc5b",
+      "intent_summary": "Dati Semplici",
+      "lamport": 1771611430964,
+      "provenance_hash": "b4754d915ebb80114df7372039656f4891c414fba6207029f249256a6116d675",
+      "timestamp": 1771611430964
+    },
+    {
+      "id": "ea4b6755-e558-4848-a347-11bbb932ac7d",
+      "intent_summary": "Custom Hook Dedicato",
+      "lamport": 1771611649109,
+      "provenance_hash": "d9e36f208e89a35adbefaf0ea99b2d82a447750e028a89ac12b118d6ae005ae7",
+      "timestamp": 1771611649109
+    },
+    {
+      "id": "c8fb133b-9e73-4c4c-83c1-51e4f3f48b9d",
+      "intent_summary": "Stato Strutturato",
+      "lamport": 1771611909086,
+      "provenance_hash": "baa210ed7ef9384c0ed0a97de4737dd8d5e414ac3f5dc427237d24b0baad14ad",
+      "timestamp": 1771611909086
+    },
+    {
+      "id": "bb5881eb-6d74-44a1-ba50-5e50dacb7306",
+      "intent_summary": "Basso volume / Alta frequenza",
+      "lamport": 1771612111063,
+      "provenance_hash": "e06de660f1db6b93b8b562cad3915dcc6445dcfaf84ea6e3b9bc6506f66a0338",
+      "timestamp": 1771612111063
+    },
+    {
+      "id": "f0d75364-084f-45aa-952b-27e444120943",
+      "intent_summary": "crea una app per therapy tools per individuals e couples",
+      "lamport": 1771612916407,
+      "provenance_hash": "5486e17c9ff8fb0035c9e09716a9603cb755eddc3d893e2b63bb9f39c441fbae",
+      "timestamp": 1771612916407
+    },
+    {
+      "id": "092bf226-7710-4673-8e8d-846fb2ec129f",
+      "intent_summary": "Journaling & Riflessione",
+      "lamport": 1771613124903,
+      "provenance_hash": "de826c9aecbf9803c030da02351df584b7b2f6b0c5a48985757b2964cacaf7b1",
+      "timestamp": 1771613124903
+    },
+    {
+      "id": "4921ef34-9b2d-4d59-bba6-46e578dbac8a",
+      "intent_summary": "Local-First & Private",
+      "lamport": 1771613153027,
+      "provenance_hash": "7422284e1604eaf4e9398961f1bdbc76642f417e9bb93e88c69a11b3504fa9e8",
+      "timestamp": 1771613153027
+    },
+    {
+      "id": "3a189dd8-494f-446f-980d-59de3ea5491e",
+      "intent_summary": "Session-Only / Temporary",
+      "lamport": 1771613179049,
+      "provenance_hash": "b62042695e1870b931758fd7142f716b84b277e8d4056ee80841da6a1a4de916",
+      "timestamp": 1771613179049
     }
   ],
-  "signature": "d292e0d6b057bbd1fa248a631ab97b152dd4f2de55e0cc2a794dd93d03c32a28b204678ec4ae3580fd217a5f26db09d6930fbfddf1bef197510b17ab5ece9105",
+  "signature": "e4170b1d22e6556728cc6d681b3926c92c13db9e26281f7b5b208113f84b5df38a10d18f0dadf1b2369ac90d222b1bffb43d62e2e98f8bcc8bdecb8b2f380207",
   "signature_scheme": "ed25519-blake3-v1",
   "signer_public_key": "eab928f8a4fd290d803031017a37b8585877d3f934e98bb0e0422cd4c39ab983",
   "version": 1
