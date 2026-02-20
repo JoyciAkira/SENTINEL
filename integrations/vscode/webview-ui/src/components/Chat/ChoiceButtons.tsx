@@ -32,20 +32,24 @@ interface ChoiceButtonsProps {
 function parseChoices(content: string): Choice[] {
   const choices: Choice[] = [];
   
-  // Pattern matches:
-  // A) text
-  // A) text (with more text in parentheses)
-  // A. text
-  // A - text
-  // Also handles multi-line option text until next option or end
+  // Split content into lines
   const lines = content.split('\n');
   let currentChoice: { letter: string; text: string } | null = null;
+  let inChoiceSection = false;
   
-  for (const line of lines) {
-    // Check if this line starts a new option: A), A., A -, A)
-    const optionMatch = line.match(/^\s*([A-C])[\).\s]+(.+)$/i);
+  // Emoji pattern - matches common emoji used as section markers
+  const emojiPattern = /^[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/u;
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const trimmedLine = line.trim();
+    
+    // Check if this line starts a new option: A), A., A -, B), etc.
+    const optionMatch = trimmedLine.match(/^([A-C])[\).\s]+(.+)$/i);
     
     if (optionMatch) {
+      inChoiceSection = true;
+      
       // Save previous choice if exists
       if (currentChoice && currentChoice.text.trim().length > 0) {
         choices.push({
@@ -60,11 +64,14 @@ function parseChoices(content: string): Choice[] {
         letter: optionMatch[1].toUpperCase(),
         text: optionMatch[2].trim(),
       };
-    } else if (currentChoice) {
-      // Continue current choice text (for multi-line options)
-      // Stop if we hit a new section (like 📋, 🎨, etc.)
-      if (line.match(/^[📋🎨🛡️❓🎯]/) || line.match(/^##\s/)) {
-        // Save current and stop
+    } else if (currentChoice && inChoiceSection) {
+      // Check for stop conditions:
+      // 1. Line starts with emoji (📋, 🎨, 🛡️, ❓, 🎯, etc.)
+      // 2. Line starts with ##
+      // 3. Empty line followed by non-choice content
+      
+      if (emojiPattern.test(trimmedLine) || trimmedLine.startsWith('##')) {
+        // Save current and stop parsing choices
         if (currentChoice.text.trim().length > 0) {
           choices.push({
             letter: currentChoice.letter,
@@ -73,11 +80,36 @@ function parseChoices(content: string): Choice[] {
           });
         }
         currentChoice = null;
+        inChoiceSection = false;
         break;
       }
-      // Append to current text if it's a continuation
-      if (line.trim().length > 0) {
-        currentChoice.text += ' ' + line.trim();
+      
+      // If line is empty, check if next line is a new section or another choice
+      if (trimmedLine.length === 0) {
+        const nextLine = lines[i + 1]?.trim() || '';
+        const nextIsChoice = /^[A-C][\).\s]/i.test(nextLine);
+        const nextIsSection = emojiPattern.test(nextLine) || nextLine.startsWith('##');
+        
+        if (!nextIsChoice && !nextIsSection) {
+          // End of choice section
+          if (currentChoice.text.trim().length > 0) {
+            choices.push({
+              letter: currentChoice.letter,
+              text: currentChoice.text.trim(),
+              fullText: `${currentChoice.letter}) ${currentChoice.text.trim()}`,
+            });
+          }
+          currentChoice = null;
+          inChoiceSection = false;
+          break;
+        }
+        continue;
+      }
+      
+      // Check if this line looks like a new section (Pro:/Contro:/etc.)
+      if (/^(Pro|Contro|Vantaggi|Svantaggi|Nota|Note):/i.test(trimmedLine)) {
+        // This is part of the choice description, include it
+        currentChoice!.text += ' ' + trimmedLine;
       }
     }
   }

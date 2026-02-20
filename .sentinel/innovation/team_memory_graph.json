@@ -1,5 +1,5 @@
 {
-  "edge_count": 36,
+  "edge_count": 44,
   "edges": [
     {
       "relation": "temporal",
@@ -98,6 +98,18 @@
       "weight": 1.0
     },
     {
+      "relation": "temporal",
+      "source": "512de09f-7b92-44fd-a3f4-aa32ccc98715",
+      "target": "c4676b8d-bf5e-44ec-8315-1a6aeaf4ec17",
+      "weight": 1.0
+    },
+    {
+      "relation": "temporal",
+      "source": "c4676b8d-bf5e-44ec-8315-1a6aeaf4ec17",
+      "target": "b494b3ea-ac0c-4ec0-adba-fac172053d67",
+      "weight": 1.0
+    },
+    {
       "relation": "semantic_overlap",
       "source": "0c23de9d-b170-466b-bd0e-83dc287936b6",
       "target": "086e9969-7540-4c91-92bd-4976a7f6fb8c",
@@ -125,6 +137,12 @@
       "relation": "semantic_overlap",
       "source": "0c23de9d-b170-466b-bd0e-83dc287936b6",
       "target": "512de09f-7b92-44fd-a3f4-aa32ccc98715",
+      "weight": 5.0
+    },
+    {
+      "relation": "semantic_overlap",
+      "source": "0c23de9d-b170-466b-bd0e-83dc287936b6",
+      "target": "c4676b8d-bf5e-44ec-8315-1a6aeaf4ec17",
       "weight": 5.0
     },
     {
@@ -177,6 +195,12 @@
     },
     {
       "relation": "semantic_overlap",
+      "source": "086e9969-7540-4c91-92bd-4976a7f6fb8c",
+      "target": "c4676b8d-bf5e-44ec-8315-1a6aeaf4ec17",
+      "weight": 6.0
+    },
+    {
+      "relation": "semantic_overlap",
       "source": "ae2457d5-1ec2-415a-b9b0-53405f7965c9",
       "target": "3470cee5-b922-4e3f-aad0-967c3deabd86",
       "weight": 6.0
@@ -195,6 +219,12 @@
     },
     {
       "relation": "semantic_overlap",
+      "source": "ae2457d5-1ec2-415a-b9b0-53405f7965c9",
+      "target": "c4676b8d-bf5e-44ec-8315-1a6aeaf4ec17",
+      "weight": 6.0
+    },
+    {
+      "relation": "semantic_overlap",
       "source": "3470cee5-b922-4e3f-aad0-967c3deabd86",
       "target": "2bcf1048-2767-48c9-b07c-e721be2cdbe1",
       "weight": 6.0
@@ -203,6 +233,12 @@
       "relation": "semantic_overlap",
       "source": "3470cee5-b922-4e3f-aad0-967c3deabd86",
       "target": "512de09f-7b92-44fd-a3f4-aa32ccc98715",
+      "weight": 6.0
+    },
+    {
+      "relation": "semantic_overlap",
+      "source": "3470cee5-b922-4e3f-aad0-967c3deabd86",
+      "target": "c4676b8d-bf5e-44ec-8315-1a6aeaf4ec17",
       "weight": 6.0
     },
     {
@@ -216,11 +252,23 @@
       "source": "2bcf1048-2767-48c9-b07c-e721be2cdbe1",
       "target": "512de09f-7b92-44fd-a3f4-aa32ccc98715",
       "weight": 6.0
+    },
+    {
+      "relation": "semantic_overlap",
+      "source": "2bcf1048-2767-48c9-b07c-e721be2cdbe1",
+      "target": "c4676b8d-bf5e-44ec-8315-1a6aeaf4ec17",
+      "weight": 6.0
+    },
+    {
+      "relation": "semantic_overlap",
+      "source": "512de09f-7b92-44fd-a3f4-aa32ccc98715",
+      "target": "c4676b8d-bf5e-44ec-8315-1a6aeaf4ec17",
+      "weight": 6.0
     }
   ],
-  "generated_at": 1771555027621,
-  "graph_hash": "24dcfe5efb13c4f6ca02e8f1c6f6f4797ec57e4e6ab179d272a8ca634e3dfa9c",
-  "node_count": 17,
+  "generated_at": 1771556474321,
+  "graph_hash": "3c2a6821d26152752708429a8209c82ddb591f81f4fe5bb9a18b9135a8431723",
+  "node_count": 19,
   "nodes": [
     {
       "id": "7944bee6-5adf-489e-9ca6-cc5fb511b8ba",
@@ -340,9 +388,23 @@
       "lamport": 1771555027616,
       "provenance_hash": "afaff983d099b8b6a22fd79b82269f14570c0f9a30d368dc637ef656ce92aaf5",
       "timestamp": 1771555027616
+    },
+    {
+      "id": "c4676b8d-bf5e-44ec-8315-1a6aeaf4ec17",
+      "intent_summary": "crea una todo list app completa",
+      "lamport": 1771556425836,
+      "provenance_hash": "9c59437a19b30a99b5e3ec5d8af89f14ce758026e42ffa4a7c691e0c16b0a2dc",
+      "timestamp": 1771556425836
+    },
+    {
+      "id": "b494b3ea-ac0c-4ec0-adba-fac172053d67",
+      "intent_summary": "A",
+      "lamport": 1771556474314,
+      "provenance_hash": "1da5c0151eb0f08fdfb28075171408a6274e6d1c7af9564a5b1e6fdff5b8da6c",
+      "timestamp": 1771556474314
     }
   ],
-  "signature": "4a5b237b89e97b1add06856d8c93248ff1db4d28ea0b2b3a935e25a268613cbc2ae7305efcc37310c809dff1fadcce690ce30b9f8c54151f54e43d763647950e",
+  "signature": "d292e0d6b057bbd1fa248a631ab97b152dd4f2de55e0cc2a794dd93d03c32a28b204678ec4ae3580fd217a5f26db09d6930fbfddf1bef197510b17ab5ece9105",
   "signature_scheme": "ed25519-blake3-v1",
   "signer_public_key": "eab928f8a4fd290d803031017a37b8585877d3f934e98bb0e0422cd4c39ab983",
   "version": 1
