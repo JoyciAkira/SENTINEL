@@ -1,5 +1,5 @@
 {
-  "edge_count": 117,
+  "edge_count": 124,
   "edges": [
     {
       "relation": "temporal",
@@ -374,6 +374,18 @@
       "weight": 1.0
     },
     {
+      "relation": "temporal",
+      "source": "3a189dd8-494f-446f-980d-59de3ea5491e",
+      "target": "3e0fae26-bbca-4fe5-a70c-78fffb07ad4b",
+      "weight": 1.0
+    },
+    {
+      "relation": "temporal",
+      "source": "3e0fae26-bbca-4fe5-a70c-78fffb07ad4b",
+      "target": "049c2346-e3b7-49a2-a7e1-fdfe0d45d494",
+      "weight": 1.0
+    },
+    {
       "relation": "semantic_overlap",
       "source": "0c23de9d-b170-466b-bd0e-83dc287936b6",
       "target": "086e9969-7540-4c91-92bd-4976a7f6fb8c",
@@ -702,11 +714,41 @@
       "source": "9126a0ac-ccdc-4d7b-9e51-31a1c5eb2e9e",
       "target": "f0d75364-084f-45aa-952b-27e444120943",
       "weight": 3.0
+    },
+    {
+      "relation": "semantic_overlap",
+      "source": "9126a0ac-ccdc-4d7b-9e51-31a1c5eb2e9e",
+      "target": "3e0fae26-bbca-4fe5-a70c-78fffb07ad4b",
+      "weight": 6.0
+    },
+    {
+      "relation": "semantic_overlap",
+      "source": "9126a0ac-ccdc-4d7b-9e51-31a1c5eb2e9e",
+      "target": "049c2346-e3b7-49a2-a7e1-fdfe0d45d494",
+      "weight": 6.0
+    },
+    {
+      "relation": "semantic_overlap",
+      "source": "f0d75364-084f-45aa-952b-27e444120943",
+      "target": "3e0fae26-bbca-4fe5-a70c-78fffb07ad4b",
+      "weight": 3.0
+    },
+    {
+      "relation": "semantic_overlap",
+      "source": "f0d75364-084f-45aa-952b-27e444120943",
+      "target": "049c2346-e3b7-49a2-a7e1-fdfe0d45d494",
+      "weight": 3.0
+    },
+    {
+      "relation": "semantic_overlap",
+      "source": "3e0fae26-bbca-4fe5-a70c-78fffb07ad4b",
+      "target": "049c2346-e3b7-49a2-a7e1-fdfe0d45d494",
+      "weight": 6.0
     }
   ],
-  "generated_at": 1771613179057,
-  "graph_hash": "9c8f7509700b4dce2b87a648a9777798bdbe7cc0040b433f65dda195edededd8",
-  "node_count": 63,
+  "generated_at": 1771614350220,
+  "graph_hash": "0e3a02991cca9aa7f6dba9166fd8d42ba424b86f465951c8bafd92c20ce9723a",
+  "node_count": 65,
   "nodes": [
     {
       "id": "7944bee6-5adf-489e-9ca6-cc5fb511b8ba",
@@ -1148,9 +1190,23 @@
       "lamport": 1771613179049,
       "provenance_hash": "b62042695e1870b931758fd7142f716b84b277e8d4056ee80841da6a1a4de916",
       "timestamp": 1771613179049
+    },
+    {
+      "id": "3e0fae26-bbca-4fe5-a70c-78fffb07ad4b",
+      "intent_summary": "crea una todo app list completa",
+      "lamport": 1771613488971,
+      "provenance_hash": "2ca1fb035a43cde75655f4a81437ca6b11a734a262373d2b0d88863c0a2d84b2",
+      "timestamp": 1771613488971
+    },
+    {
+      "id": "049c2346-e3b7-49a2-a7e1-fdfe0d45d494",
+      "intent_summary": "crea una todo list app completa",
+      "lamport": 1771614350212,
+      "provenance_hash": "625f28e30600539f7012e9a9d08e1c0d90b1c4a820557cecaf70d808240b8938",
+      "timestamp": 1771614350212
     }
   ],
-  "signature": "e4170b1d22e6556728cc6d681b3926c92c13db9e26281f7b5b208113f84b5df38a10d18f0dadf1b2369ac90d222b1bffb43d62e2e98f8bcc8bdecb8b2f380207",
+  "signature": "7ee12160290b1bce6462a67e6f1ebd2873eab7c075f718692de6aef449ae222ab7413e8476ef36f182ed3862c51fd94f0d08cc5709d1366e0dd7ab16312bbb08",
   "signature_scheme": "ed25519-blake3-v1",
   "signer_public_key": "eab928f8a4fd290d803031017a37b8585877d3f934e98bb0e0422cd4c39ab983",
   "version": 1
