@@ -12,6 +12,7 @@ import type { ChatMessage } from "../../state/types";
 import { renderMarkdown } from "../../utils/markdown";
 import FileApproval from "../Actions/FileApproval";
 import { ReasoningTrace, type ReasoningTraceData } from "../ReasoningTrace";
+import ChoiceButtons, { hasChoices, extractQuestionBeforeChoices } from "./ChoiceButtons";
 import { cn } from "@/lib/utils";
 import { useVSCodeAPI } from "../../hooks/useVSCodeAPI";
 import { Button } from "../ui/button";
@@ -35,6 +36,8 @@ export default function MessageBubble({ message, index }: MessageBubbleProps) {
   const hasFileOperations = (message.fileOperations?.length ?? 0) > 0;
   const pendingOperations = message.fileOperations?.filter(op => op.approved === undefined) ?? [];
   const hasReasoning = (message.thoughtChain?.length ?? 0) > 0;
+  const containsChoices = !isUser && hasChoices(message.content);
+  const displayContent = containsChoices ? extractQuestionBeforeChoices(message.content) : message.content;
   
   // Build reasoning trace data
   const reasoningTrace: ReasoningTraceData | null = useMemo(() => {
@@ -129,12 +132,20 @@ export default function MessageBubble({ message, index }: MessageBubbleProps) {
               "prose-pre:my-2 prose-pre:p-3 prose-pre:rounded-lg prose-pre:bg-muted/50",
               "sentinel-selectable-content"
             )}
-            dangerouslySetInnerHTML={{ __html: renderMarkdown(message.content) }}
+            dangerouslySetInnerHTML={{ __html: renderMarkdown(displayContent) }}
           />
 
           {/* Streaming cursor */}
           {message.streaming && (
             <span className="inline-block w-1.5 h-4 ml-1 bg-primary/50 animate-pulse align-middle" />
+          )}
+          
+          {/* Choice Buttons - Interactive A/B/C options */}
+          {containsChoices && !message.streaming && (
+            <ChoiceButtons 
+              content={message.content} 
+              messageId={message.id} 
+            />
           )}
         </div>
 

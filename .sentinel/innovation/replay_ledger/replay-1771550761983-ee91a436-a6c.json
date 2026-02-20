@@ -1,0 +1,19 @@
+{
+  "constitutional_spec_hash": "76f0f988cac109901d858f3be7aad2057e73d9a1ead7e9e8300f1ab8ca5d4317",
+  "counterfactual_hash": "af191d5223f376b1f69c8dd1d6aa101052f88a56c4e363b9e269abb8aac87c3a",
+  "evidence_hash": "cc644d5b328463be93c2e6111b4f218739437d68fc86426c3e3818aae3630796",
+  "memory_hit_ids": [
+    "3470cee5-b922-4e3f-aad0-967c3deabd86",
+    "ae2457d5-1ec2-415a-b9b0-53405f7965c9",
+    "ca5a5162-0760-40e8-8f8c-5f776b93e8d0",
+    "d0a53b1b-a7f5-43d7-b45d-04d129f05aab",
+    "7944bee6-5adf-489e-9ca6-cc5fb511b8ba"
+  ],
+  "policy_simulation_hash": "8b436a5883fe2f3deafd52a8923a7b6985e0d2bea808a60cd582ce3f7e4e8ae1",
+  "response_hash": "22a1f7a4f7552f237a8e1e617ae61d7dcfc62fa5952950fab67b7fba04746eaf",
+  "strict_goal_execution": false,
+  "timestamp": 1771550761983,
+  "turn_id": "ee91a436-a6c8-455c-a5c5-a222d34b7a45",
+  "user_message": "Procedere con la configurazione del modulo `Policy Center` prima di esporre le API di scrittura.",
+  "version": 1
+}

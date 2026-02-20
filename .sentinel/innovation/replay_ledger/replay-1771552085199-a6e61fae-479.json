@@ -1,0 +1,19 @@
+{
+  "constitutional_spec_hash": "4414aecd493c8a05374c928442c2613cdddfaed549017b42d5e682ffc4dd13b3",
+  "counterfactual_hash": "af191d5223f376b1f69c8dd1d6aa101052f88a56c4e363b9e269abb8aac87c3a",
+  "evidence_hash": "cc644d5b328463be93c2e6111b4f218739437d68fc86426c3e3818aae3630796",
+  "memory_hit_ids": [
+    "b0f01d08-7bdd-4aee-ad57-6d58b6c5d332",
+    "ee91a436-a6c8-455c-a5c5-a222d34b7a45",
+    "ca5a5162-0760-40e8-8f8c-5f776b93e8d0",
+    "3470cee5-b922-4e3f-aad0-967c3deabd86",
+    "ae2457d5-1ec2-415a-b9b0-53405f7965c9"
+  ],
+  "policy_simulation_hash": "8b436a5883fe2f3deafd52a8923a7b6985e0d2bea808a60cd582ce3f7e4e8ae1",
+  "response_hash": "df40d4ff05ef6ad18a36fe5f430b611ead0da35652b606e64dfe0045c59695e0",
+  "strict_goal_execution": false,
+  "timestamp": 1771552085199,
+  "turn_id": "a6e61fae-4790-4406-9a57-d092c5c1c485",
+  "user_message": "Procedi con l'implementazione del Kernel Foundation",
+  "version": 1
+}

@@ -833,6 +833,125 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
     return `${baseDir}/${normalized}`;
   }
 
+  /**
+   * Extract files from Gemini-style format: "path: <filepath>" followed by code block
+   * Example:
+   * path: src/policy/config.py
+   * 
+   * ```python
+   * def __init__(self):
+   *     ...
+   * ```
+   */
+  private extractGeminiStyleFiles(content: string): Array<{
+    path: string | null;
+    content: string;
+    language: string;
+  }> {
+    const files: Array<{
+      path: string | null;
+      content: string;
+      language: string;
+    }> = [];
+
+    // Pattern: "path:" followed by a filepath, then optionally a code block
+    const pathPattern = /(?:^|\n)path:\s*([^\n]+)/gi;
+    let pathMatch;
+    
+    while ((pathMatch = pathPattern.exec(content)) !== null) {
+      const filePath = pathMatch[1].trim();
+      const startIndex = pathMatch.index + pathMatch[0].length;
+      
+      // Look for a code block after the path
+      const remainingContent = content.slice(startIndex);
+      const codeBlockMatch = remainingContent.match(/^[\s\n]*```([a-zA-Z0-9_-]*)\n([\s\S]*?)```/);
+      
+      if (codeBlockMatch) {
+        const language = codeBlockMatch[1]?.trim() || this.inferLanguageFromPath(filePath);
+        const code = codeBlockMatch[2].trim();
+        
+        if (code.length > 0 && filePath.length > 0) {
+          files.push({
+            path: filePath,
+            content: code,
+            language,
+          });
+        }
+      }
+    }
+
+    // Also try to find standalone code blocks with path hints in title
+    const codeBlockPattern = /```([a-zA-Z0-9_-]*)\n([\s\S]*?)```/g;
+    let blockMatch;
+    
+    while ((blockMatch = codeBlockPattern.exec(content)) !== null) {
+      const language = blockMatch[1]?.trim() || "text";
+      const code = blockMatch[2].trim();
+      
+      // Check if this block is already captured by a path: prefix
+      const blockStart = blockMatch.index;
+      const precedingContent = content.slice(Math.max(0, blockStart - 200), blockStart);
+      
+      if (/path:\s*[^\n]+\s*$/m.test(precedingContent)) {
+        // Already captured by path: pattern
+        continue;
+      }
+      
+      // Try to infer path from content or context
+      const pathInComment = code.match(/(?:#\s*file:\s*|\/\/\s*file:\s*|\/\*\s*file:\s*)([^\n*]+)/i);
+      if (pathInComment) {
+        const inferredPath = pathInComment[1].trim();
+        if (!files.some((f) => f.path === inferredPath)) {
+          files.push({
+            path: inferredPath,
+            content: code,
+            language,
+          });
+        }
+      }
+    }
+
+    return files;
+  }
+
+  private inferLanguageFromPath(filePath: string): string {
+    const ext = filePath.split(".").pop()?.toLowerCase() || "";
+    const langMap: Record<string, string> = {
+      ts: "typescript",
+      tsx: "tsx",
+      js: "javascript",
+      jsx: "jsx",
+      py: "python",
+      rs: "rust",
+      go: "go",
+      java: "java",
+      rb: "ruby",
+      php: "php",
+      cs: "csharp",
+      cpp: "cpp",
+      c: "c",
+      h: "c",
+      hpp: "cpp",
+      sql: "sql",
+      sh: "bash",
+      bash: "bash",
+      zsh: "bash",
+      json: "json",
+      yaml: "yaml",
+      yml: "yaml",
+      toml: "toml",
+      md: "markdown",
+      html: "html",
+      css: "css",
+      scss: "scss",
+      sass: "sass",
+      less: "less",
+      xml: "xml",
+      svg: "xml",
+    };
+    return langMap[ext] || ext || "text";
+  }
+
   private splitNumberedSections(content: string): Array<{
     headingLine: string;
     title: string;
@@ -1369,7 +1488,77 @@ export class SentinelChatViewProvider implements vscode.WebviewViewProvider {
   }
 
   private buildChatPlan(content: string): ParsedChatPlan | null {
+    // First try the new Gemini-style format: "path: <filepath>" followed by code block
+    const geminiStyleFiles = this.extractGeminiStyleFiles(content);
+    
+    // Then try numbered sections format
     const sections = this.splitNumberedSections(content);
+    
+    // If we have Gemini-style files, use those
+    if (geminiStyleFiles.length > 0) {
+      const projectBaseDir = this.detectProjectBaseDir(content);
+      
+      const uiSections: ChatSectionPayload[] = [];
+      const fileOperations: Array<{
+        path: string;
+        type: "create" | "edit" | "delete";
+        linesAdded: number;
+        linesRemoved: number;
+        diff: string;
+      }> = [];
+      const writeEntries: PendingWritePlanEntry[] = [];
+
+      for (const file of geminiStyleFiles) {
+        const inferredPath = file.path
+          ? this.withProjectBaseDir(file.path, projectBaseDir)
+          : null;
+
+        if (inferredPath && file.content.length > 0) {
+          const lineCount = file.content.split(/\r?\n/).length;
+          const diff = file.content
+            .split(/\r?\n/)
+            .map((line) => `+${line}`)
+            .join("\n");
+
+          writeEntries.push({
+            id: `gemini-${inferredPath.replace(/[^a-zA-Z0-9]+/g, "-")}`,
+            title: file.path?.split("/").pop() || "Untitled",
+            pathHint: inferredPath,
+            language: file.language || "text",
+            content: file.content,
+            path: inferredPath,
+            applied: false,
+          });
+
+          fileOperations.push({
+            path: inferredPath,
+            type: "create",
+            linesAdded: lineCount,
+            linesRemoved: 0,
+            diff,
+          });
+
+          uiSections.push({
+            id: `gemini-${inferredPath.replace(/[^a-zA-Z0-9]+/g, "-")}`,
+            title: file.path?.split("/").pop() || "Untitled",
+            pathHint: inferredPath,
+            language: file.language || "text",
+            content: file.content,
+          });
+        }
+      }
+
+      if (writeEntries.length > 0) {
+        return {
+          normalizedContent: content,
+          sections: uiSections,
+          fileOperations,
+          writeEntries,
+        };
+      }
+    }
+    
+    // Fallback to numbered sections format
     if (sections.length === 0) return null;
     const projectBaseDir = this.detectProjectBaseDir(content);
 

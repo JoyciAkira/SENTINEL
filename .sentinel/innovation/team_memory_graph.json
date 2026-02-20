@@ -1,5 +1,5 @@
 {
-  "edge_count": 9,
+  "edge_count": 36,
   "edges": [
     {
       "relation": "temporal",
@@ -50,15 +50,177 @@
       "weight": 1.0
     },
     {
+      "relation": "temporal",
+      "source": "d99b9fa1-156a-42e1-8dbe-b94065fe9eb2",
+      "target": "086e9969-7540-4c91-92bd-4976a7f6fb8c",
+      "weight": 1.0
+    },
+    {
+      "relation": "temporal",
+      "source": "086e9969-7540-4c91-92bd-4976a7f6fb8c",
+      "target": "ae2457d5-1ec2-415a-b9b0-53405f7965c9",
+      "weight": 1.0
+    },
+    {
+      "relation": "temporal",
+      "source": "ae2457d5-1ec2-415a-b9b0-53405f7965c9",
+      "target": "3470cee5-b922-4e3f-aad0-967c3deabd86",
+      "weight": 1.0
+    },
+    {
+      "relation": "temporal",
+      "source": "3470cee5-b922-4e3f-aad0-967c3deabd86",
+      "target": "ee91a436-a6c8-455c-a5c5-a222d34b7a45",
+      "weight": 1.0
+    },
+    {
+      "relation": "temporal",
+      "source": "ee91a436-a6c8-455c-a5c5-a222d34b7a45",
+      "target": "b0f01d08-7bdd-4aee-ad57-6d58b6c5d332",
+      "weight": 1.0
+    },
+    {
+      "relation": "temporal",
+      "source": "b0f01d08-7bdd-4aee-ad57-6d58b6c5d332",
+      "target": "a6e61fae-4790-4406-9a57-d092c5c1c485",
+      "weight": 1.0
+    },
+    {
+      "relation": "temporal",
+      "source": "a6e61fae-4790-4406-9a57-d092c5c1c485",
+      "target": "2bcf1048-2767-48c9-b07c-e721be2cdbe1",
+      "weight": 1.0
+    },
+    {
+      "relation": "temporal",
+      "source": "2bcf1048-2767-48c9-b07c-e721be2cdbe1",
+      "target": "512de09f-7b92-44fd-a3f4-aa32ccc98715",
+      "weight": 1.0
+    },
+    {
+      "relation": "semantic_overlap",
+      "source": "0c23de9d-b170-466b-bd0e-83dc287936b6",
+      "target": "086e9969-7540-4c91-92bd-4976a7f6fb8c",
+      "weight": 5.0
+    },
+    {
+      "relation": "semantic_overlap",
+      "source": "0c23de9d-b170-466b-bd0e-83dc287936b6",
+      "target": "ae2457d5-1ec2-415a-b9b0-53405f7965c9",
+      "weight": 5.0
+    },
+    {
+      "relation": "semantic_overlap",
+      "source": "0c23de9d-b170-466b-bd0e-83dc287936b6",
+      "target": "3470cee5-b922-4e3f-aad0-967c3deabd86",
+      "weight": 5.0
+    },
+    {
+      "relation": "semantic_overlap",
+      "source": "0c23de9d-b170-466b-bd0e-83dc287936b6",
+      "target": "2bcf1048-2767-48c9-b07c-e721be2cdbe1",
+      "weight": 5.0
+    },
+    {
+      "relation": "semantic_overlap",
+      "source": "0c23de9d-b170-466b-bd0e-83dc287936b6",
+      "target": "512de09f-7b92-44fd-a3f4-aa32ccc98715",
+      "weight": 5.0
+    },
+    {
       "relation": "semantic_overlap",
       "source": "105ac69a-d900-441c-8722-ea53ecb04b29",
       "target": "44bfcf6f-c8d6-4fab-87dd-eaf54f9ef74c",
       "weight": 3.0
+    },
+    {
+      "relation": "semantic_overlap",
+      "source": "105ac69a-d900-441c-8722-ea53ecb04b29",
+      "target": "b0f01d08-7bdd-4aee-ad57-6d58b6c5d332",
+      "weight": 3.0
+    },
+    {
+      "relation": "semantic_overlap",
+      "source": "44bfcf6f-c8d6-4fab-87dd-eaf54f9ef74c",
+      "target": "b0f01d08-7bdd-4aee-ad57-6d58b6c5d332",
+      "weight": 3.0
+    },
+    {
+      "relation": "semantic_overlap",
+      "source": "ca5a5162-0760-40e8-8f8c-5f776b93e8d0",
+      "target": "a6e61fae-4790-4406-9a57-d092c5c1c485",
+      "weight": 2.0
+    },
+    {
+      "relation": "semantic_overlap",
+      "source": "086e9969-7540-4c91-92bd-4976a7f6fb8c",
+      "target": "ae2457d5-1ec2-415a-b9b0-53405f7965c9",
+      "weight": 6.0
+    },
+    {
+      "relation": "semantic_overlap",
+      "source": "086e9969-7540-4c91-92bd-4976a7f6fb8c",
+      "target": "3470cee5-b922-4e3f-aad0-967c3deabd86",
+      "weight": 6.0
+    },
+    {
+      "relation": "semantic_overlap",
+      "source": "086e9969-7540-4c91-92bd-4976a7f6fb8c",
+      "target": "2bcf1048-2767-48c9-b07c-e721be2cdbe1",
+      "weight": 6.0
+    },
+    {
+      "relation": "semantic_overlap",
+      "source": "086e9969-7540-4c91-92bd-4976a7f6fb8c",
+      "target": "512de09f-7b92-44fd-a3f4-aa32ccc98715",
+      "weight": 6.0
+    },
+    {
+      "relation": "semantic_overlap",
+      "source": "ae2457d5-1ec2-415a-b9b0-53405f7965c9",
+      "target": "3470cee5-b922-4e3f-aad0-967c3deabd86",
+      "weight": 6.0
+    },
+    {
+      "relation": "semantic_overlap",
+      "source": "ae2457d5-1ec2-415a-b9b0-53405f7965c9",
+      "target": "2bcf1048-2767-48c9-b07c-e721be2cdbe1",
+      "weight": 6.0
+    },
+    {
+      "relation": "semantic_overlap",
+      "source": "ae2457d5-1ec2-415a-b9b0-53405f7965c9",
+      "target": "512de09f-7b92-44fd-a3f4-aa32ccc98715",
+      "weight": 6.0
+    },
+    {
+      "relation": "semantic_overlap",
+      "source": "3470cee5-b922-4e3f-aad0-967c3deabd86",
+      "target": "2bcf1048-2767-48c9-b07c-e721be2cdbe1",
+      "weight": 6.0
+    },
+    {
+      "relation": "semantic_overlap",
+      "source": "3470cee5-b922-4e3f-aad0-967c3deabd86",
+      "target": "512de09f-7b92-44fd-a3f4-aa32ccc98715",
+      "weight": 6.0
+    },
+    {
+      "relation": "semantic_overlap",
+      "source": "ee91a436-a6c8-455c-a5c5-a222d34b7a45",
+      "target": "a6e61fae-4790-4406-9a57-d092c5c1c485",
+      "weight": 2.0
+    },
+    {
+      "relation": "semantic_overlap",
+      "source": "2bcf1048-2767-48c9-b07c-e721be2cdbe1",
+      "target": "512de09f-7b92-44fd-a3f4-aa32ccc98715",
+      "weight": 6.0
     }
   ],
-  "generated_at": 1771549060930,
-  "graph_hash": "f529460c56cf027715c01fc5d702c5e0a2fdf1d1a315aeb2490ba9f4c2e68805",
-  "node_count": 9,
+  "generated_at": 1771555027621,
+  "graph_hash": "24dcfe5efb13c4f6ca02e8f1c6f6f4797ec57e4e6ab179d272a8ca634e3dfa9c",
+  "node_count": 17,
   "nodes": [
     {
       "id": "7944bee6-5adf-489e-9ca6-cc5fb511b8ba",
@@ -122,9 +284,65 @@
       "lamport": 1771549060924,
       "provenance_hash": "5586d21c62ec49f94e16f6a119e85d21eb69feb438d62fc8dddb0cf8c92865ad",
       "timestamp": 1771549060924
+    },
+    {
+      "id": "086e9969-7540-4c91-92bd-4976a7f6fb8c",
+      "intent_summary": "crea una todo list app completa",
+      "lamport": 1771549895642,
+      "provenance_hash": "baf7def1d1f76e6bed195d1a9c9dc898569625853a091d3c446e467de13ddf04",
+      "timestamp": 1771549895642
+    },
+    {
+      "id": "ae2457d5-1ec2-415a-b9b0-53405f7965c9",
+      "intent_summary": "crea una todo list app completa",
+      "lamport": 1771550172025,
+      "provenance_hash": "add932795fe2ed40235e57479c7650347a6bb81c4ce8b831497e52937d3e93c5",
+      "timestamp": 1771550172025
+    },
+    {
+      "id": "3470cee5-b922-4e3f-aad0-967c3deabd86",
+      "intent_summary": "crea una todo list app completa",
+      "lamport": 1771550305658,
+      "provenance_hash": "ad3a5849acd2ca4dfd6c95900c2bb4fb9df31b7de352a1fd02495b5820cc46a5",
+      "timestamp": 1771550305658
+    },
+    {
+      "id": "ee91a436-a6c8-455c-a5c5-a222d34b7a45",
+      "intent_summary": "Procedere con la configurazione del modulo `Policy Center` prima di esporre le API di",
+      "lamport": 1771550761983,
+      "provenance_hash": "768e0420503505f33e900e6beac82bac79a31723949500a7c58d74c5212da9d4",
+      "timestamp": 1771550761983
+    },
+    {
+      "id": "b0f01d08-7bdd-4aee-ad57-6d58b6c5d332",
+      "intent_summary": "get_goal_graph",
+      "lamport": 1771550809106,
+      "provenance_hash": "39eb13b84e5035452a1d0610fd0a746c1ba137a2acb41633241bb7600b2b08d6",
+      "timestamp": 1771550809106
+    },
+    {
+      "id": "a6e61fae-4790-4406-9a57-d092c5c1c485",
+      "intent_summary": "Procedi con l'implementazione del Kernel Foundation",
+      "lamport": 1771552085199,
+      "provenance_hash": "7895d8951bec0adaf44e7264599679729f49a38e4e27c69d2ef34afada5853ff",
+      "timestamp": 1771552085199
+    },
+    {
+      "id": "2bcf1048-2767-48c9-b07c-e721be2cdbe1",
+      "intent_summary": "crea una todo list app completa",
+      "lamport": 1771552543858,
+      "provenance_hash": "7f7f258e52d9f81dae8e535fe0811960ee4aece25ee788b17eb70f3d59006c5b",
+      "timestamp": 1771552543858
+    },
+    {
+      "id": "512de09f-7b92-44fd-a3f4-aa32ccc98715",
+      "intent_summary": "crea una todo list app completa",
+      "lamport": 1771555027616,
+      "provenance_hash": "afaff983d099b8b6a22fd79b82269f14570c0f9a30d368dc637ef656ce92aaf5",
+      "timestamp": 1771555027616
     }
   ],
-  "signature": "9f4c924ee33a19556be00bb04fe4ae9cb1161f3a105797e4ca820a63bd2949b1ed0baebee58b8c6f72689995a8aa2d8fd955865c446f8e135b9abc59bd51f604",
+  "signature": "4a5b237b89e97b1add06856d8c93248ff1db4d28ea0b2b3a935e25a268613cbc2ae7305efcc37310c809dff1fadcce690ce30b9f8c54151f54e43d763647950e",
   "signature_scheme": "ed25519-blake3-v1",
   "signer_public_key": "eab928f8a4fd290d803031017a37b8585877d3f934e98bb0e0422cd4c39ab983",
   "version": 1
