@@ -1,5 +1,5 @@
 {
-  "edge_count": 8,
+  "edge_count": 9,
   "edges": [
     {
       "relation": "temporal",
@@ -44,15 +44,21 @@
       "weight": 1.0
     },
     {
+      "relation": "temporal",
+      "source": "ca5a5162-0760-40e8-8f8c-5f776b93e8d0",
+      "target": "d99b9fa1-156a-42e1-8dbe-b94065fe9eb2",
+      "weight": 1.0
+    },
+    {
       "relation": "semantic_overlap",
       "source": "105ac69a-d900-441c-8722-ea53ecb04b29",
       "target": "44bfcf6f-c8d6-4fab-87dd-eaf54f9ef74c",
       "weight": 3.0
     }
   ],
-  "generated_at": 1771475809800,
-  "graph_hash": "5f5b4ce053322e6e31a95f835e5a266b27426bf91ec14827ef93c324d2b2a77c",
-  "node_count": 8,
+  "generated_at": 1771549060930,
+  "graph_hash": "f529460c56cf027715c01fc5d702c5e0a2fdf1d1a315aeb2490ba9f4c2e68805",
+  "node_count": 9,
   "nodes": [
     {
       "id": "7944bee6-5adf-489e-9ca6-cc5fb511b8ba",
@@ -109,9 +115,16 @@
       "lamport": 1771475809796,
       "provenance_hash": "eae99533e1e4c3087b45793b8d7b4c23045e38893f85d96210926bbf98998d3e",
       "timestamp": 1771475809796
+    },
+    {
+      "id": "d99b9fa1-156a-42e1-8dbe-b94065fe9eb2",
+      "intent_summary": "procedi",
+      "lamport": 1771549060924,
+      "provenance_hash": "5586d21c62ec49f94e16f6a119e85d21eb69feb438d62fc8dddb0cf8c92865ad",
+      "timestamp": 1771549060924
     }
   ],
-  "signature": "09bd04610fdaa7466d60a6aa9448f90ff3ef66f17fd4eb0c6633230e8e29f9713dece8440026cd0063dce18f30411dcca7aa4f2d46db6ddfcdfcb07e8129b00d",
+  "signature": "9f4c924ee33a19556be00bb04fe4ae9cb1161f3a105797e4ca820a63bd2949b1ed0baebee58b8c6f72689995a8aa2d8fd955865c446f8e135b9abc59bd51f604",
   "signature_scheme": "ed25519-blake3-v1",
   "signer_public_key": "eab928f8a4fd290d803031017a37b8585877d3f934e98bb0e0422cd4c39ab983",
   "version": 1

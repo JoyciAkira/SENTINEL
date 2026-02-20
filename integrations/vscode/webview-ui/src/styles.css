@@ -1575,9 +1575,301 @@
 }
 
 /* ========================================
-   SENTINEL WORLD-CLASS UI - Layout IDE-like
+   SENTINEL CHAT-FIRST UI - Cline-like Layout
    ======================================== */
 
+/* Chat-First Layout Container */
+.sentinel-ide--chat-first {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--vscode-editor-background);
+}
+
+/* Minimal Header - 36px */
+.sentinel-header-minimal {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 36px;
+  padding: 0 12px;
+  background: color-mix(in oklab, var(--sentinel-surface) 97%, transparent);
+  border-bottom: 1px solid var(--sentinel-border);
+  flex-shrink: 0;
+}
+
+.header-brand {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.header-brand .brand-text {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--sentinel-ink);
+}
+
+.header-center {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  justify-content: center;
+}
+
+.goal-pill-compact {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border: 1px solid var(--sentinel-border);
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--sentinel-surface-2) 90%, transparent);
+  font-size: 11px;
+  color: var(--sentinel-ink);
+  cursor: pointer;
+  transition: all 140ms ease;
+}
+
+.goal-pill-compact:hover {
+  border-color: color-mix(in oklab, var(--sentinel-accent) 40%, var(--sentinel-border));
+  background: color-mix(in oklab, var(--sentinel-accent-soft) 40%, var(--sentinel-surface-2));
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.status-indicator {
+  display: flex;
+  align-items: center;
+}
+
+/* Goal Details Expandable Bar */
+.goal-details-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: color-mix(in oklab, var(--sentinel-surface-2) 95%, transparent);
+  border-bottom: 1px solid var(--sentinel-border);
+  flex-shrink: 0;
+  animation: slideDown 150ms ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.goal-details-content {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.detail-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+}
+
+.detail-label {
+  color: var(--sentinel-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.detail-value {
+  font-weight: 600;
+  color: var(--sentinel-ink);
+}
+
+.orchestration-mini {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Main Content - Full Width (no sidebar) */
+.sentinel-main-full {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Chat View Full Height */
+.chat-view-full {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+}
+
+.chat-messages-full {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+}
+
+.chat-input-sticky {
+  flex-shrink: 0;
+  padding: 10px 16px 12px;
+  border-top: 1px solid var(--sentinel-border);
+  background: color-mix(in oklab, var(--vscode-editor-background) 98%, black);
+}
+
+/* Feature View (non-chat) */
+.feature-view {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* Preview Panel Right - Slide In */
+.preview-panel-right {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 45%;
+  max-width: 500px;
+  min-width: 320px;
+  border-left: 1px solid var(--sentinel-border);
+  background: color-mix(in oklab, var(--sentinel-surface) 96%, transparent);
+  display: flex;
+  flex-direction: column;
+  animation: slideInRight 200ms ease-out;
+  z-index: 10;
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.preview-panel-right .preview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--sentinel-border);
+  background: color-mix(in oklab, var(--sentinel-surface-2) 90%, transparent);
+  flex-shrink: 0;
+}
+
+/* Bottom Navigation - Chat First */
+.sentinel-bottom-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 44px;
+  padding: 0 8px;
+  background: color-mix(in oklab, var(--sentinel-surface) 96%, transparent);
+  border-top: 1px solid var(--sentinel-border);
+  flex-shrink: 0;
+}
+
+.nav-tabs {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.nav-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--sentinel-muted);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 140ms ease;
+  position: relative;
+}
+
+.nav-tab:hover {
+  background: color-mix(in oklab, var(--sentinel-accent-soft) 50%, transparent);
+  color: var(--sentinel-ink);
+}
+
+.nav-tab.active {
+  background: color-mix(in oklab, var(--sentinel-accent-soft) 70%, transparent);
+  color: var(--sentinel-ink);
+}
+
+.nav-tab .tab-badge {
+  min-width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  background: var(--sentinel-accent);
+  color: white;
+  font-size: 9px;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
+  padding: 0 4px;
+}
+
+.nav-divider {
+  width: 1px;
+  height: 20px;
+  background: var(--sentinel-border);
+  margin: 0 6px;
+}
+
+.nav-status {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.status-active {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--sentinel-success);
+}
+
+.status-info {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--sentinel-muted);
+}
+
+/* Old sentinel-layout for backwards compat */
 .sentinel-layout {
   display: flex;
   flex-direction: column;

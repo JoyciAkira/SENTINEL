@@ -20,6 +20,8 @@ import {
   AlertCircle,
   Maximize2,
   Minimize2,
+  ChevronUp,
+  ChevronDown,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -39,7 +41,7 @@ import { AdvancedSettings } from "./components/Settings/AdvancedSettings";
 import { LivePreviewPanel } from "./components/Preview/LivePreviewPanel";
 import { ErrorBoundary } from "./components/shared/ErrorBoundary";
 
-// Main App Component
+// Main App Component - Chat-First Layout
 export default function App() {
   const vscodeApi = useVSCodeAPI();
   useMCPMessages(vscodeApi);
@@ -50,12 +52,12 @@ export default function App() {
   const messages = useStore((s) => s.messages);
   const addMessage = useStore((s) => s.addMessage);
 
-  // Feature toggles
+  // Feature toggles - Chat-first: chat is default
   const [activeFeature, setActiveFeature] = useState<"chat" | "swarm" | "split" | "network" | "settings">("chat");
   const [showPreview, setShowPreview] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [orchestrationRunning, setOrchestrationRunning] = useState(false);
-  const [showFocusDetails, setShowFocusDetails] = useState(false);
+  const [showGoalDetails, setShowGoalDetails] = useState(false);
 
   useEffect(() => {
     vscodeApi.postMessage({ type: "webviewReady" });
@@ -122,53 +124,34 @@ export default function App() {
   };
 
   return (
-    <div className={cn("sentinel-ide", isFullscreen && "fullscreen")}>
-      {/* Top Bar - Minimal Professional */}
-      <header className="sentinel-topbar">
-        <div className="topbar-left">
-          <div className="sentinel-brand">
-            <Shield className="size-5 text-primary" />
-            <span className="brand-text">SENTINEL</span>
-          </div>
-          
-          {goals.length > 0 && showFocusDetails && (
-            <div className="goal-pill">
+    <div className={cn("sentinel-ide sentinel-ide--chat-first", isFullscreen && "fullscreen")}>
+      {/* Minimal Header - Brand + Status Only */}
+      <header className="sentinel-header-minimal">
+        <div className="header-brand">
+          <Shield className="size-4 text-primary" />
+          <span className="brand-text">SENTINEL</span>
+        </div>
+
+        <div className="header-center">
+          {goals.length > 0 && (
+            <button 
+              className="goal-pill-compact"
+              onClick={() => setShowGoalDetails(!showGoalDetails)}
+            >
               <Target className="size-3" />
-              <span className="truncate max-w-[200px]">{goals[goals.length - 1].description}</span>
-            </div>
+              <span className="truncate max-w-[180px]">{goals[goals.length - 1].description}</span>
+              {showGoalDetails ? <ChevronUp className="size-3" /> : <ChevronDown className="size-3" />}
+            </button>
           )}
         </div>
 
-        <div className="topbar-right">
-          <div className="orchestration-controls orchestration-controls--compact">
-            <Button
-              size="xs"
-              variant={orchestrationRunning ? "destructive" : "outline"}
-              onClick={toggleOrchestration}
-              disabled={!connected}
-              className="gap-1.5"
-            >
-              {orchestrationRunning ? (
-                <><Pause className="size-3" /> Pause</>
-              ) : (
-                <><Play className="size-3" /> Start</>
-              )}
-            </Button>
-
-            {orchestrationRunning && (
-              <Button size="xs" variant="outline" onClick={stopOrchestration} className="gap-1.5">
-                <Square className="size-3" /> Stop
-              </Button>
-            )}
-          </div>
-
-          <div className="status-indicators">
+        <div className="header-actions">
+          <div className="status-indicator">
             <div className={cn("status-dot", connected ? "connected" : "disconnected")} />
-            <span className="status-text">{connected ? "Connected" : "Offline"}</span>
           </div>
           
           {pendingFileApprovals > 0 && (
-            <Badge variant="destructive" className="gap-1">
+            <Badge variant="destructive" className="gap-1 text-[10px] px-2">
               <AlertCircle className="size-3" />
               {pendingFileApprovals}
             </Badge>
@@ -177,222 +160,223 @@ export default function App() {
           <Button
             size="icon"
             variant="ghost"
+            className="size-7"
             onClick={() => setIsFullscreen(!isFullscreen)}
           >
-            {isFullscreen ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
+            {isFullscreen ? <Minimize2 className="size-3.5" /> : <Maximize2 className="size-3.5" />}
           </Button>
         </div>
       </header>
 
-      <div className="sentinel-body">
-        {/* Left Sidebar - Icon Only */}
-        <aside className="feature-sidebar feature-sidebar--icon-only">
-          <button
-            className={cn("feature-toggle feature-toggle--icon-only", activeFeature === "chat" && "active")}
-            onClick={() => setActiveFeature("chat")}
-            title="Chat"
-            data-tooltip="Chat"
-          >
-            <MessageSquare className="size-4" />
-            {messages.length > 0 && <span className="badge">{messages.length}</span>}
-          </button>
+      {/* Goal Details Expandable */}
+      {showGoalDetails && goals.length > 0 && (
+        <div className="goal-details-bar">
+          <div className="goal-details-content">
+            <span className="detail-item">
+              <span className="detail-label">Alignment</span>
+              <span className="detail-value">{alignmentScore.toFixed(0)}%</span>
+            </span>
+            <span className="detail-item">
+              <span className="detail-label">Goals</span>
+              <span className="detail-value">{goals.length}</span>
+            </span>
+            <span className="detail-item">
+              <span className="detail-label">Pending</span>
+              <span className="detail-value">{pendingFileApprovals}</span>
+            </span>
+          </div>
+          <div className="orchestration-mini">
+            <Button
+              size="xs"
+              variant={orchestrationRunning ? "destructive" : "outline"}
+              onClick={toggleOrchestration}
+              disabled={!connected}
+              className="gap-1 h-6 text-[10px]"
+            >
+              {orchestrationRunning ? <><Pause className="size-2.5" /> Pause</> : <><Play className="size-2.5" /> Start</>}
+            </Button>
+            {orchestrationRunning && (
+              <Button size="xs" variant="outline" onClick={stopOrchestration} className="gap-1 h-6 text-[10px]">
+                <Square className="size-2.5" /> Stop
+              </Button>
+            )}
+          </div>
+        </div>
+      )}
 
-          <button
-            className={cn("feature-toggle feature-toggle--icon-only", activeFeature === "split" && "active")}
-            onClick={() => setActiveFeature("split")}
-            title="Split Agent"
-            data-tooltip="Split Agent"
-          >
-            <GitBranch className="size-4" />
-          </button>
-
-          <button
-            className={cn("feature-toggle feature-toggle--icon-only", activeFeature === "swarm" && "active")}
-            onClick={() => setActiveFeature("swarm")}
-            title="Swarm"
-            data-tooltip="Swarm"
-          >
-            <Bot className="size-4" />
-          </button>
-
-          <button
-            className={cn("feature-toggle feature-toggle--icon-only", activeFeature === "network" && "active")}
-            onClick={() => setActiveFeature("network")}
-            title="Network"
-            data-tooltip="Network"
-          >
-            <Network className="size-4" />
-          </button>
-
-          <div className="feature-divider" />
-
-          <button
-            className={cn("feature-toggle feature-toggle--icon-only", activeFeature === "settings" && "active")}
-            onClick={() => setActiveFeature("settings")}
-            title="Settings"
-            data-tooltip="Settings"
-          >
-            <Settings className="size-4" />
-          </button>
-
-          <button
-            className={cn("feature-toggle feature-toggle--icon-only", showPreview && "active")}
-            onClick={() => setShowPreview(!showPreview)}
-            title={showPreview ? "Hide Preview" : "Show Preview"}
-            data-tooltip={showPreview ? "Hide Preview" : "Show Preview"}
-          >
-            {showPreview ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-          </button>
-        </aside>
-
-        {/* Main Content Area */}
-        <main className={cn("main-content", showPreview && "with-preview")}>
-          {/* Chat View */}
-          {activeFeature === "chat" && (
-            <div className="chat-view">
-              <div className="chat-focus-header">
-                <div className="chat-focus-header__title">
-                  <span>{goals.length > 0 ? "Current objective" : "Start with an outcome"}</span>
-                  {goals.length > 0 ? (
-                    <strong className="truncate">{goals[goals.length - 1].description}</strong>
-                  ) : (
-                    <strong>Describe what you want to build</strong>
-                  )}
-                </div>
-                <div className="chat-focus-header__actions">
-                  <Button size="xs" variant="outline" onClick={() => setShowFocusDetails((prev) => !prev)}>
-                    {showFocusDetails ? "Hide details" : "Show details"}
-                  </Button>
-                </div>
-              </div>
-              {showFocusDetails && (
-                <div className="chat-focus-meta">
-                  <span>{connected ? "Connected" : "Offline"}</span>
-                  <span>Alignment {alignmentScore.toFixed(0)}%</span>
-                  <span>Goals {goals.length}</span>
-                  <span>Pending approvals {pendingFileApprovals}</span>
-                </div>
+      {/* Main Content - Full Width */}
+      <main className="sentinel-main-full">
+        {/* Chat View - Default */}
+        {activeFeature === "chat" && (
+          <div className="chat-view-full">
+            <div className="chat-messages-full">
+              {messages.length === 0 && (
+                <QuickPrompts
+                  goalsCount={goals.length}
+                  pendingApprovals={pendingFileApprovals}
+                  alignmentScore={alignmentScore}
+                  hasConversation={messages.length > 0}
+                />
               )}
-              <div className="chat-messages">
-                {messages.length === 0 && (
-                  <QuickPrompts
-                    goalsCount={goals.length}
-                    pendingApprovals={pendingFileApprovals}
-                    alignmentScore={alignmentScore}
-                    hasConversation={messages.length > 0}
-                  />
-                )}
-                <MessageList />
-              </div>
-              <div className="chat-input-area">
-                <ChatInput compact={false} clineMode={true} />
-              </div>
+              <MessageList />
             </div>
-          )}
-
-          {/* Split Agent View */}
-          {activeFeature === "split" && (
-            <div className="split-view">
-              <ErrorBoundary label="Forge">
-                <SplitAgentPanel />
-              </ErrorBoundary>
+            <div className="chat-input-sticky">
+              <ChatInput compact={false} clineMode={true} />
             </div>
-          )}
+          </div>
+        )}
 
-          {/* Swarm View */}
-          {activeFeature === "swarm" && (
-            <div className="swarm-view">
-              <SwarmPanel />
-            </div>
-          )}
+        {/* Split Agent View */}
+        {activeFeature === "split" && (
+          <div className="feature-view">
+            <ErrorBoundary label="Forge">
+              <SplitAgentPanel />
+            </ErrorBoundary>
+          </div>
+        )}
 
-          {/* Network View */}
-          {activeFeature === "network" && (
-            <div className="network-view">
-              <Tabs defaultValue="graph" className="h-full">
-                <TabsList className="m-4">
-                  <TabsTrigger value="graph">Communication Graph</TabsTrigger>
-                  <TabsTrigger value="topology">Topology</TabsTrigger>
-                </TabsList>
-                <TabsContent value="graph" className="h-[calc(100%-60px)] m-0">
-                  <ErrorBoundary label="Communication Graph">
-                    <CommunicationGraph height={600} />
-                  </ErrorBoundary>
-                </TabsContent>
-                <TabsContent value="topology" className="h-[calc(100%-60px)] m-0">
-                  <ErrorBoundary label="Topology Graph">
-                    <TopologyGraph height={540} />
-                  </ErrorBoundary>
-                </TabsContent>
-              </Tabs>
-            </div>
-          )}
+        {/* Swarm View */}
+        {activeFeature === "swarm" && (
+          <div className="feature-view">
+            <SwarmPanel />
+          </div>
+        )}
 
-          {/* Settings View */}
-          {activeFeature === "settings" && (
-            <div className="settings-view">
-              <Tabs defaultValue="providers" className="h-full">
-                <TabsList className="m-4">
-                  <TabsTrigger value="providers">Providers</TabsTrigger>
-                  <TabsTrigger value="alignment">Alignment</TabsTrigger>
-                  <TabsTrigger value="advanced">Advanced</TabsTrigger>
-                </TabsList>
-                <TabsContent value="providers" className="h-[calc(100%-60px)] overflow-auto p-4">
-                  <ProviderConfigPanel />
-                </TabsContent>
-                <TabsContent value="alignment" className="h-[calc(100%-60px)] p-4">
-                  <div className="alignment-dashboard">
-                    <h3>Alignment Score: {alignmentScore.toFixed(1)}%</h3>
-                    <div className="progress-bar large">
-                      <div className="progress-fill" style={{ width: `${alignmentScore}%` }} />
-                    </div>
+        {/* Network View */}
+        {activeFeature === "network" && (
+          <div className="feature-view">
+            <Tabs defaultValue="graph" className="h-full">
+              <TabsList className="m-4">
+                <TabsTrigger value="graph">Communication Graph</TabsTrigger>
+                <TabsTrigger value="topology">Topology</TabsTrigger>
+              </TabsList>
+              <TabsContent value="graph" className="h-[calc(100%-60px)] m-0">
+                <ErrorBoundary label="Communication Graph">
+                  <CommunicationGraph height={600} />
+                </ErrorBoundary>
+              </TabsContent>
+              <TabsContent value="topology" className="h-[calc(100%-60px)] m-0">
+                <ErrorBoundary label="Topology Graph">
+                  <TopologyGraph height={540} />
+                </ErrorBoundary>
+              </TabsContent>
+            </Tabs>
+          </div>
+        )}
+
+        {/* Settings View */}
+        {activeFeature === "settings" && (
+          <div className="feature-view">
+            <Tabs defaultValue="providers" className="h-full">
+              <TabsList className="m-4">
+                <TabsTrigger value="providers">Providers</TabsTrigger>
+                <TabsTrigger value="alignment">Alignment</TabsTrigger>
+                <TabsTrigger value="advanced">Advanced</TabsTrigger>
+              </TabsList>
+              <TabsContent value="providers" className="h-[calc(100%-60px)] overflow-auto p-4">
+                <ProviderConfigPanel />
+              </TabsContent>
+              <TabsContent value="alignment" className="h-[calc(100%-60px)] p-4">
+                <div className="alignment-dashboard">
+                  <h3>Alignment Score: {alignmentScore.toFixed(1)}%</h3>
+                  <div className="progress-bar large">
+                    <div className="progress-fill" style={{ width: `${alignmentScore}%` }} />
                   </div>
-                </TabsContent>
-                <TabsContent value="advanced" className="h-[calc(100%-60px)] overflow-auto">
-                  <ErrorBoundary label="Advanced Settings">
-                    <AdvancedSettings />
-                  </ErrorBoundary>
-                </TabsContent>
-              </Tabs>
-            </div>
-          )}
-        </main>
+                </div>
+              </TabsContent>
+              <TabsContent value="advanced" className="h-[calc(100%-60px)] overflow-auto">
+                <ErrorBoundary label="Advanced Settings">
+                  <AdvancedSettings />
+                </ErrorBoundary>
+              </TabsContent>
+            </Tabs>
+          </div>
+        )}
 
-        {/* Preview Panel — real dev server preview with viewport controls */}
+        {/* Preview Panel - Collapsible from right */}
         {showPreview && (
-          <aside className="preview-panel">
+          <aside className="preview-panel-right">
+            <div className="preview-header">
+              <span className="text-xs font-medium">Live Preview</span>
+              <Button size="icon" variant="ghost" className="size-6" onClick={() => setShowPreview(false)}>
+                <EyeOff className="size-3" />
+              </Button>
+            </div>
             <ErrorBoundary label="Live Preview">
               <LivePreviewPanel />
             </ErrorBoundary>
           </aside>
         )}
-      </div>
+      </main>
 
-      {/* Bottom Status Bar */}
-      <footer className="status-bar-bottom">
-        <div className="status-left">
-          <span className="status-item">
-            <Terminal className="size-3" />
-            Ready
-          </span>
+      {/* Bottom Navigation Tabs - Chat First */}
+      <nav className="sentinel-bottom-nav">
+        <div className="nav-tabs">
+          <button
+            className={cn("nav-tab", activeFeature === "chat" && "active")}
+            onClick={() => setActiveFeature("chat")}
+          >
+            <MessageSquare className="size-4" />
+            <span>Chat</span>
+            {messages.length > 0 && <span className="tab-badge">{messages.length}</span>}
+          </button>
+
+          <button
+            className={cn("nav-tab", activeFeature === "split" && "active")}
+            onClick={() => setActiveFeature("split")}
+          >
+            <GitBranch className="size-4" />
+            <span>Split</span>
+          </button>
+
+          <button
+            className={cn("nav-tab", activeFeature === "swarm" && "active")}
+            onClick={() => setActiveFeature("swarm")}
+          >
+            <Bot className="size-4" />
+            <span>Swarm</span>
+          </button>
+
+          <button
+            className={cn("nav-tab", activeFeature === "network" && "active")}
+            onClick={() => setActiveFeature("network")}
+          >
+            <Network className="size-4" />
+            <span>Network</span>
+          </button>
+
+          <div className="nav-divider" />
+
+          <button
+            className={cn("nav-tab", showPreview && "active")}
+            onClick={() => setShowPreview(!showPreview)}
+          >
+            {showPreview ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+            <span>Preview</span>
+          </button>
+
+          <button
+            className={cn("nav-tab", activeFeature === "settings" && "active")}
+            onClick={() => setActiveFeature("settings")}
+          >
+            <Settings className="size-4" />
+            <span>Settings</span>
+          </button>
+        </div>
+
+        <div className="nav-status">
           {orchestrationRunning && (
-            <span className="status-item active">
+            <span className="status-active">
               <Zap className="size-3 animate-pulse" />
-              Orchestration Active
+              Running
             </span>
           )}
-        </div>
-        <div className="status-right">
-          <span className="status-item">
-            <Bot className="size-3" />
-            {goals.length} Goals
-          </span>
-          <span className="status-item">
+          <span className="status-info">
             <Shield className="size-3" />
-            {alignmentScore.toFixed(0)}% Aligned
+            {alignmentScore.toFixed(0)}%
           </span>
         </div>
-      </footer>
+      </nav>
     </div>
   );
 }

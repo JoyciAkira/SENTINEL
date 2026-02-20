@@ -96,6 +96,18 @@
         "risk_flag=elevated",
         "governance_pending=none"
       ]
+    },
+    {
+      "id": "d99b9fa1-156a-42e1-8dbe-b94065fe9eb2",
+      "timestamp": 1771549060924,
+      "user": "procedi",
+      "assistant": "Errore durante l'inferenza dell'agente. Verifica le API key.",
+      "intent_summary": "procedi",
+      "evidence": [
+        "memory_hits=5",
+        "risk_flag=elevated",
+        "governance_pending=none"
+      ]
     }
   ]
 }
