@@ -1,0 +1,19 @@
+{
+  "constitutional_spec_hash": "f4d88a6b3f9675f4d9756fdea53a0dc862cf395b5ce6957cb00eed74209df875",
+  "counterfactual_hash": "af191d5223f376b1f69c8dd1d6aa101052f88a56c4e363b9e269abb8aac87c3a",
+  "evidence_hash": "cc644d5b328463be93c2e6111b4f218739437d68fc86426c3e3818aae3630796",
+  "memory_hit_ids": [
+    "b44be588-614c-499f-a622-96250da6d337",
+    "03a193b1-66d8-4b6f-a7c3-d9b1e73cfbe3",
+    "bd12807e-8e20-444f-afa0-e4bce4db895f",
+    "727ec1b4-2264-47aa-a78c-d2e57df0a371",
+    "3bb3df6d-d265-4e0e-9f9f-a2dac61737d7"
+  ],
+  "policy_simulation_hash": "8b436a5883fe2f3deafd52a8923a7b6985e0d2bea808a60cd582ce3f7e4e8ae1",
+  "response_hash": "7e768a70a332656ec762300bb184a1cba9f823d8caee2928d8e33bdb09355c97",
+  "strict_goal_execution": false,
+  "timestamp": 1771617398227,
+  "turn_id": "ef78065b-3645-46b2-b2e0-8f6c899a0ab0",
+  "user_message": "Tailwind CSS",
+  "version": 1
+}

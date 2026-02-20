@@ -1,0 +1,19 @@
+{
+  "constitutional_spec_hash": "d8ed02eb173341d9f62ee08666518eee47620720ecf067a9964fcd8ad532f9b5",
+  "counterfactual_hash": "af191d5223f376b1f69c8dd1d6aa101052f88a56c4e363b9e269abb8aac87c3a",
+  "evidence_hash": "cc644d5b328463be93c2e6111b4f218739437d68fc86426c3e3818aae3630796",
+  "memory_hit_ids": [
+    "03a193b1-66d8-4b6f-a7c3-d9b1e73cfbe3",
+    "727ec1b4-2264-47aa-a78c-d2e57df0a371",
+    "4921ef34-9b2d-4d59-bba6-46e578dbac8a",
+    "ea4b6755-e558-4848-a347-11bbb932ac7d",
+    "76cd543a-b765-46b1-bb54-a220a8e77dc9"
+  ],
+  "policy_simulation_hash": "8b436a5883fe2f3deafd52a8923a7b6985e0d2bea808a60cd582ce3f7e4e8ae1",
+  "response_hash": "427eec5f890799e9c35761ef7a30dfba36be543f643b464b57901e96513fb133",
+  "strict_goal_execution": false,
+  "timestamp": 1771617263735,
+  "turn_id": "3c8833cb-061d-4c5b-9c4b-84c4cd39ec5f",
+  "user_message": "Local Storage / Browser",
+  "version": 1
+}

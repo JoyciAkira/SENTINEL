@@ -1,5 +1,5 @@
 {
-  "edge_count": 124,
+  "edge_count": 147,
   "edges": [
     {
       "relation": "temporal",
@@ -386,6 +386,72 @@
       "weight": 1.0
     },
     {
+      "relation": "temporal",
+      "source": "049c2346-e3b7-49a2-a7e1-fdfe0d45d494",
+      "target": "3bb3df6d-d265-4e0e-9f9f-a2dac61737d7",
+      "weight": 1.0
+    },
+    {
+      "relation": "temporal",
+      "source": "3bb3df6d-d265-4e0e-9f9f-a2dac61737d7",
+      "target": "727ec1b4-2264-47aa-a78c-d2e57df0a371",
+      "weight": 1.0
+    },
+    {
+      "relation": "temporal",
+      "source": "727ec1b4-2264-47aa-a78c-d2e57df0a371",
+      "target": "f93135b4-96b3-41e7-b1ec-bc0c072c589a",
+      "weight": 1.0
+    },
+    {
+      "relation": "temporal",
+      "source": "f93135b4-96b3-41e7-b1ec-bc0c072c589a",
+      "target": "53192dd5-4945-4ab7-8edd-00bfe5bf6b31",
+      "weight": 1.0
+    },
+    {
+      "relation": "temporal",
+      "source": "53192dd5-4945-4ab7-8edd-00bfe5bf6b31",
+      "target": "787c1927-8287-4297-9285-63b3507b955e",
+      "weight": 1.0
+    },
+    {
+      "relation": "temporal",
+      "source": "787c1927-8287-4297-9285-63b3507b955e",
+      "target": "bd12807e-8e20-444f-afa0-e4bce4db895f",
+      "weight": 1.0
+    },
+    {
+      "relation": "temporal",
+      "source": "bd12807e-8e20-444f-afa0-e4bce4db895f",
+      "target": "03a193b1-66d8-4b6f-a7c3-d9b1e73cfbe3",
+      "weight": 1.0
+    },
+    {
+      "relation": "temporal",
+      "source": "03a193b1-66d8-4b6f-a7c3-d9b1e73cfbe3",
+      "target": "3c8833cb-061d-4c5b-9c4b-84c4cd39ec5f",
+      "weight": 1.0
+    },
+    {
+      "relation": "temporal",
+      "source": "3c8833cb-061d-4c5b-9c4b-84c4cd39ec5f",
+      "target": "753484bb-24fe-4dc7-8981-ddb76c34fe4e",
+      "weight": 1.0
+    },
+    {
+      "relation": "temporal",
+      "source": "753484bb-24fe-4dc7-8981-ddb76c34fe4e",
+      "target": "b44be588-614c-499f-a622-96250da6d337",
+      "weight": 1.0
+    },
+    {
+      "relation": "temporal",
+      "source": "b44be588-614c-499f-a622-96250da6d337",
+      "target": "ef78065b-3645-46b2-b2e0-8f6c899a0ab0",
+      "weight": 1.0
+    },
+    {
       "relation": "semantic_overlap",
       "source": "0c23de9d-b170-466b-bd0e-83dc287936b6",
       "target": "086e9969-7540-4c91-92bd-4976a7f6fb8c",
@@ -729,6 +795,30 @@
     },
     {
       "relation": "semantic_overlap",
+      "source": "9126a0ac-ccdc-4d7b-9e51-31a1c5eb2e9e",
+      "target": "3bb3df6d-d265-4e0e-9f9f-a2dac61737d7",
+      "weight": 6.0
+    },
+    {
+      "relation": "semantic_overlap",
+      "source": "9126a0ac-ccdc-4d7b-9e51-31a1c5eb2e9e",
+      "target": "bd12807e-8e20-444f-afa0-e4bce4db895f",
+      "weight": 6.0
+    },
+    {
+      "relation": "semantic_overlap",
+      "source": "2ac09fe7-ebcb-4213-a219-4cdf116be69b",
+      "target": "3c8833cb-061d-4c5b-9c4b-84c4cd39ec5f",
+      "weight": 3.0
+    },
+    {
+      "relation": "semantic_overlap",
+      "source": "ea4b6755-e558-4848-a347-11bbb932ac7d",
+      "target": "753484bb-24fe-4dc7-8981-ddb76c34fe4e",
+      "weight": 2.0
+    },
+    {
+      "relation": "semantic_overlap",
       "source": "f0d75364-084f-45aa-952b-27e444120943",
       "target": "3e0fae26-bbca-4fe5-a70c-78fffb07ad4b",
       "weight": 3.0
@@ -741,14 +831,62 @@
     },
     {
       "relation": "semantic_overlap",
+      "source": "f0d75364-084f-45aa-952b-27e444120943",
+      "target": "3bb3df6d-d265-4e0e-9f9f-a2dac61737d7",
+      "weight": 3.0
+    },
+    {
+      "relation": "semantic_overlap",
+      "source": "f0d75364-084f-45aa-952b-27e444120943",
+      "target": "bd12807e-8e20-444f-afa0-e4bce4db895f",
+      "weight": 3.0
+    },
+    {
+      "relation": "semantic_overlap",
       "source": "3e0fae26-bbca-4fe5-a70c-78fffb07ad4b",
       "target": "049c2346-e3b7-49a2-a7e1-fdfe0d45d494",
       "weight": 6.0
+    },
+    {
+      "relation": "semantic_overlap",
+      "source": "3e0fae26-bbca-4fe5-a70c-78fffb07ad4b",
+      "target": "3bb3df6d-d265-4e0e-9f9f-a2dac61737d7",
+      "weight": 6.0
+    },
+    {
+      "relation": "semantic_overlap",
+      "source": "3e0fae26-bbca-4fe5-a70c-78fffb07ad4b",
+      "target": "bd12807e-8e20-444f-afa0-e4bce4db895f",
+      "weight": 6.0
+    },
+    {
+      "relation": "semantic_overlap",
+      "source": "049c2346-e3b7-49a2-a7e1-fdfe0d45d494",
+      "target": "3bb3df6d-d265-4e0e-9f9f-a2dac61737d7",
+      "weight": 6.0
+    },
+    {
+      "relation": "semantic_overlap",
+      "source": "049c2346-e3b7-49a2-a7e1-fdfe0d45d494",
+      "target": "bd12807e-8e20-444f-afa0-e4bce4db895f",
+      "weight": 6.0
+    },
+    {
+      "relation": "semantic_overlap",
+      "source": "3bb3df6d-d265-4e0e-9f9f-a2dac61737d7",
+      "target": "bd12807e-8e20-444f-afa0-e4bce4db895f",
+      "weight": 6.0
+    },
+    {
+      "relation": "semantic_overlap",
+      "source": "727ec1b4-2264-47aa-a78c-d2e57df0a371",
+      "target": "03a193b1-66d8-4b6f-a7c3-d9b1e73cfbe3",
+      "weight": 2.0
     }
   ],
-  "generated_at": 1771614350220,
-  "graph_hash": "0e3a02991cca9aa7f6dba9166fd8d42ba424b86f465951c8bafd92c20ce9723a",
-  "node_count": 65,
+  "generated_at": 1771617398235,
+  "graph_hash": "891ef917c477f4e380a1acc22dab08ebc01795cb05862e1f6a3d4853fc684de8",
+  "node_count": 76,
   "nodes": [
     {
       "id": "7944bee6-5adf-489e-9ca6-cc5fb511b8ba",
@@ -1204,9 +1342,86 @@
       "lamport": 1771614350212,
       "provenance_hash": "625f28e30600539f7012e9a9d08e1c0d90b1c4a820557cecaf70d808240b8938",
       "timestamp": 1771614350212
+    },
+    {
+      "id": "3bb3df6d-d265-4e0e-9f9f-a2dac61737d7",
+      "intent_summary": "crea una todo list app completa",
+      "lamport": 1771615631101,
+      "provenance_hash": "6040ebaa426314e4675ba86ce59a4f650c03cbbd0c7f011d421243bbdc2a0ea7",
+      "timestamp": 1771615631101
+    },
+    {
+      "id": "727ec1b4-2264-47aa-a78c-d2e57df0a371",
+      "intent_summary": "Web App Moderna",
+      "lamport": 1771616810336,
+      "provenance_hash": "e7da5a2e6061990c3d05e231b6d3adfce5aa7c07915500f66748dfe5ce7cf312",
+      "timestamp": 1771616810336
+    },
+    {
+      "id": "f93135b4-96b3-41e7-b1ec-bc0c072c589a",
+      "intent_summary": "Next.js + LocalStorage",
+      "lamport": 1771616837405,
+      "provenance_hash": "78ad71a02a057f375e14be10381ceab23b7cb0ed9dbc44e14808de3be6b9e886",
+      "timestamp": 1771616837405
+    },
+    {
+      "id": "53192dd5-4945-4ab7-8edd-00bfe5bf6b31",
+      "intent_summary": "**State Management (Zustand)**",
+      "lamport": 1771616866630,
+      "provenance_hash": "f319e9a9861a4c778afbf7039030a8c6c1645e4127e75304e04c7f1c42428169",
+      "timestamp": 1771616866630
+    },
+    {
+      "id": "787c1927-8287-4297-9285-63b3507b955e",
+      "intent_summary": "Store Singolo Persistente",
+      "lamport": 1771616888528,
+      "provenance_hash": "4801c67549f814390b089269089e71a824e6dc7044f6a2cb3f84d282987d3e2c",
+      "timestamp": 1771616888528
+    },
+    {
+      "id": "bd12807e-8e20-444f-afa0-e4bce4db895f",
+      "intent_summary": "crea una todo list app completa",
+      "lamport": 1771617109867,
+      "provenance_hash": "812efc5305ab160285e3b60f2562ca542e11f4b5c45d962192069f76f67bc4b6",
+      "timestamp": 1771617109867
+    },
+    {
+      "id": "03a193b1-66d8-4b6f-a7c3-d9b1e73cfbe3",
+      "intent_summary": "**Web App Full-Stack (Next.js + Tailwind)**",
+      "lamport": 1771617181585,
+      "provenance_hash": "30755dc4460c2122564bcad7bfba82665939e102ac8bae363d73cc6600ee738d",
+      "timestamp": 1771617181585
+    },
+    {
+      "id": "3c8833cb-061d-4c5b-9c4b-84c4cd39ec5f",
+      "intent_summary": "Local Storage / Browser",
+      "lamport": 1771617263735,
+      "provenance_hash": "ecd64a8855ca70a0e70e0603a13a96959bdaa0959090becb62b9b35b81a8ca6a",
+      "timestamp": 1771617263735
+    },
+    {
+      "id": "753484bb-24fe-4dc7-8981-ddb76c34fe4e",
+      "intent_summary": "Custom Hook `useLocalStorage`",
+      "lamport": 1771617299931,
+      "provenance_hash": "ae49e84f354138de2aec3f4ae1edc8da89c26778ff4c62167ce2b3de938ea475",
+      "timestamp": 1771617299931
+    },
+    {
+      "id": "b44be588-614c-499f-a622-96250da6d337",
+      "intent_summary": "**Client-Side Pure (React SPA)**",
+      "lamport": 1771617343034,
+      "provenance_hash": "734c8d286f3592704683ec83672a9819615a2f40a0b95535aeb43786ddcff14d",
+      "timestamp": 1771617343034
+    },
+    {
+      "id": "ef78065b-3645-46b2-b2e0-8f6c899a0ab0",
+      "intent_summary": "Tailwind CSS",
+      "lamport": 1771617398227,
+      "provenance_hash": "51fe868891130bc4fd67818c4ba79288a8ae4b9d674c20e7665eae8a9fc21d45",
+      "timestamp": 1771617398227
     }
   ],
-  "signature": "7ee12160290b1bce6462a67e6f1ebd2873eab7c075f718692de6aef449ae222ab7413e8476ef36f182ed3862c51fd94f0d08cc5709d1366e0dd7ab16312bbb08",
+  "signature": "b59fc91f1ad54a47a5c5d4d6c7f4fbb95c313d4ef0539b991081778aac8683ad95538d8e83aae430f7c28075bf3d6640e80bb6f977bf3def1f4b18f8bf25e20c",
   "signature_scheme": "ed25519-blake3-v1",
   "signer_public_key": "eab928f8a4fd290d803031017a37b8585877d3f934e98bb0e0422cd4c39ab983",
   "version": 1

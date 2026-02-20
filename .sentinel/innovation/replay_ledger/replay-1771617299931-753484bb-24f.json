@@ -1,0 +1,19 @@
+{
+  "constitutional_spec_hash": "25a4a74250103a375f7e924382389854c625454fad8a12e736795cc0f02111aa",
+  "counterfactual_hash": "af191d5223f376b1f69c8dd1d6aa101052f88a56c4e363b9e269abb8aac87c3a",
+  "evidence_hash": "cc644d5b328463be93c2e6111b4f218739437d68fc86426c3e3818aae3630796",
+  "memory_hit_ids": [
+    "3c8833cb-061d-4c5b-9c4b-84c4cd39ec5f",
+    "ea4b6755-e558-4848-a347-11bbb932ac7d",
+    "b7f67d58-c375-4045-9d74-0eec1215bc5b",
+    "2ac09fe7-ebcb-4213-a219-4cdf116be69b",
+    "4921ef34-9b2d-4d59-bba6-46e578dbac8a"
+  ],
+  "policy_simulation_hash": "8b436a5883fe2f3deafd52a8923a7b6985e0d2bea808a60cd582ce3f7e4e8ae1",
+  "response_hash": "41a500490c9294f435d60c66cf605c313cba91a187a12a32d198753ebdfe582e",
+  "strict_goal_execution": false,
+  "timestamp": 1771617299931,
+  "turn_id": "753484bb-24fe-4dc7-8981-ddb76c34fe4e",
+  "user_message": "Custom Hook `useLocalStorage`",
+  "version": 1
+}
